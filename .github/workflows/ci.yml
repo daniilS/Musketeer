@@ -1,0 +1,35 @@
+# https://docs.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions
+name: Python CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Resolve dependencies
+        run: |
+                sudo apt-get install tcl-dev tk-dev python-tk python3-tk xvfb
+                python -m pip install --upgrade pip
+                pip install setuptools wheel pytest
+                pip install .
+
+      - name: Test
+        run: |
+                Xvfb :99 &
+                export DISPLAY=:99
+                pytest musketeer
+
