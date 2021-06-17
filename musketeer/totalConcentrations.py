@@ -65,68 +65,65 @@ class VolumesTable(table.Table):
         self.label(3, 1, "Addition title:")
 
         for stock in range(self.dataColumns):
-            self.button(2, stock + 2, "Copy first", self.copyFirst(stock))
             self.button(
-                3, stock + 2, "Copy from titles", self.copyFromTitles(stock)
+                2, stock + 2, "Copy first",
+                lambda stock=stock: self.copyFirst(stock)
+            )
+            self.button(
+                3, stock + 2, "Copy from titles",
+                lambda stock=stock: self.copyFromTitles(stock)
             )
 
         for name in titration.additionTitles:
             self.addRow(name)
 
     def copyFirst(self, dataColumn):
-        def _copyFirst():
-            rows, _ = self.data.shape
-            first = self.data[0, dataColumn + 2].get()
-            for row in range(rows):
-                if self.data[row, dataColumn + 2] is not None:
-                    self.data[row, dataColumn + 2].set(first)
-        return _copyFirst
+        rows, _ = self.data.shape
+        first = self.data[0, dataColumn + 2].get()
+        for row in range(rows):
+            if self.data[row, dataColumn + 2] is not None:
+                self.data[row, dataColumn + 2].set(first)
 
     def copyFromTitles(self, dataColumn):
-        def _copyFromTitles():
-            rows, _ = self.data.shape
-            for row in range(rows):
-                if self.data[row, dataColumn + 2] is not None:
-                    title = self.data[row, 1].get()
-                    volume = getVolumeFromString(title, self.unit.get())
-                    if volume is not None:
-                        self.data[row, dataColumn + 2].set(volume)
-        return _copyFromTitles
+        rows, _ = self.data.shape
+        for row in range(rows):
+            if self.data[row, dataColumn + 2] is not None:
+                title = self.data[row, 1].get()
+                volume = getVolumeFromString(title, self.unit.get())
+                if volume is not None:
+                    self.data[row, dataColumn + 2].set(volume)
 
 
 def saveData(stockTable, volumesTable, titration, popup):
-    def _saveData():
-        stockConcs = []
-        for row in stockTable.data:
-            if row[0] is None:
-                continue
-            rowData = []
-            for stock in range(stockTable.dataColumns):
-                rowData.append(row[stock + 2].get())
-            stockConcs.append(rowData)
-        stockConcs = np.array(stockConcs, dtype=float) * prefixes[
-            stockTable.unit.get().strip("M")
-        ]
+    stockConcs = []
+    for row in stockTable.data:
+        if row[0] is None:
+            continue
+        rowData = []
+        for stock in range(stockTable.dataColumns):
+            rowData.append(row[stock + 2].get())
+        stockConcs.append(rowData)
+    stockConcs = np.array(stockConcs, dtype=float) * prefixes[
+        stockTable.unit.get().strip("M")
+    ]
 
-        volumes = []
-        for row in volumesTable.data:
-            if row[0] is None:
-                continue
-            rowData = []
-            for stock in range(volumesTable.dataColumns):
-                rowData.append(row[stock + 2].get())
-            volumes.append(rowData)
-        volumes = np.array(volumes, dtype=float) * prefixes[
-            volumesTable.unit.get().strip("L")
-        ]
+    volumes = []
+    for row in volumesTable.data:
+        if row[0] is None:
+            continue
+        rowData = []
+        for stock in range(volumesTable.dataColumns):
+            rowData.append(row[stock + 2].get())
+        volumes.append(rowData)
+    volumes = np.array(volumes, dtype=float) * prefixes[
+        volumesTable.unit.get().strip("L")
+    ]
 
-        moles = volumes @ stockConcs.T
-        totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
-        titration.totalConcs = moles / totalVolumes
+    moles = volumes @ stockConcs.T
+    totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
+    titration.totalConcs = moles / totalVolumes
 
-        popup.destroy()
-
-    return _saveData
+    popup.destroy()
 
 
 class GetTotalConcsFromVolumes():
@@ -149,9 +146,11 @@ class GetTotalConcsFromVolumes():
         volumesTable.pack(expand=True, fill="both")
         buttonFrame = ttk.Frame(innerFrame, borderwidth=5)
         buttonFrame.pack(expand=True, fill="both")
-        saveButton = ttk.Button(buttonFrame, text="Save", command=saveData(
-            stockTable, volumesTable, titration, popup
-        ))
+        saveButton = ttk.Button(
+            buttonFrame, text="Save", command=lambda: saveData(
+                stockTable, volumesTable, titration, popup
+            )
+        )
         saveButton.pack()
 
         popup.wait_window(popup)

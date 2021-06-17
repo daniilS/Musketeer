@@ -71,7 +71,9 @@ class Table(ttk.Frame):
         gridRow = row + self.headerRows
         rowData = []
         rowData.append(
-            self.button(gridRow, 0, "Delete", self.deleteRowFactory(row))
+            self.button(
+                gridRow, 0, "Delete", lambda row=row: self.deleteRow(row)
+            )
         )
         rowData.append(self.entry(gridRow, 1, firstEntry))
         for column in range(self.dataColumns):
@@ -79,9 +81,7 @@ class Table(ttk.Frame):
 
         self.data = np.vstack((self.data, rowData))
 
-    def deleteRowFactory(self, row):
-        def deleteRow():
-            for element in self.data[row]:
-                element.destroy()
-            self.data[row] = np.full(self.data.shape[1], None)
-        return deleteRow
+    def deleteRow(self, row):
+        for element in self.data[row]:
+            element.destroy()
+        self.data[row] = np.full(self.data.shape[1], None)
