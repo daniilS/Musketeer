@@ -1,5 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+from decimal import Decimal
 
 import re
 import numpy as np
@@ -8,13 +9,15 @@ from . import moduleFrame
 from . import table
 from .scrolledFrame import ScrolledFrame
 
-prefixes = {
-    "": 1,
-    "m": 1e-3,
-    "u": 1e-6,
-    "μ": 1e-6,
-    "n": 1e-9
+prefixesDecimal = {
+    "": Decimal(1),
+    "m": Decimal(1e-3),
+    "u": Decimal(1e-6),
+    "μ": Decimal(1e-6),
+    "n": Decimal(1e-9)
 }
+
+prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 
 def getVolumeFromString(string, unit="L"):
@@ -22,8 +25,11 @@ def getVolumeFromString(string, unit="L"):
     if not searchResult:
         return None
     volume, prefix = searchResult.group(1, 2)
-    volume = float(volume)
-    return volume * prefixes[prefix] / prefixes[unit.strip("L")]
+    volume = Decimal(volume)
+    convertedVolume = float(
+        volume * prefixesDecimal[prefix] / prefixesDecimal[unit.strip("L")]
+    )
+    return f"{convertedVolume:g}"  # strip trailing zeroes
 
 
 class StockTable(table.Table):
