@@ -7,6 +7,7 @@ class GetSignalVarsCustom():
     def __init__(self, titration):
         self.titration = titration
         self.titration.signalsMatrix = self.signalsMatrix
+        self.titration.signalNames = self.signalNames
 
     def __call__(self, freeConcs, boundConcs):
         allConcs = np.concatenate((freeConcs, boundConcs), 1)
@@ -20,6 +21,13 @@ class GetSignalVarsAll():
     def __init__(self, titration):
         self.titration = titration
         self.titration.signalsMatrix = self.signalsMatrix
+        self.titration.signalNames = self.signalNames
+
+    @property
+    def signalNames(self):
+        return np.concatenate(
+            (self.titration.freeNames, self.titration.boundNames)
+        )
 
     @property
     def signalsMatrix(self):
@@ -32,15 +40,25 @@ class GetSignalVarsAll():
 
 
 class GetSignalVarsHost(GetSignalVarsCustom):
-    @property
-    def signalsMatrix(self):
+    def filter(self):
         hostFree = np.zeros(self.titration.freeCount)
         hostFree[0] = 1
 
         hostBound = self.titration.stoichiometries[:, 0]\
             .astype(bool)\
             .astype(int)
-        signalsMatrix = np.diag(np.concatenate((hostFree, hostBound)))
+        return np.concatenate((hostFree, hostBound))
+
+    @property
+    def signalNames(self):
+        allNames = np.concatenate(
+            (self.titration.freeNames, self.titration.boundNames)
+        )
+        return allNames[self.filter().astype(bool)]
+
+    @property
+    def signalsMatrix(self):
+        signalsMatrix = np.diag(self.filter())
         emptyRows = np.all(signalsMatrix == 0, axis=1)
         return signalsMatrix[~emptyRows]
 

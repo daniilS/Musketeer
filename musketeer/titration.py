@@ -106,7 +106,7 @@ class Titration():
         fig, (ax) = plt.subplots()
 
         spectra = self.lastFitResult
-        names = np.concatenate((self.freeNames, self.boundNames))
+        names = self.signalNames
         wavelengths = self.signalTitles
         for spectrum, name in zip(spectra, names):
             plt.plot(wavelengths, spectrum, label=name)
