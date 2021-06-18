@@ -125,6 +125,8 @@ class Titration():
         ax.set_ylabel("ε / $M^{-1} cm^{-1}$")
         ax.legend()
 
+        fig.tight_layout()
+
         canvas = FigureCanvasTkAgg(fig, master=self.fitFrame)
         canvas.draw()
         canvas.get_tk_widget().grid(row=0, column=0, sticky="")
@@ -167,6 +169,7 @@ class Titration():
         ax.set_xlabel(f"[{self.freeNames[1]}] / M")
         ax.set_ylabel("Δδ / ppm")
         ax.legend()
+        fig.tight_layout()
 
         canvas = FigureCanvasTkAgg(fig, master=self.fitFrame)
         canvas.draw()
@@ -256,6 +259,7 @@ class Titration():
         ax.set_xlabel("λ (nm)")
         ax.set_ylabel("Abs (AU)")
 
+        fig.tight_layout()
         fig.canvas.draw_idle()
 
     def updateWLRange(self):
