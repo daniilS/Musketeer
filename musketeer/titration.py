@@ -1,3 +1,4 @@
+import tkinter as tk
 import tkinter.ttk as ttk
 
 import numpy as np
@@ -60,6 +61,14 @@ class Titration():
         # TODO: add support for unknown total concentrations
         return 0
 
+    @property
+    def processedData(self):
+        return self.rawData[self.rowFilter, :][:, self.columnFilter]
+
+    @property
+    def processedSignalTitles(self):
+        return self.signalTitles[self.columnFilter]
+
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[:self.kVarsCount]
@@ -107,7 +116,7 @@ class Titration():
 
         spectra = self.lastFitResult
         names = self.signalNames
-        wavelengths = self.signalTitles
+        wavelengths = self.processedSignalTitles
         for spectrum, name in zip(spectra, names):
             plt.plot(wavelengths, spectrum, label=name)
 
@@ -179,39 +188,82 @@ class Titration():
             self.plotSpectra(K)
         else:
             self.plotSpectraDiscrete(K)
-        print(self.signalTitles)
-        print(np.around(self.lastFitResult, 2))
-        print("Movement:")
-        print(np.around(self.lastFitResult[1] - self.lastFitResult[0], 2))
 
-    def drawSpectra(self):
+    def createSpectraFrame(self):
+        # TODO: make this a class
         self.spectraFrame = ttk.Frame(self.notebook)
         self.notebook.add(self.spectraFrame, text="Input spectra")
 
-        spectraColors =\
-            ["black"] + ["#80808080"]*(self.numAdditions-2) + ["tab:red"]
-        colorCycler = cycler(color=spectraColors)
+        rangeSelection = ttk.Frame(self.spectraFrame)
+        rangeSelection.grid(row=0, column=0, sticky="")
 
-        fig, (ax) = plt.subplots()
-        ax.set_prop_cycle(colorCycler)
-        ax.plot(self.signalTitles, self.processedData.T)
-        # TODO: fix hardcoding
-        ax.set_xlabel("λ (nm)")
-        ax.set_ylabel("Abs (AU)")
+        ttk.Label(rangeSelection, text="Wavelength range:").pack(side="left")
 
-        canvas = FigureCanvasTkAgg(fig, master=self.spectraFrame)
+        minWL = int(self.signalTitles.min())
+        maxWL = int(self.signalTitles.max())
+        self.spectraFrame.fromVar = tk.IntVar(self.spectraFrame, minWL)
+        self.spectraFrame.toVar = tk.IntVar(self.spectraFrame, maxWL)
+
+        ttk.Spinbox(
+            rangeSelection, textvariable=self.spectraFrame.fromVar,
+            from_=minWL, to=maxWL, width=5
+            ).pack(padx=padding, side="left")
+
+        ttk.Label(rangeSelection, text="to").pack(side="left")
+
+        ttk.Spinbox(
+            rangeSelection, textvariable=self.spectraFrame.toVar,
+            from_=minWL, to=maxWL, width=5
+            ).pack(padx=padding, side="left")
+
+        self.spectraFrame.fig, (self.spectraFrame.ax) = plt.subplots()
+
+        ttk.Button(
+            rangeSelection, text="Update", command=self.updateWLRange
+        ).pack(side="left")
+
+        canvas = FigureCanvasTkAgg(
+            self.spectraFrame.fig, master=self.spectraFrame
+        )
         canvas.draw()
-        canvas.get_tk_widget().grid(row=0, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
         toolbar = NavigationToolbar2Tk(
             canvas, self.spectraFrame, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="")
 
         self.spectraFrame.rowconfigure(0, weight=1)
         self.spectraFrame.rowconfigure(1, weight=1)
+        self.spectraFrame.rowconfigure(2, weight=1)
         self.spectraFrame.columnconfigure(0, weight=1)
+
+    def drawSpectraFrame(self):
+        ax = self.spectraFrame.ax
+        fig = self.spectraFrame.fig
+
+        ax.cla()
+
+        spectraColors =\
+            ["black"] + ["#80808080"]*(self.numAdditions-2) + ["tab:red"]
+        colorCycler = cycler(color=spectraColors)
+        ax.set_prop_cycle(colorCycler)
+
+        ax.plot(self.processedSignalTitles, self.processedData.T)
+
+        # TODO: fix hardcoding
+        ax.set_xlabel("λ (nm)")
+        ax.set_ylabel("Abs (AU)")
+
+        fig.canvas.draw_idle()
+
+    def updateWLRange(self):
+        from_ = self.spectraFrame.fromVar.get()
+        to = self.spectraFrame.toVar.get()
+        self.columnFilter = (self.signalTitles.astype(int) >= from_) & \
+            (self.signalTitles.astype(int) <= to)
+        self.drawSpectraFrame()
 
     def populateFrame(self):
         if False:
@@ -232,7 +284,8 @@ class Titration():
         self.notebook = ttk.Notebook(self.frame, padding=padding)
         self.notebook.grid(column=1, row=0, sticky="nesw")
         if self.continuous:
-            self.drawSpectra()
+            self.createSpectraFrame()
+            self.drawSpectraFrame()
         self.frame.rowconfigure(0, weight=1)
         self.frame.columnconfigure(1, weight=4)
 

@@ -129,7 +129,8 @@ def readUV(filePath):
     titration.signalTitles = np.array(wavelengths, dtype=np.float)
     # transpose data so that the column is the wavelength
     titration.rawData = np.array(absorbances, dtype=np.float).T
-    titration.processedData = np.copy(titration.rawData)
+    titration.rowFilter = np.ones(titration.rawData.shape[0], dtype=bool)
+    titration.columnFilter = np.ones(titration.rawData.shape[1], dtype=bool)
 
     return [titration]
 
@@ -249,7 +250,6 @@ def readNMR(filePath):
 
         def save():
             titration.rawData = np.array(signals, dtype=np.float).T
-            titration.processedData = np.copy(titration.rawData)
             titration.signalTitles = np.array(titles)
             popup.destroy()
 

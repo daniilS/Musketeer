@@ -79,7 +79,8 @@ class VolumesTable(table.Table):
 
     def copyFirst(self, dataColumn):
         rows, _ = self.data.shape
-        first = self.data[0, dataColumn + 2].get()
+        cells = self.data[:, dataColumn + 2]
+        first = next(cell for cell in cells if cell is not None).get()
         for row in range(rows):
             if self.data[row, dataColumn + 2] is not None:
                 self.data[row, dataColumn + 2].set(first)
@@ -108,9 +109,11 @@ def saveData(stockTable, volumesTable, titration, popup):
     ]
 
     volumes = []
-    for row in volumesTable.data:
+    for i, row in enumerate(volumesTable.data):
         if row[0] is None:
+            titration.rowFilter[i] = False
             continue
+        titration.rowFilter[i] = True
         rowData = []
         for stock in range(volumesTable.dataColumns):
             rowData.append(row[stock + 2].get())
@@ -123,6 +126,7 @@ def saveData(stockTable, volumesTable, titration, popup):
     totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
     titration.totalConcs = moles / totalVolumes
 
+    titration.drawSpectraFrame()
     popup.destroy()
 
 
