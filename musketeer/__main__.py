@@ -16,7 +16,7 @@ try:
     root.state("zoomed")
 except tk.TclError:
     # X11
-    root.state("-zoomed")
+    root.attributes("-zoomed", True)
 root.title("Musketeer")
 
 try:
