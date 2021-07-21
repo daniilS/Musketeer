@@ -4,6 +4,7 @@ import tkinter.ttk as ttk
 import numpy as np
 from scipy.optimize import minimize
 from scipy.interpolate import interp1d
+from scipy.signal import find_peaks
 from cycler import cycler
 
 from . import equilibriumConstants
@@ -141,6 +142,77 @@ class Titration():
         self.fitFrame.rowconfigure(1, weight=1)
         self.fitFrame.columnconfigure(0, weight=1)
 
+        self.plotSpectraDiscreteFromContinuous(K)
+
+    def plotSpectraDiscreteFromContinuous(self, K):
+        self.dfcFrame = ttk.Frame(self.notebook)
+        self.notebook.add(
+            self.dfcFrame, text="Fitted spectra (select wavelengths)"
+        )
+        fig, (ax) = plt.subplots()
+
+        # get the total movement at each wavelength
+        movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
+        # get the largest difference from the first point at each wavelength
+        diff = self.processedData - self.processedData[0]
+        maxDiff = np.max(abs(diff), axis=0)
+        # find the wavelengths with the largest total movement
+        peaksIndices, peakProperties = find_peaks(movement, prominence=0)
+        prominences = peakProperties["prominences"]
+        # select the four most prominent peaks
+        largestFilter = prominences.argsort()[-4:]
+        largestPeaksIndices = np.sort(peaksIndices[largestFilter])
+        # discard peaks that don't move far enough away from the baseline
+        # compared to the other peaks
+        peaksDiff = maxDiff[largestPeaksIndices]
+        threshold = np.max(peaksDiff) / 10
+        filteredPeaks = largestPeaksIndices[peaksDiff >= threshold]
+
+        curves = self.processedData.T[filteredPeaks]
+        fittedCurves = self.lastFittedCurves.T[filteredPeaks]
+        names = np.char.add(
+            # TODO: move rounding to titrationReader
+            self.processedSignalTitles[filteredPeaks]
+            .round().astype(int).astype(str),
+            " nm"
+        )
+        guestConcs = self.totalConcs.T[1]
+        # TODO: move to separate function, also use from plotSpectraDiscrete
+        for curve, fittedCurve, name in zip(curves, fittedCurves, names):
+            fittedZero = fittedCurve[0]
+            curve -= fittedZero
+            fittedCurve -= fittedZero
+            plt.scatter(guestConcs, curve)
+
+            smoothX = np.linspace(guestConcs.min(), guestConcs.max(), 100)
+            # make sure the smooth curve actually goes through all the fitted
+            # points
+            smoothX = np.unique(np.concatenate((smoothX, guestConcs)))
+
+            spl = interp1d(guestConcs, fittedCurve, kind="quadratic")
+            smoothY = spl(smoothX)
+            plt.plot(smoothX, smoothY, label=name)
+
+        ax.set_title(f"Fitted curves (K = {int(10**K)})")
+        ax.set_xlabel(f"[{self.freeNames[1]}] / M")
+        ax.set_ylabel("ΔAbs / AU")
+        ax.legend()
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=self.dfcFrame)
+        canvas.draw()
+        canvas.get_tk_widget().grid(row=0, column=0, sticky="")
+
+        toolbar = NavigationToolbar2Tk(
+            canvas, self.dfcFrame, pack_toolbar=False
+        )
+        toolbar.update()
+        toolbar.grid(row=1, column=0, sticky="")
+
+        self.dfcFrame.rowconfigure(0, weight=1)
+        self.dfcFrame.rowconfigure(1, weight=1)
+        self.dfcFrame.columnconfigure(0, weight=1)
+
     def plotSpectraDiscrete(self, K):
         self.fitFrame = ttk.Frame(self.notebook)
         self.notebook.add(self.fitFrame, text="Fitted signals")
@@ -202,8 +274,9 @@ class Titration():
 
         ttk.Label(rangeSelection, text="Wavelength range:").pack(side="left")
 
-        minWL = int(self.signalTitles.min())
-        maxWL = int(self.signalTitles.max())
+        # TODO: move rounding to titrationReader
+        minWL = int(round(self.signalTitles.min()))
+        maxWL = int(round(self.signalTitles.max()))
         self.spectraFrame.fromVar = tk.IntVar(self.spectraFrame, minWL)
         self.spectraFrame.toVar = tk.IntVar(self.spectraFrame, maxWL)
 
