@@ -121,7 +121,10 @@ class Titration():
         for spectrum, name in zip(spectra, names):
             plt.plot(wavelengths, spectrum, label=name)
 
-        ax.set_title(f"Fitted spectra (K = {int(10**K)})")
+        ttk.Label(
+            self.fitFrame, text=f"Fitted spectra (K = {int(10**K)})",
+            font='-size 15'
+        ).grid(row=0, column=0, sticky="")
         ax.set_xlabel("λ / nm")
         ax.set_ylabel("ε / $M^{-1} cm^{-1}$")
         ax.legend()
@@ -130,16 +133,17 @@ class Titration():
 
         canvas = FigureCanvasTkAgg(fig, master=self.fitFrame)
         canvas.draw()
-        canvas.get_tk_widget().grid(row=0, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
         toolbar = NavigationToolbar2Tk(
             canvas, self.fitFrame, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="")
 
         self.fitFrame.rowconfigure(0, weight=1)
         self.fitFrame.rowconfigure(1, weight=1)
+        self.fitFrame.rowconfigure(2, weight=1)
         self.fitFrame.columnconfigure(0, weight=1)
 
         self.plotSpectraDiscreteFromContinuous(K)
@@ -193,7 +197,10 @@ class Titration():
             smoothY = spl(smoothX)
             plt.plot(smoothX, smoothY, label=name)
 
-        ax.set_title(f"Fitted curves (K = {int(10**K)})")
+        ttk.Label(
+            self.dfcFrame, text=f"Fitted curves (K = {int(10**K)})",
+            font='-size 15'
+        ).grid(row=0, column=0, sticky="")
         ax.set_xlabel(f"[{self.freeNames[1]}] / M")
         ax.set_ylabel("ΔAbs / AU")
         ax.legend()
@@ -201,16 +208,17 @@ class Titration():
 
         canvas = FigureCanvasTkAgg(fig, master=self.dfcFrame)
         canvas.draw()
-        canvas.get_tk_widget().grid(row=0, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
         toolbar = NavigationToolbar2Tk(
             canvas, self.dfcFrame, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="")
 
         self.dfcFrame.rowconfigure(0, weight=1)
         self.dfcFrame.rowconfigure(1, weight=1)
+        self.dfcFrame.rowconfigure(2, weight=1)
         self.dfcFrame.columnconfigure(0, weight=1)
 
     def plotSpectraDiscrete(self, K):
@@ -237,7 +245,10 @@ class Titration():
             smoothY = spl(smoothX)
             plt.plot(smoothX, smoothY, label=name)
 
-        ax.set_title(f"Fitted curves (K = {int(10**K)})")
+        ttk.Label(
+            self.fitFrame, text=f"Fitted curves (K = {int(10**K)})",
+            font='-size 15'
+        ).grid(row=0, column=0, sticky="")
         ax.set_xlabel(f"[{self.freeNames[1]}] / M")
         ax.set_ylabel("Δδ / ppm")
         ax.legend()
@@ -245,16 +256,17 @@ class Titration():
 
         canvas = FigureCanvasTkAgg(fig, master=self.fitFrame)
         canvas.draw()
-        canvas.get_tk_widget().grid(row=0, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
         toolbar = NavigationToolbar2Tk(
             canvas, self.fitFrame, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="")
 
         self.fitFrame.rowconfigure(0, weight=1)
         self.fitFrame.rowconfigure(1, weight=1)
+        self.fitFrame.rowconfigure(2, weight=1)
         self.fitFrame.columnconfigure(0, weight=1)
 
     def fitData(self):
