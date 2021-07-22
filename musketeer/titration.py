@@ -165,7 +165,22 @@ class Titration():
         prominences = peakProperties["prominences"]
         # select the four most prominent peaks
         largestFilter = prominences.argsort()[-4:]
-        largestPeaksIndices = np.sort(peaksIndices[largestFilter])
+        largestPeaksIndices = peaksIndices[largestFilter]
+
+        # Shoulder peaks can appear as inflection points rather than maxima.
+        # We'll add the two most prominent inflection points from a first-order
+        # approximation of the first derivative of the total movement:
+        inflectionIndices, inflectionProperties = \
+            find_peaks(-abs(np.diff(movement)), prominence=0)
+        inflectionProminences = inflectionProperties["prominences"]
+        inflectionFilter = inflectionProminences.argsort()[-2:]
+        largestInflectionsIndices = inflectionIndices[inflectionFilter]
+
+        # combine the two arrays, without duplicates, and sort them
+        largestPeaksIndices = np.sort(np.unique(np.concatenate(
+            (largestPeaksIndices, largestInflectionsIndices)
+        )))
+
         # discard peaks that don't move far enough away from the baseline
         # compared to the other peaks
         peaksDiff = maxDiff[largestPeaksIndices]
