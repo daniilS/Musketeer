@@ -9,7 +9,10 @@ from . import titrationReader
 from .style import padding
 
 
-root = Style(theme="lumen").master
+# need to keep a reference to the Style object so that image-based widgets
+# appear correctly
+ttkStyle = Style(theme="lumen")
+root = ttkStyle.master
 
 try:
     # Windows and OS X
