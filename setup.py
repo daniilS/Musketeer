@@ -11,6 +11,7 @@ setuptools.setup(
     description="A tool for fitting data from titration experiments.",
     long_description=long_description,
     long_description_content_type='text/markdown',
+    license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: End Users/Desktop",
@@ -22,7 +23,6 @@ setuptools.setup(
     ],
     url="https://github.com/daniilS/Musketeer",
     packages=["musketeer"],
-    package_data={"": ["*.png"]},
     include_package_data=True,
     install_requires=[
         "numpy",
