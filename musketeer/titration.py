@@ -370,12 +370,6 @@ class Titration():
         self.drawSpectraFrame()
 
     def populateFrame(self):
-        if False:
-            self.options = ttk.ScrolledFrame(
-                self.frame, padding=padding, text="Options", borderwidth=1
-            )
-            self.options.grid(column=0, row=0, sticky="nesw")
-
         scrolledFrame = ScrolledFrame(self.frame)
         scrolledFrame.grid(column=0, row=0, sticky="nesw")
         # TODO: frame doesn't receive focus, so scroll wheel doesn't get bound.

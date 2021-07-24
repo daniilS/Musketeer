@@ -92,32 +92,6 @@ class ScrolledFrame(tkscrolledframe.ScrolledFrame):
         # Process our remaining configuration options
         self.configure(**kw)
 
-        if False:
-            super().__init__(master, **kw)
-
-            Scrollbar = AutoHideScrollbar
-            c = self._canvas
-            scrollbars = "both"
-
-            self._x_scrollbar.destroy()
-            self._y_scrollbar.destroy()
-
-            # Scrollbars
-            xs = self._x_scrollbar = Scrollbar(self,
-                                               orient="horizontal",
-                                               command=c.xview)
-            ys = self._y_scrollbar = Scrollbar(self,
-                                               orient="vertical",
-                                               command=c.yview)
-            c.configure(xscrollcommand=xs.set, yscrollcommand=ys.set)
-
-            # Lay out our widgets
-            c.grid(row=0, column=0, sticky="nsew")
-            if scrollbars == "vertical" or scrollbars == "both":
-                ys.grid(row=0, column=1, sticky="ns")
-            if scrollbars == "horizontal" or scrollbars == "both":
-                xs.grid(row=1, column=0, sticky="we")
-
     def display_widget(self, widget_class, stretch=True, **kw):
         self._stretch = stretch
         return super().display_widget(widget_class, **kw)
