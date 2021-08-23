@@ -73,7 +73,7 @@ class Titration():
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[:self.kVarsCount]
-        totalConcVars = ksAndTotalConcs[:self.kVarsCount]
+        totalConcVars = ksAndTotalConcs[self.kVarsCount:]
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
