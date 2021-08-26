@@ -6,8 +6,8 @@ from ttkbootstrap import Style
 import matplotlib.pyplot as plt
 
 from . import titrationReader
+from .titrationFrame import TitrationFrame
 from .style import padding
-
 
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
@@ -49,9 +49,8 @@ notebook.pack(expand=True, fill="both")
 # create a tab for each titration, and let the titration object handle its
 # own I/O
 for titration in titrations:
-    titration.frame = ttk.Frame(notebook, padding=padding)
-    notebook.add(titration.frame, text="Titration", sticky="nesw")
-    titration.populateFrame()
+    titrationFrame = TitrationFrame(notebook, titration, padding=padding)
+    notebook.add(titrationFrame, text="Titration", sticky="nesw")
 
 
 def closePlots():

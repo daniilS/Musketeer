@@ -126,7 +126,6 @@ def saveData(stockTable, volumesTable, titration, popup):
     totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
     titration.totalConcs = moles / totalVolumes
 
-    titration.drawSpectraFrame()
     popup.destroy()
 
 

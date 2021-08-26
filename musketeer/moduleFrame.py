@@ -9,13 +9,14 @@ class ModuleFrame(ttk.LabelFrame):
     attributeName = ""
     setDefault = True
 
-    def __init__(self, parent, titration, *args, **kwargs):
+    def __init__(self, parent, titration, updatePlots, *args, **kwargs):
         super().__init__(
             parent, text=self.frameLabel, borderwidth=5,
             *args, **kwargs
 
         )
         self.titration = titration
+        self.updatePlots = updatePlots
 
         self.stringVar = tk.StringVar()
 
@@ -36,3 +37,4 @@ class ModuleFrame(ttk.LabelFrame):
     def callback(self, value):
         Strategy = self.dropdownOptions[value]
         setattr(self.titration, self.attributeName, Strategy(self.titration))
+        self.updatePlots()
