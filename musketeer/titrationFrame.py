@@ -39,8 +39,8 @@ class TitrationFrame(ttk.Frame):
         # TODO: frame doesn't receive focus, so scroll wheel doesn't get bound.
         # Fix by binding scroll wheel event to root, then trigger the scrolling
         # method of the currently active notebook tab.
-        # scrolledFrame.bind_arrow_keys(self.frame)
-        # scrolledFrame.bind_scroll_wheel(self.frame)
+        # scrolledFrame.bind_arrow_keys(self)
+        # scrolledFrame.bind_scroll_wheel(self)
         self.options = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 
         for mod in (
@@ -285,7 +285,7 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
             " nm"
         )
         guestConcs = titration.totalConcs.T[1]
-        # TODO: move to separate function, also use from plotSpectraDiscrete
+        # TODO: move to separate function, also use from DiscreteFittedFrame
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
