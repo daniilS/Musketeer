@@ -1,7 +1,7 @@
 from . import moduleFrame
 
 
-class GetConcs():
+class GetConcs(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
@@ -9,7 +9,7 @@ class GetConcs():
         return signalVars
 
 
-class GetFraction():
+class GetFraction(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 

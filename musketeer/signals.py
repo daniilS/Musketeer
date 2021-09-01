@@ -3,7 +3,7 @@ import numpy as np
 from . import moduleFrame
 
 
-class GetSignalVarsCustom():
+class GetSignalVarsCustom(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         self.titration.signalsMatrix = self.signalsMatrix
@@ -17,7 +17,7 @@ class GetSignalVarsCustom():
     # TODO: allow user to input signalsMatrix
 
 
-class GetSignalVarsAll():
+class GetSignalVarsAll(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         self.titration.signalsMatrix = self.signalsMatrix

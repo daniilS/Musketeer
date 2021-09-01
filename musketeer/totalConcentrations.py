@@ -20,18 +20,6 @@ prefixesDecimal = {
 prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 
-def getVolumeFromString(string, unit="L"):
-    searchResult = re.search(r"([0-9.]+) ?([nuμm]?)[lL]", string)
-    if not searchResult:
-        return None
-    volume, prefix = searchResult.group(1, 2)
-    volume = Decimal(volume)
-    convertedVolume = float(
-        volume * prefixesDecimal[prefix] / prefixesDecimal[unit.strip("L")]
-    )
-    return f"{convertedVolume:g}"  # strip trailing zeroes
-
-
 class StockTable(table.Table):
     def __init__(self, master, titration):
         self.headerRows = 3
@@ -90,56 +78,33 @@ class VolumesTable(table.Table):
         for row in range(rows):
             if self.data[row, dataColumn + 2] is not None:
                 title = self.data[row, 1].get()
-                volume = getVolumeFromString(title, self.unit.get())
+                volume = self.getVolumeFromString(title, self.unit.get())
                 if volume is not None:
                     self.data[row, dataColumn + 2].set(volume)
 
-
-def saveData(stockTable, volumesTable, titration, popup):
-    stockConcs = []
-    for row in stockTable.data:
-        if row[0] is None:
-            continue
-        rowData = []
-        for stock in range(stockTable.dataColumns):
-            rowData.append(row[stock + 2].get())
-        stockConcs.append(rowData)
-    stockConcs = np.array(stockConcs, dtype=float) * prefixes[
-        stockTable.unit.get().strip("M")
-    ]
-
-    volumes = []
-    for i, row in enumerate(volumesTable.data):
-        if row[0] is None:
-            titration.rowFilter[i] = False
-            continue
-        titration.rowFilter[i] = True
-        rowData = []
-        for stock in range(volumesTable.dataColumns):
-            rowData.append(row[stock + 2].get())
-        volumes.append(rowData)
-    volumes = np.array(volumes, dtype=float) * prefixes[
-        volumesTable.unit.get().strip("L")
-    ]
-
-    moles = volumes @ stockConcs.T
-    totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
-    titration.totalConcs = moles / totalVolumes
-
-    popup.destroy()
+    def getVolumeFromString(self, string, unit="L"):
+        searchResult = re.search(r"([0-9.]+) ?([nuμm]?)[lL]", string)
+        if not searchResult:
+            return None
+        volume, prefix = searchResult.group(1, 2)
+        volume = Decimal(volume)
+        convertedVolume = float(
+            volume * prefixesDecimal[prefix] / prefixesDecimal[unit.strip("L")]
+        )
+        return f"{convertedVolume:g}"  # strip trailing zeroes
 
 
-class GetTotalConcsFromVolumes():
-    def __init__(self, titration):
+class VolumesPopup(tk.Toplevel):
+    def __init__(self, titration, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.titration = titration
-        popup = tk.Toplevel()
-        popup.title("Enter volumes")
-        popup.grab_set()
+        self.title("Enter volumes")
+        self.grab_set()
 
-        frame = ScrolledFrame(popup, height=900, max_width=1500)
+        frame = ScrolledFrame(self, height=900, max_width=1500)
         frame.pack(expand=True, fill="both")
-        frame.bind_arrow_keys(popup)
-        frame.bind_scroll_wheel(popup)
+        frame.bind_arrow_keys(self)
+        frame.bind_scroll_wheel(self)
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
 
@@ -150,20 +115,60 @@ class GetTotalConcsFromVolumes():
         buttonFrame = ttk.Frame(innerFrame, borderwidth=5)
         buttonFrame.pack(expand=True, fill="both")
         saveButton = ttk.Button(
-            buttonFrame, text="Save", command=lambda: saveData(
-                stockTable, volumesTable, titration, popup
+            buttonFrame, text="Save", command=lambda: self.saveData(
+                stockTable, volumesTable, titration
             )
         )
         saveButton.pack()
 
-        popup.wait_window(popup)
+    def saveData(self, stockTable, volumesTable, titration):
+        stockConcs = []
+        for row in stockTable.data:
+            if row[0] is None:
+                continue
+            rowData = []
+            for stock in range(stockTable.dataColumns):
+                rowData.append(row[stock + 2].get())
+            stockConcs.append(rowData)
+        stockConcs = np.array(stockConcs, dtype=float) * prefixes[
+            stockTable.unit.get().strip("M")
+        ]
+
+        volumes = []
+        for i, row in enumerate(volumesTable.data):
+            if row[0] is None:
+                titration.rowFilter[i] = False
+                continue
+            titration.rowFilter[i] = True
+            rowData = []
+            for stock in range(volumesTable.dataColumns):
+                rowData.append(row[stock + 2].get())
+            volumes.append(rowData)
+        volumes = np.array(volumes, dtype=float) * prefixes[
+            volumesTable.unit.get().strip("L")
+        ]
+
+        moles = volumes @ stockConcs.T
+        totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
+        titration.totalConcs = moles / totalVolumes
+
+        self.destroy()
+
+
+class GetTotalConcsFromVolumes(moduleFrame.Strategy):
+    def __init__(self, titration):
+        self.titration = titration
 
     def __call__(self, totalConcVars):
         # TODO: implement unknown concentrations
         return self.titration.totalConcs
 
+    def showPopup(self):
+        popup = VolumesPopup(self.titration)
+        popup.wait_window(popup)
 
-class GetTotalConcs():
+
+class GetTotalConcs(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 

@@ -3,7 +3,7 @@ from numpy.linalg import lstsq
 from . import moduleFrame
 
 
-class FitSignals():
+class FitSignals(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
