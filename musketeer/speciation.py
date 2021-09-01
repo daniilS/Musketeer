@@ -3,7 +3,7 @@ import numpy as np
 from . import moduleFrame
 
 
-class SpeciationHG():
+class SpeciationHG(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         titration.stoichiometries = np.array([
@@ -29,7 +29,7 @@ class SpeciationHG():
         return free, bound
 
 
-class SpeciationCustom():
+class SpeciationCustom(moduleFrame.Strategy):
     def __call__(self):
         # TODO: copy gradient descent algorithm here
         raise NotImplementedError

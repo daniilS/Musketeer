@@ -5,20 +5,22 @@ import numpy as np
 from . import moduleFrame
 
 
-class GetKsCustom():
+class GetKsCustom(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
-        popup = tk.Toplevel()
-        popup.title("Edit equilibrium constant values")
-        popup.grab_set()
-        # TODO: implement
 
     def __call__(self, kVars):
         kVars = np.insert(kVars, 0, 1)
         return self.titration.ksMatrix @ kVars
 
+    def showPopup(self):
+        popup = tk.Toplevel()
+        popup.title("Edit equilibrium constant values")
+        popup.grab_set()
+        # TODO: implement
 
-class GetKsAll():
+
+class GetKsAll(moduleFrame.Strategy):
     # when every equilibrium constant is unknown and independent
     def __init__(self, titration):
         self.titration = titration

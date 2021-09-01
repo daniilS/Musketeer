@@ -3,7 +3,7 @@ import numpy as np
 from . import moduleFrame
 
 
-class ResidualsSum():
+class ResidualsSum(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
@@ -11,7 +11,7 @@ class ResidualsSum():
         return np.sum(residuals)
 
 
-class ResidualsSumScaled():
+class ResidualsSumScaled(moduleFrame.Strategy):
     # TODO: test & use
     # sum of the residuals, scaled by the number of data points for each signal
     def __init__(self, titration):
@@ -24,7 +24,7 @@ class ResidualsSumScaled():
         return np.sum(residuals / numPoints)
 
 
-class ResidualsSumNormalised():
+class ResidualsSumNormalised(moduleFrame.Strategy):
     def __call__(self, residuals):
         raise NotImplementedError
 

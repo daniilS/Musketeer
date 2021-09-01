@@ -2,6 +2,14 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 
+# all module strategies should be a subclass
+class Strategy():
+    # currently, the only thing it does is provide an empty popup method so
+    # that strategies not requiring a GUI don't need to explicitly define one
+    def showPopup(self):
+        pass
+
+
 class ModuleFrame(ttk.LabelFrame):
     frameLabel = ""
     dropdownLabelText = ""
@@ -9,13 +17,14 @@ class ModuleFrame(ttk.LabelFrame):
     attributeName = ""
     setDefault = True
 
-    def __init__(self, parent, titration, *args, **kwargs):
+    def __init__(self, parent, titration, updatePlots, *args, **kwargs):
         super().__init__(
             parent, text=self.frameLabel, borderwidth=5,
             *args, **kwargs
 
         )
         self.titration = titration
+        self.updatePlots = updatePlots
 
         self.stringVar = tk.StringVar()
 
@@ -34,5 +43,8 @@ class ModuleFrame(ttk.LabelFrame):
         optionMenu.pack(fill="x", pady=(5, 0))
 
     def callback(self, value):
-        Strategy = self.dropdownOptions[value]
-        setattr(self.titration, self.attributeName, Strategy(self.titration))
+        SelectedStrategy = self.dropdownOptions[value]
+        selectedStrategy = SelectedStrategy(self.titration)
+        selectedStrategy.showPopup()
+        setattr(self.titration, self.attributeName, selectedStrategy)
+        self.updatePlots()
