@@ -4,6 +4,7 @@ import tkinter.ttk as ttk
 from matplotlib.backends.backend_tkagg import (
     NavigationToolbar2Tk as OriginalToolbar
 )
+from matplotlib.backend_bases import _Mode
 
 
 # TODO: Fix the tooltips. In the default matplotlib class, the tooltip can
@@ -40,3 +41,12 @@ class NavigationToolbar2Tk(OriginalToolbar):
         b._ntimage = image
         b.pack(side=tk.LEFT)
         return b
+
+    def _update_buttons_checked(self):
+        # sync button checkstates to match active mode
+        for text, mode in [('Zoom', _Mode.ZOOM), ('Pan', _Mode.PAN)]:
+            if text in self._buttons:
+                if self.mode == mode:
+                    self._buttons[text].var.set(1)  # NOT .invoke()
+                else:
+                    self._buttons[text].var.set(0)

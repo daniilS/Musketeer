@@ -22,10 +22,11 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 # TODO: stop using pyplot to avoid window closing issues?
-import matplotlib.pyplot as plt # noqa
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # noqa
-from .navigationToolbar2Tk import NavigationToolbar2Tk # noqa
-from matplotlib.backend_bases import key_press_handler # noqa
+import matplotlib.pyplot as plt  # noqa
+from matplotlib.backends.backend_tkagg import (  # noqa
+    NavigationToolbar2Tk, FigureCanvasTkAgg
+)
+from matplotlib.backend_bases import key_press_handler  # noqa
 
 
 class TitrationFrame(ttk.Frame):

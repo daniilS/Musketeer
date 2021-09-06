@@ -15,9 +15,10 @@ from .titration import Titration
 import matplotlib
 matplotlib.use("TkAgg")
 
-import matplotlib.pyplot as plt  # noqa
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # noqa
-from .navigationToolbar2Tk import NavigationToolbar2Tk # noqa
+import matplotlib.pyplot as plt   # noqa
+from matplotlib.backends.backend_tkagg import (  # noqa
+    NavigationToolbar2Tk, FigureCanvasTkAgg
+)
 from matplotlib.backend_bases import key_press_handler  # noqa
 
 universalCsvVersion = packaging.version.parse("1.0.0")

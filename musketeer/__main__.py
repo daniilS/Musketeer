@@ -5,9 +5,11 @@ import os
 from ttkbootstrap import Style
 import matplotlib.pyplot as plt
 
-from . import titrationReader
+from . import titrationReader, patchMatplotlib
 from .titrationFrame import TitrationFrame
 from .style import padding
+
+patchMatplotlib.applyPatch()
 
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
