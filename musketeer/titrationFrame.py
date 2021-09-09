@@ -123,14 +123,14 @@ class InputSpectraFrame(ttk.Frame):
         ttk.Spinbox(
             rangeSelection, textvariable=self.fromVar,
             from_=minWL, to=maxWL, width=5
-            ).pack(padx=padding, side="left")
+        ).pack(padx=padding, side="left")
 
         ttk.Label(rangeSelection, text="to").pack(side="left")
 
         ttk.Spinbox(
             rangeSelection, textvariable=self.toVar,
             from_=minWL, to=maxWL, width=5
-            ).pack(padx=padding, side="left")
+        ).pack(padx=padding, side="left")
 
         self.fig, (self.ax) = plt.subplots()
 
@@ -164,8 +164,9 @@ class InputSpectraFrame(ttk.Frame):
 
         ax.cla()
 
-        spectraColors =\
-            ["black"] + ["#80808080"]*(titration.numAdditions-2) + ["tab:red"]
+        spectraColors = ["black"] +\
+            ["#80808080"] * (titration.numAdditions - 2) +\
+            ["tab:red"]
         colorCycler = cycler(color=spectraColors)
         ax.set_prop_cycle(colorCycler)
 
