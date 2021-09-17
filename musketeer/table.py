@@ -11,17 +11,27 @@ class Table(ttk.Frame):
 
     # TODO: add ability to add columns, and link rows to data
 
-    def __init__(self, master):
-        super().__init__(master, padding=padding)
+    def __init__(self, master, headerRows, dataColumns, readonlyTitles=False,
+                 **kwargs):
+        self.headerRows = headerRows
+        self.dataColumns = dataColumns
+        self.readonlyTitles = readonlyTitles
+        super().__init__(master, padding=padding, **kwargs)
 
         self.addRowButton = self.button(
-            self.headerRows-1, 0, "New row", self.addRow
+            self.headerRows - 1, 0, "New row", self.addRow
         )
 
-        self.data = np.empty((0, 2+self.dataColumns), float)
+        self.initEmptyCells()
 
-    def entry(self, row, column, text="", align="left", columnspan=1):
-        entry = ttk.Entry(self, width=self.width*columnspan, justify=align)
+    def initEmptyCells(self):
+        self.cells = np.empty((0, 2 + self.dataColumns))
+
+    def entry(self, row, column, text="", align="left", columnspan=1,
+              **kwargs):
+        entry = ttk.Entry(
+            self, width=self.width * columnspan, justify=align, **kwargs
+        )
 
         def set(text=""):
             entry.delete(0, "end")
@@ -34,19 +44,26 @@ class Table(ttk.Frame):
         )
         return entry
 
-    def label(self, row, column, text="", columnspan=1):
-        frame = ttk.Frame(self, width=self.width*columnspan, borderwidth=5)
+    def readonlyEntry(self, *args, **kwargs):
+        entry = self.entry(*args, **kwargs)
+        entry.state(["readonly"])
+        entry.configure(takefocus=False)
+        return entry
+
+    def label(self, row, column, text="", columnspan=1, **kwargs):
+        frame = ttk.Frame(self, width=self.width * columnspan, borderwidth=5)
         frame.grid(
             row=row, column=column, sticky="nesw", columnspan=columnspan
         )
-        label = ttk.Label(frame, text=text)
+        label = ttk.Label(frame, text=text, **kwargs)
         label.pack()
         return frame
 
-    def button(self, row, column, text="", command=None, columnspan=1):
+    def button(self, row, column, text="", command=None, columnspan=1,
+               **kwargs):
         button = ttk.Button(
             self, text=text, command=command, style="Outline.TButton",
-            takefocus=False
+            takefocus=False, **kwargs
         )
         button.grid(
             row=row, column=column, sticky="nesw", columnspan=columnspan,
@@ -66,22 +83,76 @@ class Table(ttk.Frame):
         optionMenu.grid(row=row, column=column, sticky="nesw", padx=1, pady=1)
         return optionMenu, stringVar
 
-    def addRow(self, firstEntry=""):
-        row = self.data.shape[0]
+    def addRow(self, firstEntry="", data=None):
+        row = self.cells.shape[0]
         gridRow = row + self.headerRows
-        rowData = []
-        rowData.append(
+        newRow = []
+        newRow.append(
             self.button(
                 gridRow, 0, "Delete", lambda row=row: self.deleteRow(row)
             )
         )
-        rowData.append(self.entry(gridRow, 1, firstEntry))
+        if self.readonlyTitles:
+            entry = self.readonlyEntry(gridRow, 1, firstEntry)
+        else:
+            entry = self.entry(gridRow, 1, firstEntry)
+        newRow.append(entry)
         for column in range(self.dataColumns):
-            rowData.append(self.entry(gridRow, 2 + column, align="right"))
+            entry = self.entry(gridRow, 2 + column, align="right")
+            if data is not None:
+                entry.set(data[column])
+            newRow.append(entry)
 
-        self.data = np.vstack((self.data, rowData))
+        self.cells = np.vstack((self.cells, newRow))
 
     def deleteRow(self, row):
-        for element in self.data[row]:
+        for element in self.cells[row]:
             element.destroy()
-        self.data[row] = np.full(self.data.shape[1], None)
+        self.cells[row] = np.full(self.cells.shape[1], None)
+
+    @property
+    def data(self):
+        data = np.empty((0, self.dataColumns))
+        for row in self.cells:
+            if row[0] is None:
+                continue
+            rowData = [float(cell.get()) for cell in row[2:]]
+            data = np.vstack([data, rowData])
+        return data
+
+    @data.setter
+    def data(self, data):
+        for widget in np.nditer(self.cells):
+            widget.destroy()
+
+        self.dataColumns = data.shape[1]
+        self.initEmptyCells()
+        for row in data:
+            self.addRow("", row)
+
+    @property
+    def fullData(self):
+        data = np.empty((0, 1 + self.dataColumns))
+        for row in self.cells:
+            if row[0] is None:
+                continue
+            rowData = [float(cell.get()) for cell in row[2:]]
+            rowData.insert(0, row[1].get())
+            data = np.vstack([data, rowData])
+        return data
+
+    @fullData.setter
+    def fullData(self, fullData):
+        for widget in np.nditer(self.cells):
+            widget.destroy()
+
+        self.dataColumns = fullData.shape[1] - 1
+        self.initEmptyCells()
+        for row in fullData:
+            self.addRow(row[0], row[1:])
+
+    @property
+    def rowTitles(self):
+        return np.array(
+            [title.get() for title in self.cells[:, 1] if title is not None]
+        )

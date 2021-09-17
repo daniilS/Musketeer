@@ -22,9 +22,7 @@ prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 class StockTable(table.Table):
     def __init__(self, master, titration):
-        self.headerRows = 3
-        self.dataColumns = 2
-        super().__init__(master)
+        super().__init__(master, 3, 2, False)
 
         self.label(0, 0, "Stock concentrations:", 4)
         self.label(1, 2, "Unit:")
@@ -40,9 +38,7 @@ class StockTable(table.Table):
 
 class VolumesTable(table.Table):
     def __init__(self, master, titration):
-        self.headerRows = 4
-        self.dataColumns = 2
-        super().__init__(master)
+        super().__init__(master, 4, 2, True)
 
         self.label(0, 0, "Addition volumes:", 4)
         self.label(1, 2, "Unit:")
@@ -66,21 +62,21 @@ class VolumesTable(table.Table):
             self.addRow(name)
 
     def copyFirst(self, dataColumn):
-        rows, _ = self.data.shape
-        cells = self.data[:, dataColumn + 2]
+        rows, _ = self.cells.shape
+        cells = self.cells[:, dataColumn + 2]
         first = next(cell for cell in cells if cell is not None).get()
         for row in range(rows):
-            if self.data[row, dataColumn + 2] is not None:
-                self.data[row, dataColumn + 2].set(first)
+            if self.cells[row, dataColumn + 2] is not None:
+                self.cells[row, dataColumn + 2].set(first)
 
     def copyFromTitles(self, dataColumn):
-        rows, _ = self.data.shape
+        rows, _ = self.cells.shape
         for row in range(rows):
-            if self.data[row, dataColumn + 2] is not None:
-                title = self.data[row, 1].get()
+            if self.cells[row, dataColumn + 2] is not None:
+                title = self.cells[row, 1].get()
                 volume = self.getVolumeFromString(title, self.unit.get())
                 if volume is not None:
-                    self.data[row, dataColumn + 2].set(volume)
+                    self.cells[row, dataColumn + 2].set(volume)
 
     def getVolumeFromString(self, string, unit="L"):
         searchResult = re.search(r"([0-9.]+) ?([nuμm]?)[lL]", string)
@@ -122,34 +118,19 @@ class VolumesPopup(tk.Toplevel):
         saveButton.pack()
 
     def saveData(self, stockTable, volumesTable, titration):
-        stockConcs = []
-        for row in stockTable.data:
-            if row[0] is None:
-                continue
-            rowData = []
-            for stock in range(stockTable.dataColumns):
-                rowData.append(row[stock + 2].get())
-            stockConcs.append(rowData)
-        stockConcs = np.array(stockConcs, dtype=float) * prefixes[
+        titration.stockConcs = stockTable.data * prefixes[
             stockTable.unit.get().strip("M")
         ]
 
-        volumes = []
-        for i, row in enumerate(volumesTable.data):
-            if row[0] is None:
-                titration.rowFilter[i] = False
-                continue
-            titration.rowFilter[i] = True
-            rowData = []
-            for stock in range(volumesTable.dataColumns):
-                rowData.append(row[stock + 2].get())
-            volumes.append(rowData)
-        volumes = np.array(volumes, dtype=float) * prefixes[
+        titration.volumes = volumesTable.data * prefixes[
             volumesTable.unit.get().strip("L")
         ]
+        titration.rowFilter = np.in1d(
+            titration.additionTitles, volumesTable.rowTitles
+        )
 
-        moles = volumes @ stockConcs.T
-        totalVolumes = np.atleast_2d(np.sum(volumes, 1)).T
+        moles = titration.volumes @ titration.stockConcs.T
+        totalVolumes = np.atleast_2d(np.sum(titration.volumes, 1)).T
         titration.totalConcs = moles / totalVolumes
 
         self.destroy()
