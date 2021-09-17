@@ -187,8 +187,8 @@ class InputSpectraFrame(ttk.Frame):
         to = self.toVar.get()
         self.titration.columnFilter = \
             (self.titration.signalTitles.astype(int) >= from_) & \
-            (self.signalTitles.astype(int) <= to)
-        self.drawPlot()
+            (self.titration.signalTitles.astype(int) <= to)
+        self.plot()
 
 
 class ContinuousFittedFrame(ttk.Frame):
