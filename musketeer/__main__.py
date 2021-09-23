@@ -6,11 +6,18 @@ import ctypes
 from ttkbootstrap import Style
 import matplotlib.pyplot as plt
 
-from . import titrationReader, patchMatplotlib
+from . import titrationReader, patchMatplotlib, windowsHighDpiPatch
 from .titrationFrame import TitrationFrame
 from .style import padding
 
 patchMatplotlib.applyPatch()
+windowsHighDpiPatch.setEnhancedDpiScaling()
+try:
+    appId = u'daniilS.musketeer'
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
+except:  # noqa
+    pass
+
 
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
@@ -24,37 +31,6 @@ except tk.TclError:
     # X11
     root.attributes("-zoomed", True)
 root.title("Musketeer")
-
-try:
-    appId = u'daniilS.musketeer'
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
-except:  # noqa
-    pass
-try:
-    # From Windows 10, version 1607 onwards, it's possible to set the high DPI
-    # scaling mode to "System (Enhanced)" using this function. This makes the
-    # GUI look less blurry on displays using a scaling factor above 100%.
-    #
-    # A proper solution would involve disabling system scaling and handling it
-    # through the application instead. This would require setting the dpi
-    # awareness context to -4, querying the current monitor's scaling factor,
-    # using it with "tk scaling" (and updating it whenever a window is moved to
-    # another display, and manually changing any elements in tk that aren't
-    # automatically updated, such as the padding in widget styles, and widget
-    # elements drawn as images. This does not seem worth it for now.
-    #
-    # Information on the syscall:
-    # https://docs.microsoft.com/en-us/windows/win32/hidpi/dpi-awareness-context
-    # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddpiawarenesscontext
-    DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED = -5
-    setThreadDpiAwarenessContext = \
-        ctypes.windll.user32.SetThreadDpiAwarenessContext
-    setThreadDpiAwarenessContext.argtypes = (ctypes.c_void_p,)
-    setThreadDpiAwarenessContext.restype = ctypes.c_void_p
-    setThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED)
-except:  # noqa
-    pass
-
 
 # should get the correct location no matter how the script is run
 # TODO: consider using importlib_resources
