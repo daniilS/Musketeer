@@ -11,11 +11,12 @@ class Table(ttk.Frame):
 
     # TODO: add ability to add columns, and link rows to data
 
-    def __init__(self, master, headerRows, dataColumns, readonlyTitles=False,
-                 **kwargs):
+    def __init__(self, master, headerRows, dataColumns, *,
+                 readonlyTitles=False, allowBlanks=False, **kwargs):
         self.headerRows = headerRows
         self.dataColumns = dataColumns
         self.readonlyTitles = readonlyTitles
+        self.allowBlanks = allowBlanks
         super().__init__(master, padding=padding, **kwargs)
 
         self.addRowButton = self.button(
@@ -34,8 +35,11 @@ class Table(ttk.Frame):
         )
 
         def set(text=""):
+            oldState = self.state()
+            self.state(["!disabled"])
             entry.delete(0, "end")
             entry.insert(0, text)
+            self.state(oldState)
         entry.set = set
 
         entry.set(text)
@@ -110,13 +114,25 @@ class Table(ttk.Frame):
             element.destroy()
         self.cells[row] = np.full(self.cells.shape[1], None)
 
+    def resetData(self):
+        for row in self.cells:
+            for element in row:
+                if element is not None:
+                    element.destroy()
+        self.initEmptyCells()
+
+    def float(self, number):
+        if self.allowBlanks and number == "":
+            return np.nan
+        return float(number)
+
     @property
     def data(self):
         data = np.empty((0, self.dataColumns))
         for row in self.cells:
             if row[0] is None:
                 continue
-            rowData = [float(cell.get()) for cell in row[2:]]
+            rowData = [self.float(cell.get()) for cell in row[2:]]
             data = np.vstack([data, rowData])
         return data
 
@@ -136,7 +152,7 @@ class Table(ttk.Frame):
         for row in self.cells:
             if row[0] is None:
                 continue
-            rowData = [float(cell.get()) for cell in row[2:]]
+            rowData = [self.float(cell.get()) for cell in row[2:]]
             rowData.insert(0, row[1].get())
             data = np.vstack([data, rowData])
         return data
@@ -156,3 +172,10 @@ class Table(ttk.Frame):
         return np.array(
             [title.get() for title in self.cells[:, 1] if title is not None]
         )
+
+    @rowTitles.setter
+    def rowTitle(self, titles):
+        titleCells = self.cells[:, 1]
+        titleCells = titleCells[titleCells != None]
+        for cell, title in zip(titleCells, titles):
+            cell.set(title)

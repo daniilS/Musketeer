@@ -34,11 +34,6 @@ class Titration():
         return self.processedData.shape[0]
 
     @property
-    def concVarsCount(self):
-        # TODO: add support for unknown total concentrations
-        return 0
-
-    @property
     def processedData(self):
         return self.rawData[self.rowFilter, :][:, self.columnFilter]
 
@@ -77,7 +72,7 @@ class Titration():
 
     def optimise(self):
         initialGuessKs = np.full(self.kVarsCount, 3)
-        initialGuessConcs = np.full(self.concVarsCount, -4)
+        initialGuessConcs = np.full(self.getConcVarsCount(), -4)
         initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
 
         result = minimize(
