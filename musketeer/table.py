@@ -138,11 +138,8 @@ class Table(ttk.Frame):
 
     @data.setter
     def data(self, data):
-        for widget in np.nditer(self.cells):
-            widget.destroy()
-
         self.dataColumns = data.shape[1]
-        self.initEmptyCells()
+        self.resetData()
         for row in data:
             self.addRow("", row)
 
@@ -159,11 +156,8 @@ class Table(ttk.Frame):
 
     @fullData.setter
     def fullData(self, fullData):
-        for widget in np.nditer(self.cells):
-            widget.destroy()
-
         self.dataColumns = fullData.shape[1] - 1
-        self.initEmptyCells()
+        self.resetData()
         for row in fullData:
             self.addRow(row[0], row[1:])
 
