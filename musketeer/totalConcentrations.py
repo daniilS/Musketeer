@@ -7,9 +7,8 @@ import re
 import numpy as np
 
 from . import moduleFrame
-from .table import Table
+from .table import Table, ButtonFrame
 from .scrolledFrame import ScrolledFrame
-from .style import padding
 
 prefixesDecimal = {
     "": Decimal(1),
@@ -24,7 +23,13 @@ prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 class StockTable(Table):
     def __init__(self, master, titration):
-        super().__init__(master, 3, 2, readonlyTitles=True, allowBlanks=True)
+        if hasattr(titration, "stockTitles"):
+            stockTitles = titration.stockTitles
+        else:
+            stockTitles = ("Stock 1", "Stock 2")
+        super().__init__(master, 2, stockTitles, allowBlanks=True,
+                         rowOptions=("readonlyTitles", "delete"),
+                         columnOptions=("new", "delete"))
 
         self.titration = titration
 
@@ -32,14 +37,15 @@ class StockTable(Table):
         self.label(1, 2, "Unit:")
         _, self.unit = self.dropdown(1, 3, ("nm", "\u03BCM", "mM", "M"), "mM")
 
-        self.label(2, 1, "Species:")
-        self.entry(2, 2, "Stock 1")
-        self.entry(2, 3, "Stock 2")
-
         if hasattr(titration, "stockConcs"):
             self.populate(titration.stockConcs)
         else:
             self.populateDefault()
+
+    def deleteRowButton(self, *args, **kwargs):
+        button = super().deleteRowButton(*args, **kwargs)
+        button.state(["disabled"])
+        return button
 
     def populate(self, stockConcs):
         for name, row in zip(self.titration.freeNames, stockConcs):
@@ -63,7 +69,13 @@ class StockTable(Table):
 
 class VolumesTable(Table):
     def __init__(self, master, titration):
-        super().__init__(master, 4, 2, readonlyTitles=True, allowBlanks=False)
+        if hasattr(titration, "stockTitles"):
+            stockTitles = titration.stockTitles
+        else:
+            stockTitles = ("Stock 1", "Stock 2")
+        super().__init__(master, 4, stockTitles, allowBlanks=False,
+                         rowOptions=("delete", "readonlyTitles"),
+                         columnOptions=())
 
         self.titration = titration
 
@@ -77,13 +89,13 @@ class VolumesTable(Table):
 
         self.label(3, 1, "Addition title:")
 
-        for stock in range(self.dataColumns):
-            self.button(
-                2, stock + 2, "Copy first",
+        for stock in range(len(stockTitles)):
+            self.cells[0, stock + 2] = self.button(
+                self.headerRows, stock + 2, "Copy first",
                 lambda stock=stock: self.copyFirst(stock)
             )
-            self.button(
-                3, stock + 2, "Copy from titles",
+            self.cells[1, stock + 2] = self.button(
+                self.headerRows + 1, stock + 2, "Copy from titles",
                 lambda stock=stock: self.copyFromTitles(stock)
             )
 
@@ -102,14 +114,20 @@ class VolumesTable(Table):
             self.addRow(name)
 
     def copyFirst(self, dataColumn):
-        rows, _ = self.cells.shape
-        cells = self.cells[:, dataColumn + 2]
-        first = next(cell for cell in cells if cell is not None).get()
-        for row in range(rows):
-            if self.cells[row, dataColumn + 2] is not None:
-                self.cells[row, dataColumn + 2].set(first)
+        cells = self.cells[2:, dataColumn + 2]
+        first = cells[0].get()
+        for cell in cells:
+            cell.set(first)
 
     def copyFromTitles(self, dataColumn):
+        cells = self.cells[2:]
+        for row in cells:
+            title = row[1].get()
+            volume = self.getVolumeFromString(title, self.unit.get())
+            if volume is not None:
+                row[dataColumn + 2].set(volume)
+
+    def OLDcopyFromTitles(self, dataColumn):
         rows, _ = self.cells.shape
         for row in range(rows):
             if self.cells[row, dataColumn + 2] is not None:
@@ -174,21 +192,26 @@ class VolumesPopup(tk.Toplevel):
         self.volumesTable = VolumesTable(innerFrame, titration)
         self.volumesTable.pack(expand=True, fill="both")
 
-        buttonFrame = ttk.Frame(innerFrame, borderwidth=padding)
-        buttonFrame.pack(expand=True, fill="both")
-        resetButton = ttk.Button(buttonFrame, text="Reset", command=self.reset,
-                                 style="danger.TButton")
-        resetButton.pack(side="left", padx=padding)
-        saveButton = ttk.Button(buttonFrame, text="Save",
-                                command=self.saveData, style="success.TButton")
-        saveButton.pack(side="right", padx=padding)
-        cancelButton = ttk.Button(buttonFrame, text="Cancel",
-                                  command=self.destroy,
-                                  style="secondary.TButton")
-        cancelButton.pack(side="right", padx=padding)
+        self.stockTable.newColumnButton.configure(command=self.addColumns)
+        self.stockTable._deleteColumn = self.stockTable.deleteColumn
+        self.stockTable.deleteColumn = self.deleteColumns
+
+        buttonFrame = ButtonFrame(
+            innerFrame, self.reset, self.saveData, self.destroy
+        )
+        buttonFrame.pack(expand=False, fill="both")
+
+    def addColumns(self):
+        self.stockTable.addColumn()
+        self.volumesTable.addColumn()
+
+    def deleteColumns(self, column):
+        self.stockTable._deleteColumn(column)
+        self.volumesTable.deleteColumn(column)
 
     def reset(self):
         for table in (self.stockTable, self.volumesTable):
+            table._columnTitles = ("Stock 1", "Stock 2")
             table.resetData()
             table.populateDefault()
 

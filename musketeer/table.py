@@ -9,24 +9,33 @@ from .style import padding, cellWidth
 class Table(ttk.Frame):
     width = cellWidth
 
-    # TODO: add ability to add columns, and link rows to data
-
-    def __init__(self, master, headerRows, dataColumns, *,
-                 readonlyTitles=False, allowBlanks=False, **kwargs):
-        self.headerRows = headerRows
-        self.dataColumns = dataColumns
-        self.readonlyTitles = readonlyTitles
+    def __init__(self, master, headerRows, columnTitles=[], *,
+                 allowBlanks=False, rowOptions=[], columnOptions=[], **kwargs):
+        self.rowOptions = rowOptions
+        self.columnOptions = columnOptions
         self.allowBlanks = allowBlanks
         super().__init__(master, padding=padding, **kwargs)
 
-        self.addRowButton = self.button(
-            self.headerRows - 1, 0, "New row", self.addRow
-        )
+        self.headerRows = headerRows
+        if "new" in rowOptions:
+            self.newRowButton = self.button(
+                self.headerRows + 1, 0, "New row", self.addRow,
+                style="success.Outline.TButton"
+            )
+        if "new" in columnOptions:
+            self.newColumnButton = self.button(
+                self.headerRows, 1, "New column", self.addColumn,
+                style="success.Outline.TButton"
+            )
 
+        # used to change the number of columns externally.
+        self._columnTitles = columnTitles
         self.initEmptyCells()
 
     def initEmptyCells(self):
-        self.cells = np.empty((0, 2 + self.dataColumns))
+        self.cells = np.full((2, 2), None)
+        for title in self._columnTitles:
+            self.addColumn(title)
 
     def entry(self, row, column, text="", align="left", columnspan=1,
               **kwargs):
@@ -64,15 +73,29 @@ class Table(ttk.Frame):
         return frame
 
     def button(self, row, column, text="", command=None, columnspan=1,
-               **kwargs):
+               style="Outline.TButton", **kwargs):
         button = ttk.Button(
-            self, text=text, command=command, style="Outline.TButton",
+            self, text=text, command=command, style=style,
             takefocus=False, **kwargs
         )
         button.grid(
             row=row, column=column, sticky="nesw", columnspan=columnspan,
             padx=1, pady=1
         )
+        return button
+
+    def deleteRowButton(self, *args, **kwargs):
+        button = self.button(*args, **kwargs)
+        button.configure(command=lambda: self.deleteRow(
+            button.grid_info()["row"] - self.headerRows
+        ))
+        return button
+
+    def deleteColumnButton(self, *args, **kwargs):
+        button = self.button(*args, **kwargs)
+        button.configure(command=lambda button=button: self.deleteColumn(
+            button.grid_info()["column"]
+        ))
         return button
 
     def dropdown(self, row, column, choices=[], default=None, columnspan=1):
@@ -87,32 +110,62 @@ class Table(ttk.Frame):
         optionMenu.grid(row=row, column=column, sticky="nesw", padx=1, pady=1)
         return optionMenu, stringVar
 
+    def redraw(self):
+        for (row, column), cell in np.ndenumerate(self.cells):
+            if cell is not None:
+                cell.grid(row=row + self.headerRows, column=column)
+
     def addRow(self, firstEntry="", data=None):
         row = self.cells.shape[0]
         gridRow = row + self.headerRows
-        newRow = []
-        newRow.append(
-            self.button(
-                gridRow, 0, "Delete", lambda row=row: self.deleteRow(row)
-            )
-        )
-        if self.readonlyTitles:
-            entry = self.readonlyEntry(gridRow, 1, firstEntry)
-        else:
-            entry = self.entry(gridRow, 1, firstEntry)
-        newRow.append(entry)
-        for column in range(self.dataColumns):
+        newRow = np.full(self.cells.shape[1], None)
+        if "delete" in self.rowOptions:
+            newRow[0] = self.deleteRowButton(gridRow, 0, "Delete")
+        if "readonlyTitles" in self.rowOptions:
+            newRow[1] = self.readonlyEntry(gridRow, 1, firstEntry)
+        elif "titles" in self.rowOptions:
+            newRow[1] = self.entry(gridRow, 1, firstEntry)
+        for column in range(self.cells.shape[1] - 2):
             entry = self.entry(gridRow, 2 + column, align="right")
             if data is not None:
                 entry.set(data[column])
-            newRow.append(entry)
+            newRow[2 + column] = entry
 
         self.cells = np.vstack((self.cells, newRow))
 
+    def addColumn(self, firstEntry="", data=None):
+        column = self.cells.shape[1]
+        newColumn = np.full(self.cells.shape[0], None)
+        if "delete" in self.columnOptions:
+            newColumn[0] = self.deleteColumnButton(self.headerRows, column,
+                                                   "Delete")
+        if "readonlyTitles" in self.columnOptions:
+            newColumn[1] = self.readonlyEntry(self.headerRows + 1, column,
+                                              firstEntry)
+        elif "titles" in self.columnOptions:
+            newColumn[1] = self.entry(self.headerRows + 1, column, firstEntry)
+        for row in range(self.cells.shape[0] - 2):
+            entry = self.entry(self.headerRows + 2 + row, column,
+                               align="right")
+            if data is not None:
+                entry.set(data[row])
+            newColumn[2 + row] = entry
+
+        self.cells = np.hstack((self.cells, newColumn[:, None]))
+
     def deleteRow(self, row):
         for element in self.cells[row]:
-            element.destroy()
-        self.cells[row] = np.full(self.cells.shape[1], None)
+            if element is not None:
+                element.destroy()
+        self.cells = np.delete(self.cells, row, 0)
+        self.redraw()
+
+    def deleteColumn(self, column):
+        for element in self.cells[:, column]:
+            if element is not None:
+                element.destroy()
+        self.cells = np.delete(self.cells, column, 1)
+        self.redraw()
 
     def resetData(self):
         for row in self.cells:
@@ -128,48 +181,45 @@ class Table(ttk.Frame):
 
     @property
     def data(self):
-        data = np.empty((0, self.dataColumns))
-        for row in self.cells:
-            if row[0] is None:
-                continue
-            rowData = [self.float(cell.get()) for cell in row[2:]]
-            data = np.vstack([data, rowData])
+        data = np.empty(self.cells[2:, 2:].shape)
+        for (row, column), cell in np.ndenumerate(self.cells[2:, 2:]):
+            data[row, column] = self.float(cell.get())
         return data
 
     @data.setter
     def data(self, data):
-        self.dataColumns = data.shape[1]
-        self.resetData()
+        # TODO: handle number of columns
         for row in data:
             self.addRow("", row)
 
     @property
-    def fullData(self):
-        data = np.empty((0, 1 + self.dataColumns))
-        for row in self.cells:
-            if row[0] is None:
-                continue
-            rowData = [self.float(cell.get()) for cell in row[2:]]
-            rowData.insert(0, row[1].get())
-            data = np.vstack([data, rowData])
-        return data
-
-    @fullData.setter
-    def fullData(self, fullData):
-        self.dataColumns = fullData.shape[1] - 1
-        self.resetData()
-        for row in fullData:
-            self.addRow(row[0], row[1:])
-
-    @property
     def rowTitles(self):
-        return np.array(
-            [title.get() for title in self.cells[:, 1] if title is not None]
-        )
+        return np.array([title.get() for title in self.cells[2:, 1]])
 
     @rowTitles.setter
-    def rowTitle(self, titles):
-        titleCells = self.cells[:, 1]
-        titleCells = titleCells[titleCells != None]
-        for cell, title in zip(titleCells, titles):
+    def rowTitles(self, titles):
+        for cell, title in zip(self.cells[2:, 1], titles):
             cell.set(title)
+
+    @property
+    def columnTitles(self):
+        return np.array([title.get() for title in self.cells[1, 2:]])
+
+    @columnTitles.setter
+    def columnTitles(self, titles):
+        for cell, title in zip(self.cells[1, 2:], titles):
+            cell.set(title)
+
+
+class ButtonFrame(ttk.Frame):
+    def __init__(self, master, reset, save, cancel, *args, **kwargs):
+        super().__init__(master, borderwidth=padding, *args, **kwargs)
+        self.resetButton = ttk.Button(self, text="Reset", command=reset,
+                                      style="danger.TButton")
+        self.resetButton.pack(side="left", padx=padding)
+        self.saveButton = ttk.Button(self, text="Save", command=save,
+                                     style="success.TButton")
+        self.saveButton.pack(side="right", padx=padding)
+        self.cancelButton = ttk.Button(self, text="Cancel", command=cancel,
+                                       style="secondary.TButton")
+        self.cancelButton.pack(side="right", padx=padding)
