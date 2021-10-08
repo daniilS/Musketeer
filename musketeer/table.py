@@ -28,14 +28,11 @@ class Table(ttk.Frame):
                 style="success.Outline.TButton"
             )
 
-        # used to change the number of columns externally.
-        self._columnTitles = columnTitles
         self.initEmptyCells()
+        self.columnTitles = columnTitles
 
     def initEmptyCells(self):
         self.cells = np.full((2, 2), None)
-        for title in self._columnTitles:
-            self.addColumn(title)
 
     def entry(self, row, column, text="", align="left", columnspan=1,
               **kwargs):
@@ -174,16 +171,16 @@ class Table(ttk.Frame):
                     element.destroy()
         self.initEmptyCells()
 
-    def float(self, number):
+    def convertData(self, number):
         if self.allowBlanks and number == "":
             return np.nan
         return float(number)
 
     @property
     def data(self):
-        data = np.empty(self.cells[2:, 2:].shape)
+        data = np.full(self.cells[2:, 2:].shape, self.convertData("0"))
         for (row, column), cell in np.ndenumerate(self.cells[2:, 2:]):
-            data[row, column] = self.float(cell.get())
+            data[row, column] = self.convertData(cell.get())
         return data
 
     @data.setter
@@ -207,8 +204,18 @@ class Table(ttk.Frame):
 
     @columnTitles.setter
     def columnTitles(self, titles):
-        for cell, title in zip(self.cells[1, 2:], titles):
-            cell.set(title)
+        # make sure the number of columns matches the number of titles
+        difference = len(titles) - len(self.cells[1, 2:])
+        if difference > 0:
+            for _ in range(difference):
+                self.addColumn()
+        elif difference < 0:
+            for _ in range(difference):
+                self.deleteColumn(self.cells.shape[1])
+        if ("titles" in self.columnOptions
+                or "readonlyTitles" in self.columnOptions):
+            for cell, title in zip(self.cells[1, 2:], titles):
+                cell.set(title)
 
 
 class ButtonFrame(ttk.Frame):

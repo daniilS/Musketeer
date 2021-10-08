@@ -4,11 +4,6 @@ from scipy.optimize import minimize
 
 class Titration():
     def __init__(self):
-        self.freeNames = np.array(["Host", "Guest"])
-        self.ksMatrix = np.array([[]])
-        self.signalsMatrix = np.array([[]])
-        self.stoichiometries = np.array([[]])
-
         # identical to [True, True, True, ..., True]
         self.rowFilter = slice(None)
         self.columnFilter = slice(None)

@@ -29,7 +29,7 @@ class StockTable(Table):
             stockTitles = ("Stock 1", "Stock 2")
         super().__init__(master, 2, stockTitles, allowBlanks=True,
                          rowOptions=("readonlyTitles", "delete"),
-                         columnOptions=("new", "delete"))
+                         columnOptions=("titles", "new", "delete"))
 
         self.titration = titration
 
@@ -87,17 +87,7 @@ class VolumesTable(Table):
         if hasattr(titration, "volumesUnit"):
             self.unit.set(titration.volumesUnit)
 
-        self.label(3, 1, "Addition title:")
-
-        for stock in range(len(stockTitles)):
-            self.cells[0, stock + 2] = self.button(
-                self.headerRows, stock + 2, "Copy first",
-                lambda stock=stock: self.copyFirst(stock)
-            )
-            self.cells[1, stock + 2] = self.button(
-                self.headerRows + 1, stock + 2, "Copy from titles",
-                lambda stock=stock: self.copyFromTitles(stock)
-            )
+        self.label(self.headerRows + 1, 1, "Addition title:")
 
         if hasattr(titration, "volumes"):
             self.populate(titration.volumes)
@@ -113,28 +103,39 @@ class VolumesTable(Table):
         for name in self.titration.additionTitles:
             self.addRow(name)
 
-    def copyFirst(self, dataColumn):
-        cells = self.cells[2:, dataColumn + 2]
+    def addColumn(self, firstEntry="", data=None):
+        super().addColumn(firstEntry, data)
+        column = self.cells.shape[1] - 1
+        copyFirstButton = self.button(self.headerRows, column, "Copy first")
+        copyFirstButton.configure(
+            command=lambda button=copyFirstButton: self.copyFirst(
+                button.grid_info()["column"]
+            )
+        )
+        self.cells[0, column] = copyFirstButton
+
+        copyTitlesButton = self.button(self.headerRows + 1, column,
+                                       "Copy from titles")
+        copyTitlesButton.configure(
+            command=lambda button=copyTitlesButton: self.copyFromTitles(
+                button.grid_info()["column"]
+            )
+        )
+        self.cells[1, column] = copyTitlesButton
+
+    def copyFirst(self, column):
+        cells = self.cells[2:, column]
         first = cells[0].get()
         for cell in cells:
             cell.set(first)
 
-    def copyFromTitles(self, dataColumn):
+    def copyFromTitles(self, column):
         cells = self.cells[2:]
         for row in cells:
             title = row[1].get()
             volume = self.getVolumeFromString(title, self.unit.get())
             if volume is not None:
-                row[dataColumn + 2].set(volume)
-
-    def OLDcopyFromTitles(self, dataColumn):
-        rows, _ = self.cells.shape
-        for row in range(rows):
-            if self.cells[row, dataColumn + 2] is not None:
-                title = self.cells[row, 1].get()
-                volume = self.getVolumeFromString(title, self.unit.get())
-                if volume is not None:
-                    self.cells[row, dataColumn + 2].set(volume)
+                row[column].set(volume)
 
     def getVolumeFromString(self, string, toUnit="L"):
         searchResult = re.search(r"([0-9.]+) ?([nuμm]?)[lL]", string)
@@ -211,8 +212,8 @@ class VolumesPopup(tk.Toplevel):
 
     def reset(self):
         for table in (self.stockTable, self.volumesTable):
-            table._columnTitles = ("Stock 1", "Stock 2")
             table.resetData()
+            table.columnTitles = ("Stock 1", "Stock 2")
             table.populateDefault()
 
     def saveData(self):

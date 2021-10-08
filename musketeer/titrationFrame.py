@@ -45,9 +45,9 @@ class TitrationFrame(ttk.Frame):
         self.options = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 
         for mod in (
+            speciation,
             equilibriumConstants,
             totalConcentrations,
-            speciation,
             signals,
             proportionality,
             fitSignals,
@@ -204,6 +204,8 @@ class ContinuousFittedFrame(ttk.Frame):
 
         spectra = titration.lastFitResult
         names = titration.signalNames
+        print(spectra.shape)
+        print(names)
         wavelengths = titration.processedSignalTitles
         for spectrum, name in zip(spectra, names):
             plt.plot(wavelengths, spectrum, label=name)
