@@ -6,10 +6,10 @@ from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from cycler import cycler
 
+from . import speciation
 from . import equilibriumConstants
 from . import totalConcentrations
-from . import speciation
-from . import signals
+from . import contributors
 from . import proportionality
 from . import fitSignals
 from . import combineResiduals
@@ -48,7 +48,7 @@ class TitrationFrame(ttk.Frame):
             speciation,
             equilibriumConstants,
             totalConcentrations,
-            signals,
+            contributors,
             proportionality,
             fitSignals,
             combineResiduals
@@ -203,9 +203,7 @@ class ContinuousFittedFrame(ttk.Frame):
         fig, (ax) = plt.subplots()
 
         spectra = titration.lastFitResult
-        names = titration.signalNames
-        print(spectra.shape)
-        print(names)
+        names = titration.contributorNames()
         wavelengths = titration.processedSignalTitles
         for spectrum, name in zip(spectra, names):
             plt.plot(wavelengths, spectrum, label=name)

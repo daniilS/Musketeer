@@ -9,8 +9,7 @@ class FitSignals(moduleFrame.Strategy):
 
     # TODO: account for known signals
     def __call__TODO(self, signalVars):
-        knownMask = self.titration.signalValues != None  # noqa: E711
-        # I said what I said, flake8
+        knownMask = self.titration.signalValues != None
         knownValues = self.titration.signalValues[knownMask]
         knownSignals = signalVars[knownMask]
         unknownSignals = signalVars[~knownMask]

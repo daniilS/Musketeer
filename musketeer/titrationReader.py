@@ -102,7 +102,6 @@ def readUV(filePath):
     titration = Titration()
     # set default parameters for UV-Vis titrations
     titration.continuous = True
-    titration.contributors = "both"
     titration.labelX = "λ (nm)"
     titration.labelY = "Abs (AU)"
     titration.legendSuffix = "nm"
