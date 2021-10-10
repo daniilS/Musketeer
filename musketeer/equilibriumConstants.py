@@ -1,23 +1,91 @@
-import tkinter as tk
-
 import numpy as np
+import tkinter as tk
+import tkinter.ttk as ttk
+import tkinter.messagebox as mb
 
 from . import moduleFrame
+from .table import Table, ButtonFrame
+from .scrolledFrame import ScrolledFrame
 
 
-class GetKsCustom(moduleFrame.Strategy):
+class KnownKsTable(Table):
+    def __init__(self, master, titration):
+        self.titration = titration
+        super().__init__(master, 0, ("Value",), allowBlanks=True,
+                         rowOptions=("readonlyTitles"), columnOptions=()
+                         )
+        self.populateDefault()
+
+    def populateDefault(self):
+        for boundName, knownK in zip(self.titration.boundNames,
+                                     self.titration.knownKs):
+            self.addRow(boundName, [knownK if not np.isnan(knownK) else ""])
+
+
+class KnownKsPopup(tk.Toplevel):
+    def __init__(self, titration, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.titration = titration
+        self.title("Enter known equilibrium constants")
+        self.grab_set()
+
+        height = int(self.master.winfo_height() * 0.4)
+        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame.pack(expand=True, fill="both")
+        frame.bind_arrow_keys(self)
+        frame.bind_scroll_wheel(self)
+
+        innerFrame = frame.display_widget(ttk.Frame, stretch=True)
+        knownKsLabel = ttk.Label(
+            innerFrame,
+            text="Enter known log(K) values. Leave blank for unknown values."
+        )
+        knownKsLabel.pack()
+
+        self.knownKsTable = KnownKsTable(innerFrame, titration)
+        self.knownKsTable.pack(expand=True, fill="both")
+
+        buttonFrame = ButtonFrame(
+            innerFrame, self.reset, self.saveData, self.destroy
+        )
+        buttonFrame.pack(expand=False, fill="both", side="bottom")
+
+    def reset(self):
+        self.knownKsTable.resetData()
+        self.knownKsTable.columnTitles = ("Value",)
+        self.knownKsTable.populateDefault()
+
+    def saveData(self):
+        try:
+            knownKs = self.knownKsTable.data[:, 0]
+        except Exception as e:
+            mb.showerror(title="Could not save data", message=e, parent=self)
+            return
+
+        self.titration.knownKs = knownKs
+        self.destroy()
+
+
+class GetKsKnown(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
+        if not (hasattr(titration, 'knownKs')
+                and len(titration.knownKs) == titration.boundCount
+                ):
+            titration.knownKs = np.full(titration.boundCount, np.nan)
+        titration.kVarsCount = self.kVarsCount
 
     def __call__(self, kVars):
-        kVars = np.insert(kVars, 0, 1)
-        return self.titration.ksMatrix @ kVars
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = kVars
+        return ks
 
     def showPopup(self):
-        popup = tk.Toplevel()
-        popup.title("Edit equilibrium constant values")
-        popup.grab_set()
-        # TODO: implement
+        popup = KnownKsPopup(self.titration)
+        popup.wait_window(popup)
+
+    def kVarsCount(self):
+        return np.count_nonzero(np.isnan(self.titration.knownKs))
 
 
 class GetKsAll(moduleFrame.Strategy):
@@ -25,6 +93,10 @@ class GetKsAll(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         titration.ksMatrix = np.identity(titration.boundCount)
+        titration.kVarsCount = self.kVarsCount
+
+    def kVarsCount(self):
+        return self.titration.boundCount
 
     def __call__(self, kVars):
         return kVars
@@ -35,6 +107,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Which Ks to optimise?"
     dropdownOptions = {
         "Optimise all Ks": GetKsAll,
-        "Custom": GetKsCustom
+        "Specify some known Ks": GetKsKnown
     }
     attributeName = "getKs"

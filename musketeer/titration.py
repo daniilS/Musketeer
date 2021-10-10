@@ -21,10 +21,6 @@ class Titration():
         return self.freeCount + self.boundCount
 
     @property
-    def kVarsCount(self):
-        return self.ksMatrix.shape[0]
-
-    @property
     def numAdditions(self):
         return self.processedData.shape[0]
 
@@ -38,8 +34,8 @@ class Titration():
 
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
-        kVars = ksAndTotalConcs[:self.kVarsCount]
-        totalConcVars = ksAndTotalConcs[self.kVarsCount:]
+        kVars = ksAndTotalConcs[:self.kVarsCount()]
+        totalConcVars = ksAndTotalConcs[self.kVarsCount():]
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
@@ -66,7 +62,7 @@ class Titration():
         return self.optimisationFunc(ksAndTotalConcs)
 
     def optimise(self):
-        initialGuessKs = np.full(self.kVarsCount, 3)
+        initialGuessKs = np.full(self.kVarsCount(), 3)
         initialGuessConcs = np.full(self.getConcVarsCount(), -4)
         initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
 
