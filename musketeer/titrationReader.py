@@ -135,6 +135,81 @@ def readUV(filePath):
     return [titration]
 
 
+class CSVPopup(tk.Toplevel):
+    def __init__(self, *args, **kwargs):
+        self.aborted = True
+        super().__init__(*args, **kwargs)
+        frame = ttk.Frame(self, padding=15)
+        frame.pack(expand=True, fill="both")
+
+        self.additionTitlesCheckbutton = ttk.Checkbutton(
+            frame, text="Addition titles")
+        self.signalTitlesCheckbutton = ttk.Checkbutton(
+            frame, text="Signal titles")
+        self.additionsRowsRadiobutton = ttk.Radiobutton(
+            frame, value=0, text="Rows are additions, columns are signals")
+        self.additionsColumnsRadiobutton = ttk.Radiobutton(
+            frame, value=1, text="Rows are signals, columns are additions")
+        self.continueButton = ttk.Button(
+            frame, text="Continue", command=self.continueCommand)
+
+        self.additionTitlesCheckbutton.pack(pady=2.5)
+        self.signalTitlesCheckbutton.pack(pady=2.5)
+        self.additionsRowsRadiobutton.pack(pady=2.5)
+        self.additionsColumnsRadiobutton.pack(pady=2.5)
+        self.continueButton.pack(pady=2.5, side='bottom')
+
+        self.additionsRowsRadiobutton.invoke()
+
+    def continueCommand(self):
+        self.aborted = False
+        self.hasSignalTitles = self.signalTitlesCheckbutton.instate(
+            ["selected"])
+        self.hasAdditionTitles = self.additionTitlesCheckbutton.instate(
+            ["selected"])
+        self.needTranspose = self.additionsColumnsRadiobutton.instate(
+            ["selected"])
+        self.destroy()
+
+
+def readCSV(filePath):
+    popup = CSVPopup()
+    popup.wait_window(popup)
+    if popup.aborted:
+        sys.exit()
+
+    titration = Titration()
+    titration.continuous = False
+
+    with open(filePath, "r", newline='') as inFile:
+        data = np.genfromtxt(inFile, dtype=str, delimiter=",")
+        print(data)
+        if popup.needTranspose:
+            data = data.T
+        if popup.hasAdditionTitles and popup.hasSignalTitles:
+            titration.additionTitles = data[1:, 0]
+            titration.signalTitles = data[0, 1:]
+            titration.rawData = data[1:, 1:].astype(float)
+        elif popup.hasAdditionTitles:
+            titration.additionTitles = data[:, 0]
+            titration.signalTitles = np.array(
+                ["Signal " + str(i) for i in data.shape[1]])
+            titration.rawData = data[:, 1:].astype(float)
+        elif popup.hasSignalTitles:
+            titration.additionTitles = np.array(
+                ["Addition " + str(i) for i in data.shape[0]])
+            titration.signalTitles = data[0, :]
+            titration.rawData = data[1:, :].astype(float)
+        else:
+            titration.additionTitles = np.array(
+                ["Addition " + str(i) for i in data.shape[0]])
+            titration.signalTitles = np.array(
+                ["Signal " + str(i) for i in data.shape[1]])
+            titration.rawData = data
+
+    return [titration]
+
+
 def readNMR(filePath):
     # TODO: proof of concept works, convert to class
     # reads an MNova 1D peaks list
@@ -283,13 +358,8 @@ def readNMR(filePath):
         # plt.show()
 
 
-def readCustom(filePath):
-    # TODO: decide on standard format & implement
-    raise NotImplementedError
-
-
 fileReaders = {
     "UV-Vis csv file": readUV,
     "NMR peak list": readNMR,
-    "Universal csv file": readCustom
+    "Universal csv file": readCSV
 }

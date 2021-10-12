@@ -9,6 +9,7 @@ class FitSignals(moduleFrame.Strategy):
 
     # TODO: account for known signals
     def __call__TODO(self, signalVars):
+        # rows are additions, columns are contributors
         knownMask = self.titration.signalValues != None
         knownValues = self.titration.signalValues[knownMask]
         knownSignals = signalVars[knownMask]
