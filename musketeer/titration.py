@@ -22,7 +22,7 @@ class Titration():
 
     @property
     def polymerCount(self):
-        np.count_nonzero(self.stoichiometries < 0)
+        return np.count_nonzero(self.stoichiometries < 0)
 
     @property
     def numAdditions(self):
@@ -39,14 +39,17 @@ class Titration():
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[:self.kVarsCount()]
-        totalConcVars = ksAndTotalConcs[self.kVarsCount():]
+        totalConcVars = ksAndTotalConcs[
+            self.kVarsCount():-self.alphaVarsCount()]
+        alphaVars = ksAndTotalConcs[
+            self.kVarsCount() + self.getConcVarsCount():]
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
-        ks = self.getKs(kVars)
+        ks, alphas = self.getKs(kVars, alphaVars)
         totalConcs = self.getTotalConcs(totalConcVars)
 
-        freeConcs, boundConcs = self.speciation(ks, totalConcs)
+        freeConcs, boundConcs = self.speciation(ks, totalConcs, alphas)
         self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
 
         signalVars = self.getSignalVars(freeConcs, boundConcs)
@@ -68,7 +71,9 @@ class Titration():
     def optimise(self):
         initialGuessKs = np.full(self.kVarsCount(), 3)
         initialGuessConcs = np.full(self.getConcVarsCount(), -4)
-        initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
+        initialGuessAlphas = np.full(self.alphaVarsCount(), 0)
+        initialGuess = np.concatenate(
+            (initialGuessKs, initialGuessConcs, initialGuessAlphas))
 
         result = minimize(
             self.optimisationFuncLog, x0=initialGuess, method="Nelder-Mead"

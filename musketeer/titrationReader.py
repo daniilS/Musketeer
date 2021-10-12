@@ -183,7 +183,6 @@ def readCSV(filePath):
 
     with open(filePath, "r", newline='') as inFile:
         data = np.genfromtxt(inFile, dtype=str, delimiter=",")
-        print(data)
         if popup.needTranspose:
             data = data.T
         if popup.hasAdditionTitles and popup.hasSignalTitles:

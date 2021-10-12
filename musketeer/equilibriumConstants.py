@@ -87,22 +87,27 @@ class GetKsKnown(moduleFrame.Strategy):
         titration.kVarsCount = self.kVarsCount
         titration.alphaVarsCount = self.alphaVarsCount
 
-    def __call__(self, kVars):
+    def __call__(self, kVars, alphaVars):
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = kVars
-        return ks
+        alphas = self.titration.knownAlphas[self.polymerIndices].copy()
+        alphas[np.isnan(alphas)] = alphaVars
+        return (ks, alphas)
 
     def showPopup(self):
         popup = KnownKsPopup(self.titration)
         popup.wait_window(popup)
 
+    @property
+    def polymerIndices(self):
+        return np.any(self.titration.stoichiometries < 0, 1)
+
     def kVarsCount(self):
         return np.count_nonzero(np.isnan(self.titration.knownKs))
 
     def alphaVarsCount(self):
-        polymerIndices = np.any(self.titration.stoichiometries < 0, 1)
         return np.count_nonzero(np.isnan(
-            self.titration.knownAlphas[polymerIndices])
+            self.titration.knownAlphas[self.polymerIndices])
         )
 
 
@@ -120,8 +125,8 @@ class GetKsAll(moduleFrame.Strategy):
     def kVarsCount(self):
         return self.titration.boundCount
 
-    def __call__(self, kVars):
-        return kVars
+    def __call__(self, kVars, alphaVars):
+        return (kVars, alphaVars)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

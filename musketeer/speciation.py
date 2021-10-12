@@ -15,7 +15,7 @@ class SpeciationHG(moduleFrame.Strategy):
         titration.stoichiometries = np.array([[1, 1]])
         titration.boundNames = np.array(["HG"])
 
-    def __call__(self, ks, totalConcs):
+    def __call__(self, ks, totalConcs, alphas):
         K = ks[0]
         Htot, Gtot = totalConcs.T
         H = (
@@ -106,23 +106,7 @@ class SpeciationCOGS(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
-    def COGS(self, M, y, k, alpha=None):
-        P = 1 / max(np.sum(M, 0))
-        P = 0.5
-        tol = 1e-7
-        free = y.copy()
-        while True:
-            bound = k * np.prod(free**M, 1)
-            # ignore polymerisation for now
-            total = free + M.T @ bound  # total concentrations of species
-            if all((total - y) <= tol * y):
-                break
-            # to handle 0 total concentration
-            invTotal = np.where(total == 0, 1, 1 / total)
-            free *= ((y * invTotal) ** P)
-        return free, bound
-
-    def COGS_new(self, M, y, k, alphas):
+    def COGS(self, M, y, k, alphas):
         free = y.copy()
         bound = np.empty(len(k))
         polymers = np.any(M < 0, 1)
@@ -131,9 +115,9 @@ class SpeciationCOGS(moduleFrame.Strategy):
         complexes = ~polymers
 
         P = np.empty(len(k))
-        P[complexes] = np.sum(M[complexes, :], 0)
-        P[polymers] = 2 * k[polymers] * y[polymers]
-        P = max(P)
+        P[complexes] = np.sum(M[complexes, :], 1)
+        P[polymers] = 2 * k[polymers] * y[polymerParents]
+        P = 1 / max(P)
         tol = 1e-7
         while True:
             bound[complexes] = k[complexes] * np.prod(free**M[complexes, :], 1)
@@ -151,7 +135,7 @@ class SpeciationCOGS(moduleFrame.Strategy):
             free *= ((y * invTotal) ** P)
         return free, bound
 
-    def __call__(self, ks, totalConcs):
+    def __call__(self, ks, totalConcs, alphas):
         numPoints = totalConcs.shape[0]
         free = np.zeros((numPoints, self.titration.stoichiometries.shape[1]))
         bound = np.zeros((numPoints, self.titration.stoichiometries.shape[0]))
@@ -159,7 +143,8 @@ class SpeciationCOGS(moduleFrame.Strategy):
             free[i], bound[i] = self.COGS(
                 self.titration.stoichiometries,
                 totalConcs[i],
-                ks
+                ks,
+                alphas
             )
         return free, bound
 
