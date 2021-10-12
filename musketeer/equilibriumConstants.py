@@ -11,15 +11,20 @@ from .scrolledFrame import ScrolledFrame
 class KnownKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
-        super().__init__(master, 0, ("Value",), allowBlanks=True,
-                         rowOptions=("readonlyTitles"), columnOptions=()
+        super().__init__(master, 0, ["Value", "α"], allowBlanks=True,
+                         rowOptions=("readonlyTitles"),
+                         columnOptions=("titles")
                          )
         self.populateDefault()
 
     def populateDefault(self):
-        for boundName, knownK in zip(self.titration.boundNames,
-                                     self.titration.knownKs):
-            self.addRow(boundName, [knownK if not np.isnan(knownK) else ""])
+        for boundName, knownK, knownAlpha in zip(self.titration.boundNames,
+                                                 self.titration.knownKs,
+                                                 self.titration.knownAlphas):
+            self.addRow(boundName, [
+                knownK if not np.isnan(knownK) else "",
+                knownAlpha if not np.isnan(knownAlpha) else ""
+            ])
 
 
 class KnownKsPopup(tk.Toplevel):
@@ -52,17 +57,19 @@ class KnownKsPopup(tk.Toplevel):
 
     def reset(self):
         self.knownKsTable.resetData()
-        self.knownKsTable.columnTitles = ("Value",)
+        self.knownKsTable.columnTitles = ["Value", "α"]
         self.knownKsTable.populateDefault()
 
     def saveData(self):
         try:
             knownKs = self.knownKsTable.data[:, 0]
+            knownAlphas = self.knownKsTable.data[:, 1]
         except Exception as e:
             mb.showerror(title="Could not save data", message=e, parent=self)
             return
 
         self.titration.knownKs = knownKs
+        self.titration.knownAlphas = knownAlphas
         self.destroy()
 
 
@@ -73,7 +80,12 @@ class GetKsKnown(moduleFrame.Strategy):
                 and len(titration.knownKs) == titration.boundCount
                 ):
             titration.knownKs = np.full(titration.boundCount, np.nan)
+        if not (hasattr(titration, 'knownAlphas')
+                and len(titration.knownAlphas) == titration.boundCount
+                ):
+            titration.knownAlphas = np.full(titration.boundCount, np.nan)
         titration.kVarsCount = self.kVarsCount
+        titration.alphaVarsCount = self.alphaVarsCount
 
     def __call__(self, kVars):
         ks = self.titration.knownKs.copy()
@@ -87,6 +99,12 @@ class GetKsKnown(moduleFrame.Strategy):
     def kVarsCount(self):
         return np.count_nonzero(np.isnan(self.titration.knownKs))
 
+    def alphaVarsCount(self):
+        polymerIndices = np.any(self.titration.stoichiometries < 0, 1)
+        return np.count_nonzero(np.isnan(
+            self.titration.knownAlphas[polymerIndices])
+        )
+
 
 class GetKsAll(moduleFrame.Strategy):
     # when every equilibrium constant is unknown and independent
@@ -94,6 +112,10 @@ class GetKsAll(moduleFrame.Strategy):
         self.titration = titration
         titration.ksMatrix = np.identity(titration.boundCount)
         titration.kVarsCount = self.kVarsCount
+        titration.alphaVarsCount = self.alphaVarsCount
+
+    def alphaVarsCount(self):
+        return self.titration.polymerCount
 
     def kVarsCount(self):
         return self.titration.boundCount

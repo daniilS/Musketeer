@@ -122,6 +122,35 @@ class SpeciationCOGS(moduleFrame.Strategy):
             free *= ((y * invTotal) ** P)
         return free, bound
 
+    def COGS_new(self, M, y, k, alphas):
+        free = y.copy()
+        bound = np.empty(len(k))
+        polymers = np.any(M < 0, 1)
+        # the index of the species making up each of the polymers
+        polymerParents = np.nonzero(M[polymers])[1]
+        complexes = ~polymers
+
+        P = np.empty(len(k))
+        P[complexes] = np.sum(M[complexes, :], 0)
+        P[polymers] = 2 * k[polymers] * y[polymers]
+        P = max(P)
+        tol = 1e-7
+        while True:
+            bound[complexes] = k[complexes] * np.prod(free**M[complexes, :], 1)
+            # cap the maximum guess to avoid divergence
+            bound[polymers] = np.where(
+                free[polymerParents] * k[polymers] >= 1,
+                free[polymerParents]**2 * k[polymers] / P,
+                (2 - k[polymers] * free[polymerParents]) * (k[polymers] * free[polymerParents]**2) / (alphas * (1 - k[polymers] * free[polymerParents])**2)
+            )
+            total = free + abs(M.T) @ bound  # total concentrations of species
+            if all((total - y) <= tol * y):
+                break
+            # to handle 0 total concentration
+            invTotal = np.where(total == 0, 1, 1 / total)
+            free *= ((y * invTotal) ** P)
+        return free, bound
+
     def __call__(self, ks, totalConcs):
         numPoints = totalConcs.shape[0]
         free = np.zeros((numPoints, self.titration.stoichiometries.shape[1]))

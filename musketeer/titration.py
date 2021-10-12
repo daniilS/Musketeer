@@ -21,6 +21,10 @@ class Titration():
         return self.freeCount + self.boundCount
 
     @property
+    def polymerCount(self):
+        np.count_nonzero(self.stoichiometries < 0)
+
+    @property
     def numAdditions(self):
         return self.processedData.shape[0]
 
