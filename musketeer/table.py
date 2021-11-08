@@ -41,11 +41,11 @@ class Table(ttk.Frame):
         )
 
         def set(text=""):
-            oldState = self.state()
-            self.state(["!disabled"])
+            oldState = entry.state()
+            entry.state(["!disabled", "!readonly"])
             entry.delete(0, "end")
             entry.insert(0, text)
-            self.state(oldState)
+            entry.state(oldState)
         entry.set = set
 
         entry.set(text)
