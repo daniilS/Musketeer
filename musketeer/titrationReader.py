@@ -159,6 +159,8 @@ class CSVPopup(tk.Toplevel):
         self.additionsColumnsRadiobutton.pack(pady=2.5)
         self.continueButton.pack(pady=2.5, side='bottom')
 
+        self.additionTitlesCheckbutton.invoke()
+        self.signalTitlesCheckbutton.invoke()
         self.additionsRowsRadiobutton.invoke()
 
     def continueCommand(self):

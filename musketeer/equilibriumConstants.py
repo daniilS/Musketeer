@@ -13,7 +13,7 @@ class KnownKsTable(Table):
         self.titration = titration
         super().__init__(master, 0, ["Value", "α"], allowBlanks=True,
                          rowOptions=("readonlyTitles"),
-                         columnOptions=("titles")
+                         columnOptions=("readonlyTitles")
                          )
         self.populateDefault()
 
@@ -43,7 +43,7 @@ class KnownKsPopup(tk.Toplevel):
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
         knownKsLabel = ttk.Label(
             innerFrame,
-            text="Enter known log(K) values. Leave blank for unknown values."
+            text="Enter known K values. Leave blank for unknown values."
         )
         knownKsLabel.pack()
 

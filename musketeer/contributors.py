@@ -42,10 +42,12 @@ class GetSignalVarsHost(GetSignalVarsCustom):
         hostFree = np.zeros(self.titration.freeCount)
         hostFree[0] = 1
 
-        hostBound = self.titration.stoichiometries[:, 0]\
-            .astype(bool)\
-            .astype(int)
+        hostBound = abs(self.titration.stoichiometries[:, 0])
+
         return np.concatenate((hostFree, hostBound))
+
+    def filter_unscaled(self):
+        return self.filter().astype(bool).astype(int)
 
     def contributorNames(self):
         allNames = np.concatenate(

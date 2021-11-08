@@ -15,6 +15,7 @@ from . import fitSignals
 from . import combineResiduals
 from .style import padding
 from .scrolledFrame import ScrolledFrame
+from .table import Table
 
 # need to tell matplotlib to use the tkinter backend, otherwise the scale
 # of figures can get messed up if it would default to a different backend
@@ -101,6 +102,13 @@ class TitrationFrame(ttk.Frame):
             self.notebook.add(
                 self.discreteFittedFrame,
                 text="Fitted signals"
+            )
+            self.resultsFrame = ResultsFrame(
+                self, self.titration
+            )
+            self.notebook.add(
+                self.resultsFrame,
+                text="Results"
             )
 
 
@@ -342,7 +350,7 @@ class DiscreteFittedFrame(ttk.Frame):
         curves = titration.processedData.T
         fittedCurves = titration.lastFittedCurves.T
         names = titration.signalTitles
-        guestConcs = titration.totalConcs.T[1]
+        guestConcs = titration.totalConcs.T[titration.totalConcs.shape[1] - 1]
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
@@ -362,7 +370,7 @@ class DiscreteFittedFrame(ttk.Frame):
             self, text=f"Fitted curves (K = {int(10**K)})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
-        ax.set_xlabel(f"[{titration.freeNames[1]}] / M")
+        ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
         ax.set_ylabel("Δδ / ppm")
         ax.legend()
         fig.tight_layout()
@@ -381,3 +389,38 @@ class DiscreteFittedFrame(ttk.Frame):
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
         self.columnconfigure(0, weight=1)
+
+
+class ResultsFrame(ttk.Frame):
+    def __init__(self, parent, titration, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.titration = titration
+        self.showResults()
+
+    def showResults(self):
+        titration = self.titration
+        kTable = Table(self, 0, ["Value", "α"], rowOptions=("readonlyTitles"),
+                       columnOptions=("readonlyTitles"))
+
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
+
+        alphas = titration.knownAlphas.copy()
+        polymerAlphas = alphas[np.any(titration.stoichiometries < 0, 1)]
+        polymerAlphas[np.isnan(polymerAlphas)] = 10**titration.lastKs[
+            titration.kVarsCount() + titration.getConcVarsCount():]
+        print(polymerAlphas)
+
+        for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
+            kTable.addRow(boundName, [int(k), alpha if not np.isnan(alpha) else ""])
+        kTable.pack(pady=15)
+
+        spectrumTable = Table(
+            self, 0, titration.signalTitles,
+            rowOptions=("readonlyTitles"), columnOptions=("readonlyTitles"))
+        for contributorName, values in zip(
+            titration.contributorNames(),
+            np.around(titration.lastFitResult, 2)
+        ):
+            spectrumTable.addRow(contributorName, values)
+        spectrumTable.pack(pady=15)

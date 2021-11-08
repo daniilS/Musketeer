@@ -78,7 +78,8 @@ class Titration():
         result = minimize(
             self.optimisationFuncLog, x0=initialGuess, method="Nelder-Mead"
         )
-
+        # to make sure the last fit is the optimal one
+        self.optimisationFuncLog(result.x)
         return result.x
 
     def fitData(self):
