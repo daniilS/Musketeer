@@ -11,7 +11,6 @@ from .titrationFrame import TitrationFrame
 from .style import padding
 
 patchMatplotlib.applyPatch()
-windowsHighDpiPatch.setEnhancedDpiScaling()
 try:
     appId = u'daniilS.musketeer'
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
@@ -23,6 +22,8 @@ except:  # noqa
 # appear correctly
 ttkStyle = Style(theme="lumen")
 root = ttkStyle.master
+
+windowsHighDpiPatch.setEnhancedDpiScaling(root)
 
 try:
     # Windows and OS X
