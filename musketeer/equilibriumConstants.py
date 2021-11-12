@@ -126,6 +126,9 @@ class GetKsAll(moduleFrame.Strategy):
         return self.titration.boundCount
 
     def __call__(self, kVars, alphaVars):
+        # TODO: move this to a more sensible place
+        self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
+        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
         return (kVars, alphaVars)
 
 

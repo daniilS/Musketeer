@@ -95,6 +95,13 @@ class TitrationFrame(ttk.Frame):
                 self.discreteFittedFrame,
                 text="Fitted spectra (select wavelengths)"
             )
+            self.resultsFrame = ResultsFrame(
+                self, self.titration
+            )
+            self.notebook.add(
+                self.resultsFrame,
+                text="Results"
+            )
         else:
             self.discreteFittedFrame = DiscreteFittedFrame(
                 self, self.titration
@@ -349,7 +356,7 @@ class DiscreteFittedFrame(ttk.Frame):
 
         curves = titration.processedData.T
         fittedCurves = titration.lastFittedCurves.T
-        names = titration.signalTitles
+        names = titration.processedSignalTitles
         guestConcs = titration.totalConcs.T[titration.totalConcs.shape[1] - 1]
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
@@ -409,14 +416,13 @@ class ResultsFrame(ttk.Frame):
         polymerAlphas = alphas[np.any(titration.stoichiometries < 0, 1)]
         polymerAlphas[np.isnan(polymerAlphas)] = 10**titration.lastKs[
             titration.kVarsCount() + titration.getConcVarsCount():]
-        print(polymerAlphas)
 
         for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
             kTable.addRow(boundName, [int(k), alpha if not np.isnan(alpha) else ""])
         kTable.pack(pady=15)
 
         spectrumTable = Table(
-            self, 0, titration.signalTitles,
+            self, 0, titration.processedSignalTitles,
             rowOptions=("readonlyTitles"), columnOptions=("readonlyTitles"))
         for contributorName, values in zip(
             titration.contributorNames(),
