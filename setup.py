@@ -30,7 +30,8 @@ setuptools.setup(
         "matplotlib",
         "ttkbootstrap",
         "tkscrolledframe",
-        "ttkwidgets"
+        "ttkwidgets",
+        "tksheet"
     ],
     python_requires=">=3.7"
 )

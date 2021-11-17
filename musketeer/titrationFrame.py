@@ -2,6 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import numpy as np
+import tksheet
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from cycler import cycler
@@ -406,7 +407,7 @@ class ResultsFrame(ttk.Frame):
 
     def showResults(self):
         titration = self.titration
-        kTable = Table(self, 0, ["Value", "α"], rowOptions=("readonlyTitles"),
+        kTable = Table(self, 0, ["K", "α"], rowOptions=("readonlyTitles"),
                        columnOptions=("readonlyTitles"))
 
         ks = self.titration.knownKs.copy()
@@ -419,14 +420,14 @@ class ResultsFrame(ttk.Frame):
 
         for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
             kTable.addRow(boundName, [int(k), alpha if not np.isnan(alpha) else ""])
-        kTable.pack(pady=15)
+        kTable.pack(side="top", pady=15)
 
-        spectrumTable = Table(
-            self, 0, titration.processedSignalTitles,
-            rowOptions=("readonlyTitles"), columnOptions=("readonlyTitles"))
-        for contributorName, values in zip(
-            titration.contributorNames(),
-            np.around(titration.lastFitResult, 2)
-        ):
-            spectrumTable.addRow(contributorName, values)
-        spectrumTable.pack(pady=15)
+        sheet = tksheet.Sheet(
+            self,
+            data=list(np.around(titration.lastFitResult, 2)),
+            headers=list(titration.processedSignalTitles),
+            row_index=list(titration.contributorNames()),
+            set_all_heights_and_widths=True,
+        )
+        sheet.enable_bindings()
+        sheet.pack(side="top", pady=15, fill="x")

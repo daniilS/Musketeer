@@ -129,6 +129,7 @@ def readUV(filePath):
     # TODO: use appropriate number of significate figures (affects spinbox and
     # discrete-from-continuous legend)
     titration.signalTitles = np.array(wavelengths, dtype=np.float)
+    titration.signalTitles = np.rint(titration.signalTitles)
     # transpose data so that the column is the wavelength
     titration.rawData = np.array(absorbances, dtype=np.float).T
 
