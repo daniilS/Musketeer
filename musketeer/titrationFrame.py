@@ -1,5 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.filedialog as fd
 
 import numpy as np
 import tksheet
@@ -431,3 +432,15 @@ class ResultsFrame(ttk.Frame):
         )
         sheet.enable_bindings()
         sheet.pack(side="top", pady=15, fill="x")
+
+        saveButton = ttk.Button(self, text="Save as CSV",
+                                command=self.saveCSV, style="success.TButton")
+        saveButton.pack(side="top", pady=15)
+
+    def saveCSV(self):
+        fileName = fd.asksaveasfilename(filetypes=[("CSV file", "*.csv")])
+        data = self.titration.lastFitResult
+        rowTitles = np.atleast_2d(self.titration.contributorNames()).T
+        columnTitles = np.append("", self.titration.processedSignalTitles)
+        output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
+        np.savetxt(fileName, output, fmt="%s", delimiter=",")
