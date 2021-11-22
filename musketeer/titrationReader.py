@@ -6,7 +6,6 @@ import csv
 import numpy as np
 import os
 import re
-import sys
 from pkg_resources import packaging
 
 from .titration import Titration

@@ -6,6 +6,7 @@ import tksheet
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from cycler import cycler
+from ttkbootstrap.widgets import InteractiveNotebook
 
 from . import speciation
 from . import equilibriumConstants
@@ -36,6 +37,7 @@ class TitrationFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.numFits = 0
 
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
@@ -67,13 +69,14 @@ class TitrationFrame(ttk.Frame):
         )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
-        # tabs with various plots
-        from ttkbootstrap.widgets import InteractiveNotebook
-        self.notebook = InteractiveNotebook(self, padding=padding, style="Flat.Interactive.TNotebook")
+        # tabs with different fits
+        self.notebook = InteractiveNotebook(self, padding=padding,
+                                            style="Flat.Interactive.TNotebook")
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
         if self.titration.continuous:
-            self.inputSpectraFrame = InputSpectraFrame(self, self.titration)
+            self.inputSpectraFrame = InputSpectraFrame(self.notebook,
+                                                       self.titration)
             self.notebook.add(self.inputSpectraFrame, text="Input Spectra")
 
         self.rowconfigure(0, weight=1)
@@ -85,42 +88,25 @@ class TitrationFrame(ttk.Frame):
 
     def fitData(self):
         self.titration.fitData()
+        self.numFits += 1
+        nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
+        self.notebook.add(nb, text=f"Fit {self.numFits}")
+
         if self.titration.continuous:
-            self.continuousFittedFrame = ContinuousFittedFrame(
-                self, self.titration
-            )
-            self.notebook.add(
-                self.continuousFittedFrame, text="Fitted Spectra"
-            )
-            self.discreteFittedFrame = DiscreteFromContinuousFittedFrame(
-                self, self.titration
-            )
-            self.notebook.add(
-                self.discreteFittedFrame,
-                text="Fitted spectra (select wavelengths)"
-            )
-            self.resultsFrame = ResultsFrame(
-                self, self.titration
-            )
-            self.notebook.add(
-                self.resultsFrame,
-                text="Results"
-            )
+            continuousFittedFrame = ContinuousFittedFrame(nb, self.titration)
+            nb.add(continuousFittedFrame, text="Fitted Spectra")
+            discreteFittedFrame = DiscreteFromContinuousFittedFrame(
+                nb, self.titration)
+            nb.add(discreteFittedFrame,
+                   text="Fitted spectra (select wavelengths)")
         else:
-            self.discreteFittedFrame = DiscreteFittedFrame(
-                self, self.titration
-            )
-            self.notebook.add(
-                self.discreteFittedFrame,
-                text="Fitted signals"
-            )
-            self.resultsFrame = ResultsFrame(
-                self, self.titration
-            )
-            self.notebook.add(
-                self.resultsFrame,
-                text="Results"
-            )
+            discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
+            nb.add(self.discreteFittedFrame, text="Fitted signals")
+
+        resultsFrame = ResultsFrame(nb, self.titration)
+        nb.add(resultsFrame, text="Results")
+
+        self.notebook.select(str(nb))
 
 
 class InputSpectraFrame(ttk.Frame):
