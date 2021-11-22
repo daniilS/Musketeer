@@ -3,7 +3,8 @@ import tkinter.ttk as ttk
 import os
 import ctypes
 
-from ttkbootstrap import Style
+import ttkbootstrap
+from ttkbootstrap.widgets import InteractiveNotebook
 import matplotlib.pyplot as plt
 
 from . import titrationReader, patchMatplotlib, windowsHighDpiPatch
@@ -20,7 +21,7 @@ except:  # noqa
 
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
-ttkStyle = Style(theme="lumen")
+ttkStyle = ttkbootstrap.Style(theme="lumen")
 root = ttkStyle.master
 
 windowsHighDpiPatch.setEnhancedDpiScaling(root)
@@ -43,18 +44,31 @@ root.iconphoto(True, icon)
 frame = ttk.Frame(root, padding=padding)
 frame.pack(expand=True, fill="both")
 
-fileReader = titrationReader.getFileReader()
-filePath = titrationReader.getFilePath()
-titrations = fileReader(filePath)
 
-notebook = ttk.Notebook(frame, padding=padding)
+class TitrationsNotebook(InteractiveNotebook):
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, padding=padding, newtab=self.readFile,
+                         style="Flat.Interactive.TNotebook", *args, **kwargs)
+
+    def readFile(self):
+        fileReader = titrationReader.getFileReader()
+        if fileReader == "":
+            return
+        filePath = titrationReader.getFilePath()
+        if filePath == "":
+            return
+        titrations = fileReader(filePath)
+
+        # create a tab for each titration, and let the titration object handle
+        # its own I/O
+        for titration in titrations:
+            titrationFrame = TitrationFrame(self, titration, padding=padding)
+            self.add(titrationFrame, text=titration.title, sticky="nesw")
+
+
+notebook = TitrationsNotebook(frame)
 notebook.pack(expand=True, fill="both")
-
-# create a tab for each titration, and let the titration object handle its
-# own I/O
-for titration in titrations:
-    titrationFrame = TitrationFrame(notebook, titration, padding=padding)
-    notebook.add(titrationFrame, text="Titration", sticky="nesw")
+notebook.readFile()
 
 
 def closePlots():

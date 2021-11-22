@@ -4,6 +4,7 @@ from scipy.optimize import minimize
 
 class Titration():
     def __init__(self):
+        self.title = "Titration"
         # identical to [True, True, True, ..., True]
         self.rowFilter = slice(None)
         self.columnFilter = slice(None)

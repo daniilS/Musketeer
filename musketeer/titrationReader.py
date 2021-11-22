@@ -4,6 +4,7 @@ import tkinter.filedialog as fd
 
 import csv
 import numpy as np
+import os
 import re
 import sys
 from pkg_resources import packaging
@@ -33,8 +34,6 @@ def find_nearest(array, value):
 
 def getFileReader():
     fileType = askFileType()
-    if fileType == "":
-        sys.exit("No filetype selected.")
     return fileReaders[fileType]
 
 
@@ -74,8 +73,6 @@ def getFilePath():
         title="Select input file",
         filetypes=[("csv files", "*.csv"), ("all files", "*.*")]
     )
-    if filePath == "":
-        sys.exit("No input file selected.")
     return filePath
 
 
@@ -100,6 +97,7 @@ def getVolumeFromString(string):
 
 def readUV(filePath):
     titration = Titration()
+    titration.title = os.path.basename(filePath)
     # set default parameters for UV-Vis titrations
     titration.continuous = True
     titration.labelX = "λ (nm)"
@@ -180,9 +178,10 @@ def readCSV(filePath):
     popup = CSVPopup()
     popup.wait_window(popup)
     if popup.aborted:
-        sys.exit()
+        return []
 
     titration = Titration()
+    titration.title = os.path.basename(filePath)
     titration.continuous = False
 
     with open(filePath, "r", newline='') as inFile:
@@ -214,7 +213,6 @@ def readCSV(filePath):
 
 
 def readNMR(filePath):
-    # TODO: proof of concept works, convert to class
     # reads an MNova 1D peaks list
     additionTitles = []
     frequencies = []
@@ -271,6 +269,7 @@ def readNMR(filePath):
         plottedPoints = np.copy(currentSignal)
         cycler = plt.rcParams['axes.prop_cycle'].by_key()['color']
         titration = Titration()
+        titration.title = os.path.basename(filePath)
         titration.continuous = False
         titration.additionTitles = np.array(additionTitles)
 
