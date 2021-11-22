@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
+import tkinter.messagebox as mb
 
 from . import speciation
 from . import equilibriumConstants
@@ -65,7 +66,7 @@ class TitrationFrame(ttk.Frame):
             moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
 
         fitDataButton = ttk.Button(
-            self.options, text="Fit", command=self.fitData
+            self.options, text="Fit", command=self.tryFitData
         )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
@@ -85,6 +86,13 @@ class TitrationFrame(ttk.Frame):
     def updatePlots(self):
         if hasattr(self, "inputSpectraFrame"):
             self.inputSpectraFrame.plot()
+
+    def tryFitData(self, *args, **kwargs):
+        try:
+            self.fitData(*args, **kwargs)
+        except Exception as e:
+            mb.showerror(title="Failed to fit data", message=e, parent=self)
+            return
 
     def fitData(self):
         self.titration.fitData()

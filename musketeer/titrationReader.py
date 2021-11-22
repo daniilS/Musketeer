@@ -33,6 +33,8 @@ def find_nearest(array, value):
 
 def getFileReader():
     fileType = askFileType()
+    if fileType == "":
+        return None
     return fileReaders[fileType]
 
 

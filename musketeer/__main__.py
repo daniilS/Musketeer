@@ -6,6 +6,7 @@ import ctypes
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook
 import matplotlib.pyplot as plt
+import tkinter.messagebox as mb
 
 from . import titrationReader, patchMatplotlib, windowsHighDpiPatch
 from .titrationFrame import TitrationFrame
@@ -52,12 +53,17 @@ class TitrationsNotebook(InteractiveNotebook):
 
     def readFile(self):
         fileReader = titrationReader.getFileReader()
-        if fileReader == "":
+        if fileReader is None:
             return
         filePath = titrationReader.getFilePath()
         if filePath == "":
             return
-        titrations = fileReader(filePath)
+        try:
+            titrations = fileReader(filePath)
+        except Exception as e:
+            mb.showerror(title="Failed to read file", message=e,
+                         parent=self)
+            return
 
         # create a tab for each titration, and let the titration object handle
         # its own I/O
