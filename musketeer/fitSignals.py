@@ -9,36 +9,29 @@ class FitSignals(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
-    # TODO: account for known signals
-    def __call__TODO(self, signalVars):
+    def __call__(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
-        knownMask = self.titration.signalValues != None
-        knownValues = self.titration.signalValues[knownMask]
-        knownSignals = signalVars[knownMask]
-        unknownSignals = signalVars[~knownMask]
+        knownMask = ~np.isnan(knownSpectra[:, 0])
+        knownSignals = signalVars[:, knownMask]
+        unknownSignals = signalVars[:, ~knownMask]
 
-        knownSpectrum = knownValues @ knownSignals
+        knownSpectrum = knownSignals @ knownSpectra[knownMask, :]
         unknownSpectrum = self.titration.processedData - knownSpectrum
         fittedSignals, residuals, _, _ = lstsq(
             unknownSignals, unknownSpectrum, rcond=None
         )
-        return fittedSignals, residuals
-
-    def __call__(self, signalVars):
-        unknownSignals = signalVars
-        unknownSpectrum = self.titration.processedData
-        fittedSignals, residuals, _, _ = lstsq(
-            unknownSignals, unknownSpectrum, rcond=None
-        )
-        fittedCurves = unknownSignals @ fittedSignals
-        return fittedSignals, residuals, fittedCurves
+        fittedCurves = unknownSignals @ fittedSignals + knownSpectrum
+        allSignals = knownSpectra.copy()
+        allSignals[~knownMask, :] = fittedSignals
+        return allSignals, residuals, fittedCurves
 
 
 class FitSignalsNonnegative(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
 
-    def __call__(self, signalVars):
+    # TODO: account for known spectra
+    def __call__(self, signalVars, knownSpectra):
         fittedSignals = np.empty((0, signalVars.shape[1]))
         residuals = np.empty((1, 0))
         for signal in self.titration.processedData.T:

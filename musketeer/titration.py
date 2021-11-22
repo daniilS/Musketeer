@@ -57,8 +57,10 @@ class Titration():
         proportionalSignalVars = \
             self.getProportionalSignals(signalVars, totalConcs)
 
+        knownSpectra = self.getKnownSpectra()
+
         self.lastFitResult, residuals, self.lastFittedCurves = \
-            self.fitSignals(proportionalSignalVars)
+            self.fitSignals(proportionalSignalVars, knownSpectra)
 
         combinedResiduals = self.combineResiduals(residuals)
 

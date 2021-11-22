@@ -15,6 +15,7 @@ from . import contributors
 from . import proportionality
 from . import fitSignals
 from . import combineResiduals
+from . import knownSignals
 from .style import padding
 from .scrolledFrame import ScrolledFrame
 from .table import Table
@@ -53,6 +54,7 @@ class TitrationFrame(ttk.Frame):
             totalConcentrations,
             contributors,
             proportionality,
+            knownSignals,
             fitSignals,
             combineResiduals
         ):
@@ -67,7 +69,8 @@ class TitrationFrame(ttk.Frame):
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         # tabs with various plots
-        self.notebook = ttk.Notebook(self, padding=padding)
+        from ttkbootstrap.widgets import InteractiveNotebook
+        self.notebook = InteractiveNotebook(self, padding=padding, style="Flat.Interactive.TNotebook")
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
         if self.titration.continuous:
