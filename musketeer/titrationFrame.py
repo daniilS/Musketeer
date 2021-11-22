@@ -1,4 +1,3 @@
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 
@@ -134,23 +133,24 @@ class InputSpectraFrame(ttk.Frame):
 
         ttk.Label(rangeSelection, text="Wavelength range:").pack(side="left")
 
-        # TODO: move rounding to titrationReader
-        minWL = int(round(self.titration.signalTitles.min()))
-        maxWL = int(round(self.titration.signalTitles.max()))
-        self.fromVar = tk.IntVar(self, minWL)
-        self.toVar = tk.IntVar(self, maxWL)
+        minWL = self.titration.signalTitles.min()
+        maxWL = self.titration.signalTitles.max()
+        decimals = self.titration.signalTitlesDecimals
+        step = 1 / (10 ** decimals)
 
-        ttk.Spinbox(
-            rangeSelection, textvariable=self.fromVar,
-            from_=minWL, to=maxWL, width=5
-        ).pack(padx=padding, side="left")
+        self.fromSpinbox = ttk.Spinbox(
+            rangeSelection, from_=minWL, to=maxWL, width=5, increment=step
+        )
+        self.fromSpinbox.set(f"{minWL:.{decimals}f}")
+        self.fromSpinbox.pack(padx=padding, side="left")
 
         ttk.Label(rangeSelection, text="to").pack(side="left")
 
-        ttk.Spinbox(
-            rangeSelection, textvariable=self.toVar,
-            from_=minWL, to=maxWL, width=5
-        ).pack(padx=padding, side="left")
+        self.toSpinbox = ttk.Spinbox(
+            rangeSelection, from_=minWL, to=maxWL, width=5, increment=step
+        )
+        self.toSpinbox.set(f"{maxWL:.{decimals}f}")
+        self.toSpinbox.pack(padx=padding, side="left")
 
         self.fig, (self.ax) = plt.subplots()
 
@@ -203,11 +203,11 @@ class InputSpectraFrame(ttk.Frame):
         fig.canvas.draw_idle()
 
     def updateWLRange(self):
-        from_ = self.fromVar.get()
-        to = self.toVar.get()
+        from_ = float(self.fromSpinbox.get())
+        to = float(self.toSpinbox.get())
         self.titration.columnFilter = \
-            (self.titration.signalTitles.astype(int) >= from_) & \
-            (self.titration.signalTitles.astype(int) <= to)
+            (self.titration.signalTitles >= from_) & \
+            (self.titration.signalTitles <= to)
         self.plot()
 
 

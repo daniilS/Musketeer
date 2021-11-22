@@ -126,12 +126,13 @@ def readUV(filePath):
             absorbances.append(row[1::2])
 
     titration.additionTitles = titleRow
-    # TODO: use appropriate number of significate figures (affects spinbox and
-    # discrete-from-continuous legend)
-    titration.signalTitles = np.array(wavelengths, dtype=np.float)
-    titration.signalTitles = np.rint(titration.signalTitles)
+    titration.signalTitles = np.array(wavelengths, dtype=float)
+    averageStep = abs(np.average(np.diff(titration.signalTitles)))
+    titration.signalTitlesDecimals = int(-np.rint(np.log10(averageStep)))
+    titration.signalTitles = np.round(titration.signalTitles,
+                                      titration.signalTitlesDecimals)
     # transpose data so that the column is the wavelength
-    titration.rawData = np.array(absorbances, dtype=np.float).T
+    titration.rawData = np.array(absorbances, dtype=float).T
 
     return [titration]
 
@@ -326,7 +327,7 @@ def readNMR(filePath):
             cycler.pop(0)
 
         def save():
-            titration.rawData = np.array(signals, dtype=np.float).T
+            titration.rawData = np.array(signals, dtype=float).T
             titration.signalTitles = np.array(titles)
             popup.destroy()
 
