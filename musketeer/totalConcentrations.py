@@ -221,12 +221,14 @@ class VolumesPopup(tk.Toplevel):
 
     def saveData(self):
         try:
+            stockTitles = self.stockTable.columnTitles
             stockConcs = self.stockTable.data
             volumes = self.volumesTable.data
         except Exception as e:
             mb.showerror(title="Could not save data", message=e, parent=self)
             return
 
+        self.titration.stockTitles = stockTitles
         self.titration.unknownTotalConcsLinked = \
             self.unknownTotalConcsLinkedVar.get()
 
