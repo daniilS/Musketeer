@@ -95,7 +95,10 @@ class VolumesTable(Table):
             self.populateDefault()
 
     def populate(self, volumes):
-        for name, row in zip(self.titration.additionTitles, volumes):
+        for name, row in zip(
+            self.titration.additionTitles[self.titration.rowFilter],
+            volumes
+        ):
             self.addRow(name, [self.convertVolume(volume, "L", self.unit.get())
                                for volume in row])
 

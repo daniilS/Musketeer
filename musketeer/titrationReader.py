@@ -124,7 +124,7 @@ def readUV(filePath):
             wavelengths.append(row[0])
             absorbances.append(row[1::2])
 
-    titration.additionTitles = titleRow
+    titration.additionTitles = np.array(titleRow)
     titration.signalTitles = np.array(wavelengths, dtype=float)
     averageStep = abs(np.average(np.diff(titration.signalTitles)))
     titration.signalTitlesDecimals = int(-np.rint(np.log10(averageStep)))
