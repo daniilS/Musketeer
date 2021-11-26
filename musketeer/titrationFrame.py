@@ -109,7 +109,7 @@ class TitrationFrame(ttk.Frame):
                    text="Fitted spectra (select wavelengths)")
         else:
             discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
-            nb.add(self.discreteFittedFrame, text="Fitted signals")
+            nb.add(discreteFittedFrame, text="Fitted signals")
 
         resultsFrame = ResultsFrame(nb, self.titration)
         nb.add(resultsFrame, text="Results")
