@@ -405,7 +405,7 @@ class ResultsFrame(ttk.Frame):
 
     def showResults(self):
         titration = self.titration
-        kTable = Table(self, 0, ["K", "α"], rowOptions=("readonlyTitles"),
+        kTable = Table(self, 0, 0, ["K", "α"], rowOptions=("readonlyTitles"),
                        columnOptions=("readonlyTitles"))
 
         ks = self.titration.knownKs.copy()

@@ -11,7 +11,7 @@ from .scrolledFrame import ScrolledFrame
 class KnownKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
-        super().__init__(master, 0, ["Value", "α"], allowBlanks=True,
+        super().__init__(master, 0, 0, ["Value", "α"], allowBlanks=True,
                          rowOptions=("readonlyTitles"),
                          columnOptions=("readonlyTitles")
                          )

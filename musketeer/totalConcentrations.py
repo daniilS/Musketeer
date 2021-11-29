@@ -27,15 +27,16 @@ class StockTable(Table):
             stockTitles = titration.stockTitles
         else:
             stockTitles = ("Stock 1", "Stock 2")
-        super().__init__(master, 2, stockTitles, allowBlanks=True,
+        super().__init__(master, 2, 0, stockTitles, allowBlanks=True,
                          rowOptions=("readonlyTitles", "delete"),
                          columnOptions=("titles", "new", "delete"))
 
         self.titration = titration
 
-        self.label(0, 0, "Stock concentrations:", 4)
-        self.label(1, 2, "Unit:")
-        _, self.unit = self.dropdown(1, 3, ("nm", "\u03BCM", "mM", "M"), "mM")
+        self.label(0 - self.headerGridRows, 0, "Stock concentrations:", 4)
+        self.label(1 - self.headerGridRows, 2, "Unit:")
+        _, self.unit = self.dropdown(1 - self.headerGridRows, 3,
+                                     ("nm", "\u03BCM", "mM", "M"), "mM")
 
         if hasattr(titration, "stockConcs"):
             self.populate(titration.stockConcs)
@@ -73,21 +74,21 @@ class VolumesTable(Table):
             stockTitles = titration.stockTitles
         else:
             stockTitles = ("Stock 1", "Stock 2")
-        super().__init__(master, 4, stockTitles, allowBlanks=False,
+        super().__init__(master, 2, 2, stockTitles, allowBlanks=False,
                          rowOptions=("delete", "readonlyTitles"),
                          columnOptions=())
 
         self.titration = titration
 
-        self.label(0, 0, "Addition volumes:", 4)
-        self.label(1, 2, "Unit:")
+        self.label(0 - self.headerGridRows, 0, "Addition volumes:", 4)
+        self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(
-            1, 3, ("nL", "\u03BCL", "mL", "L"), "\u03BCL"
+            1 - self.headerGridRows, 3, ("nL", "\u03BCL", "mL", "L"), "\u03BCL"
         )
         if hasattr(titration, "volumesUnit"):
             self.unit.set(titration.volumesUnit)
 
-        self.label(self.headerRows + 1, 1, "Addition title:")
+        self.label(1, 1, "Addition title:")
 
         if hasattr(titration, "volumes"):
             self.populate(titration.volumes)
@@ -109,7 +110,7 @@ class VolumesTable(Table):
     def addColumn(self, firstEntry="", data=None):
         super().addColumn(firstEntry, data)
         column = self.cells.shape[1] - 1
-        copyFirstButton = self.button(self.headerRows, column, "Copy first")
+        copyFirstButton = self.button(0, column, "Copy first")
         copyFirstButton.configure(
             command=lambda button=copyFirstButton: self.copyFirst(
                 button.grid_info()["column"]
@@ -117,7 +118,7 @@ class VolumesTable(Table):
         )
         self.cells[0, column] = copyFirstButton
 
-        copyTitlesButton = self.button(self.headerRows + 1, column,
+        copyTitlesButton = self.button(1, column,
                                        "Copy from titles")
         copyTitlesButton.configure(
             command=lambda button=copyTitlesButton: self.copyFromTitles(
@@ -127,13 +128,13 @@ class VolumesTable(Table):
         self.cells[1, column] = copyTitlesButton
 
     def copyFirst(self, column):
-        cells = self.cells[2:, column]
+        cells = self.cells[self.headerCells:, column]
         first = cells[0].get()
         for cell in cells:
             cell.set(first)
 
     def copyFromTitles(self, column):
-        cells = self.cells[2:]
+        cells = self.cells[self.headerCells:]
         for row in cells:
             title = row[1].get()
             volume = self.getVolumeFromString(title, self.unit.get())

@@ -48,7 +48,7 @@ class SpeciationTable(Table):
         else:
             stoichiometries = np.array([[1, 1]])
 
-        super().__init__(master, 0, freeNames, allowBlanks=False,
+        super().__init__(master, 0, 0, freeNames, allowBlanks=False,
                          rowOptions=("titles", "new", "delete"),
                          columnOptions=("titles", "new", "delete"))
         for boundName, stoichiometry in zip(boundNames, stoichiometries):
