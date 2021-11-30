@@ -36,7 +36,7 @@ class StockTable(Table):
         self.label(0 - self.headerGridRows, 0, "Stock concentrations:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(1 - self.headerGridRows, 3,
-                                     ("nm", "\u03BCM", "mM", "M"), "mM")
+                                     ("nm", "μM", "mM", "M"), "mM")
 
         if hasattr(titration, "stockConcs"):
             self.populate(titration.stockConcs)
@@ -83,7 +83,7 @@ class VolumesTable(Table):
         self.label(0 - self.headerGridRows, 0, "Addition volumes:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(
-            1 - self.headerGridRows, 3, ("nL", "\u03BCL", "mL", "L"), "\u03BCL"
+            1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL"
         )
         if hasattr(titration, "volumesUnit"):
             self.unit.set(titration.volumesUnit)
@@ -97,8 +97,7 @@ class VolumesTable(Table):
 
     def populate(self, volumes):
         for name, row in zip(
-            self.titration.additionTitles[self.titration.rowFilter],
-            volumes
+            self.titration.additionTitles[self.titration.rowFilter], volumes
         ):
             self.addRow(name, [self.convertVolume(volume, "L", self.unit.get())
                                for volume in row])
@@ -118,8 +117,7 @@ class VolumesTable(Table):
         )
         self.cells[0, column] = copyFirstButton
 
-        copyTitlesButton = self.button(1, column,
-                                       "Copy from titles")
+        copyTitlesButton = self.button(1, column, "Copy from titles")
         copyTitlesButton.configure(
             command=lambda button=copyTitlesButton: self.copyFromTitles(
                 button.grid_info()["column"]
@@ -245,6 +243,145 @@ class VolumesPopup(tk.Toplevel):
             self.titration.additionTitles, self.volumesTable.rowTitles
         )
 
+        # Calculate and save total concentrations if no stock concentrations
+        # are unknown, to transfer them to the ConcsPopup.
+        if np.count_nonzero(np.isnan(self.titration.stockConcs)) == 0:
+            moles = self.titration.volumes @ self.titration.stockConcs.T
+            totalVolumes = np.atleast_2d(np.sum(self.titration.volumes, 1)).T
+            self.titration.totalConcs = moles / totalVolumes
+        elif hasattr(self.titration, "totalConcs"):
+            del self.titration.totalConcs
+
+        self.destroy()
+
+
+class ConcsTable(Table):
+    # TODO: merge with VolumesTable
+    def __init__(self, master, titration):
+        self.titration = titration
+
+        super().__init__(master, 2, 2, titration.freeNames, allowBlanks=False,
+                         rowOptions=("delete", "readonlyTitles"),
+                         columnOptions=("readonlyTitles"))
+
+        self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
+        self.label(1 - self.headerGridRows, 2, "Unit:")
+        _, self.unit = self.dropdown(
+            1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
+        )
+        if hasattr(titration, "concsUnit"):
+            self.unit.set(titration.concsUnit)
+
+        self.label(self.headerCells - 1, 1, "Addition title:")
+
+        if hasattr(titration, "totalConcs"):
+            self.populate(titration.totalConcs)
+        else:
+            self.populateDefault()
+
+    def populate(self, concs):
+        for name, row in zip(
+            self.titration.additionTitles[self.titration.rowFilter], concs
+        ):
+            self.addRow(name, [self.convertConc(conc, "M", self.unit.get())
+                               for conc in row])
+
+    def populateDefault(self):
+        for name in self.titration.additionTitles:
+            self.addRow(name)
+
+    def addColumn(self, firstEntry="", data=None):
+        super().addColumn(firstEntry, data)
+        column = self.cells.shape[1] - 1
+        copyFirstButton = self.button(0, column, "Copy first")
+        copyFirstButton.configure(
+            command=lambda button=copyFirstButton: self.copyFirst(
+                button.grid_info()["column"]
+            )
+        )
+        self.cells[0, column] = copyFirstButton
+
+        copyTitlesButton = self.button(1, column, "Copy from titles")
+        copyTitlesButton.configure(
+            command=lambda button=copyTitlesButton: self.copyFromTitles(
+                button.grid_info()["column"]
+            )
+        )
+        self.cells[1, column] = copyTitlesButton
+
+    def copyFirst(self, column):
+        cells = self.cells[self.headerCells:, column]
+        first = cells[0].get()
+        for cell in cells:
+            cell.set(first)
+
+    def copyFromTitles(self, column):
+        cells = self.cells[self.headerCells:]
+        for row in cells:
+            title = row[1].get()
+            conc = self.getConcFromString(title, self.unit.get())
+            if conc is not None:
+                row[column].set(conc)
+
+    def getConcFromString(self, string, toUnit="M"):
+        searchResult = re.search(r"([0-9.]+) ?([nuμm]?)M", string)
+        if not searchResult:
+            return None
+        conc, prefix = searchResult.group(1, 2)
+        return self.convertConc(conc, prefix, toUnit)
+
+    def convertConc(self, conc, fromUnit, toUnit):
+        conc = Decimal(conc)
+        convertedConc = float(
+            conc * prefixesDecimal[fromUnit.strip("M")]
+            / prefixesDecimal[toUnit.strip("M")]
+        )
+        return f"{convertedConc:g}"  # strip trailing zeroes
+
+
+class ConcsPopup(tk.Toplevel):
+    def __init__(self, titration, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.titration = titration
+        self.title("Enter concentrations")
+        self.grab_set()
+
+        height = int(self.master.winfo_height() * 0.8)
+        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame.pack(expand=True, fill="both")
+        frame.bind_arrow_keys(self)
+        frame.bind_scroll_wheel(self)
+
+        innerFrame = frame.display_widget(ttk.Frame, stretch=True)
+
+        self.concsTable = ConcsTable(innerFrame, titration)
+        self.concsTable.pack(expand=True, fill="both")
+
+        buttonFrame = ButtonFrame(
+            innerFrame, self.reset, self.saveData, self.destroy
+        )
+        buttonFrame.pack(expand=False, fill="both")
+
+    def reset(self):
+        self.concsTable.resetData()
+        self.concsTable.populateDefault()
+
+    def saveData(self):
+        try:
+            totalConcs = self.concsTable.data
+        except Exception as e:
+            mb.showerror(title="Could not save data", message=e, parent=self)
+            return
+
+        self.titration.totalConcs = totalConcs * prefixes[
+            self.concsTable.unit.get().strip("M")
+        ]
+        self.titration.concsUnit = self.concsTable.unit.get()
+
+        self.titration.rowFilter = np.in1d(
+            self.titration.additionTitles, self.concsTable.rowTitles
+        )
+
         self.destroy()
 
 
@@ -269,9 +406,9 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
         moles = titration.volumes @ stockConcs.T
         totalVolumes = np.atleast_2d(np.sum(titration.volumes, 1)).T
-        titration.totalConcs = moles / totalVolumes
+        totalConcs = moles / totalVolumes
 
-        return titration.totalConcs
+        return totalConcs
 
     def showPopup(self):
         popup = VolumesPopup(self.titration)
@@ -292,10 +429,17 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 class GetTotalConcs(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
+        titration.getConcVarsCount = self.getConcVarsCount
 
     def __call__(self, totalConcVars):
-        # TODO: implement unknown concentrations
         return self.titration.totalConcs
+
+    def showPopup(self):
+        popup = ConcsPopup(self.titration)
+        popup.wait_window(popup)
+
+    def getConcVarsCount(self):
+        return 0
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
