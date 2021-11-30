@@ -4,7 +4,6 @@ import tkinter.filedialog as fd
 import numpy as np
 import tksheet
 from scipy.interpolate import interp1d
-from scipy.signal import find_peaks
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
 import tkinter.messagebox as mb
@@ -261,43 +260,12 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
         ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
         fig, (ax) = plt.subplots()
 
-        # TODO: move to Titration class
-        # get the total movement at each wavelength
-        movement = abs(np.diff(titration.processedData, axis=0)).sum(axis=0)
-        # get the largest difference from the first point at each wavelength
-        diff = titration.processedData - titration.processedData[0]
-        maxDiff = np.max(abs(diff), axis=0)
-        # find the wavelengths with the largest total movement
-        peaksIndices, peakProperties = find_peaks(movement, prominence=0)
-        prominences = peakProperties["prominences"]
-        # select the four most prominent peaks
-        largestFilter = prominences.argsort()[-4:]
-        largestPeaksIndices = peaksIndices[largestFilter]
+        peakIndices = titration.getPeakIndices()
 
-        # Shoulder peaks can appear as inflection points rather than maxima.
-        # We'll add the two most prominent inflection points from a first-order
-        # approximation of the first derivative of the total movement:
-        inflectionIndices, inflectionProperties = \
-            find_peaks(-abs(np.diff(movement)), prominence=0)
-        inflectionProminences = inflectionProperties["prominences"]
-        inflectionFilter = inflectionProminences.argsort()[-2:]
-        largestInflectionsIndices = inflectionIndices[inflectionFilter]
-
-        # combine the two arrays, without duplicates, and sort them
-        largestPeaksIndices = np.sort(np.unique(np.concatenate(
-            (largestPeaksIndices, largestInflectionsIndices)
-        )))
-
-        # discard peaks that don't move far enough away from the baseline
-        # compared to the other peaks
-        peaksDiff = maxDiff[largestPeaksIndices]
-        threshold = np.max(peaksDiff) / 10
-        filteredPeaks = largestPeaksIndices[peaksDiff >= threshold]
-
-        curves = titration.processedData.T[filteredPeaks]
-        fittedCurves = titration.lastFittedCurves.T[filteredPeaks]
+        curves = titration.processedData.T[peakIndices]
+        fittedCurves = titration.lastFittedCurves.T[peakIndices]
         names = np.char.add(
-            titration.processedSignalTitlesStrings[filteredPeaks], " nm"
+            titration.processedSignalTitlesStrings[peakIndices], " nm"
         )
 
         guestConcs = titration.lastFreeConcs.T[-1]

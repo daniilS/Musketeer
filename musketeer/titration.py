@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize
+from scipy.signal import find_peaks
 
 
 class Titration():
@@ -44,6 +45,38 @@ class Titration():
                              for title in self.processedSignalTitles])
         else:
             return self.processedSignalTitles.astype(str)
+
+    def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
+        # get the total movement for each signal
+        movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
+        # get the largest difference from the first point at each wavelength
+        diff = self.processedData - self.processedData[0]
+        maxDiff = np.max(abs(diff), axis=0)
+        # find the wavelengths with the largest total movement
+        peakIndices, peakProperties = find_peaks(movement, prominence=0)
+        prominences = peakProperties["prominences"]
+        # select the four most prominent peaks
+        largestFilter = prominences.argsort()[-maxPeaks:]
+        largestPeakIndices = peakIndices[largestFilter]
+
+        # Shoulder peaks can appear as inflection points rather than maxima.
+        # We'll add the two most prominent inflection points from a first-order
+        # approximation of the first derivative of the total movement:
+        inflectionIndices, inflectionProperties = \
+            find_peaks(-abs(np.diff(movement)), prominence=0)
+        inflectionProminences = inflectionProperties["prominences"]
+        inflectionFilter = inflectionProminences.argsort()[-maxShoulderPeaks:]
+        largestInflectionsIndices = inflectionIndices[inflectionFilter]
+
+        # combine the two arrays, without duplicates, and sort them
+        largestPeakIndices = np.sort(np.unique(np.concatenate(
+            (largestPeakIndices, largestInflectionsIndices)
+        )))
+
+        # discard peaks that don't move far enough away from the baseline
+        # compared to the other peaks
+        peaksDiff = maxDiff[largestPeakIndices]
+        return largestPeakIndices[peaksDiff >= np.max(peaksDiff) * threshold]
 
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
