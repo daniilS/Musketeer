@@ -37,6 +37,14 @@ class Titration():
     def processedSignalTitles(self):
         return self.signalTitles[self.columnFilter]
 
+    @property
+    def processedSignalTitlesStrings(self):
+        if self.processedSignalTitles.dtype == float:
+            return np.array([f"{title:.{self.signalTitlesDecimals}f}"
+                             for title in self.processedSignalTitles])
+        else:
+            return self.processedSignalTitles.astype(str)
+
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[:self.kVarsCount()]

@@ -297,11 +297,9 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
         curves = titration.processedData.T[filteredPeaks]
         fittedCurves = titration.lastFittedCurves.T[filteredPeaks]
         names = np.char.add(
-            # TODO: move rounding to titrationReader
-            titration.processedSignalTitles[filteredPeaks]
-            .round().astype(int).astype(str),
-            " nm"
+            titration.processedSignalTitlesStrings[filteredPeaks], " nm"
         )
+
         guestConcs = titration.lastFreeConcs.T[-1]
         # TODO: move to separate function, also use from DiscreteFittedFrame
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
@@ -358,7 +356,7 @@ class DiscreteFittedFrame(ttk.Frame):
 
         curves = titration.processedData.T
         fittedCurves = titration.lastFittedCurves.T
-        names = titration.processedSignalTitles
+        names = titration.processedSignalTitlesStrings
         guestConcs = titration.lastFreeConcs.T[-1]
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
@@ -427,7 +425,7 @@ class ResultsFrame(ttk.Frame):
         sheet = tksheet.Sheet(
             self,
             data=list(np.around(titration.lastFitResult, 2)),
-            headers=list(titration.processedSignalTitles),
+            headers=list(titration.processedSignalTitlesStrings),
             row_index=list(titration.contributorNames()),
             set_all_heights_and_widths=True,
         )
@@ -439,7 +437,8 @@ class ResultsFrame(ttk.Frame):
         saveButton.pack(side="top", pady=15)
 
     def saveCSV(self):
-        fileName = fd.asksaveasfilename(filetypes=[("CSV file", "*.csv")])
+        fileName = fd.asksaveasfilename(filetypes=[("CSV file", "*.csv")],
+                                        defaultextension=".csv")
         data = self.titration.lastFitResult
         rowTitles = np.atleast_2d(self.titration.contributorNames()).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
