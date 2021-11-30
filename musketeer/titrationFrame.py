@@ -213,7 +213,8 @@ class ContinuousFittedFrame(ttk.Frame):
 
     def plot(self):
         titration = self.titration
-        K = titration.lastKs[0]  # TODO: support multiple Ks
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
         fig, (ax) = plt.subplots()
 
         spectra = titration.lastFitResult
@@ -223,7 +224,7 @@ class ContinuousFittedFrame(ttk.Frame):
             plt.plot(wavelengths, spectrum, label=name)
 
         ttk.Label(
-            self, text=f"Fitted spectra (K = {int(10**K)})",
+            self, text=f"Fitted spectra (K = {ks[0]:.0f})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
         ax.set_xlabel("λ / nm")
@@ -256,7 +257,8 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
 
     def plot(self):
         titration = self.titration
-        K = titration.lastKs[0]  # TODO: support multiple Ks
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
         fig, (ax) = plt.subplots()
 
         # TODO: move to Titration class
@@ -300,7 +302,7 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
             .round().astype(int).astype(str),
             " nm"
         )
-        guestConcs = titration.totalConcs.T[1]
+        guestConcs = titration.lastFreeConcs.T[-1]
         # TODO: move to separate function, also use from DiscreteFittedFrame
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
@@ -318,7 +320,7 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
             plt.plot(smoothX, smoothY, label=name)
 
         ttk.Label(
-            self, text=f"Fitted curves (K = {int(10**K)})",
+            self, text=f"Fitted curves (K = {ks[0]:.0f})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
         ax.set_xlabel(f"[{titration.freeNames[1]}] / M")
@@ -350,13 +352,14 @@ class DiscreteFittedFrame(ttk.Frame):
 
     def plot(self):
         titration = self.titration
-        K = titration.lastKs[0]  # TODO: support multiple Ks
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
         fig, (ax) = plt.subplots()
 
         curves = titration.processedData.T
         fittedCurves = titration.lastFittedCurves.T
         names = titration.processedSignalTitles
-        guestConcs = titration.totalConcs.T[titration.totalConcs.shape[1] - 1]
+        guestConcs = titration.lastFreeConcs.T[-1]
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
@@ -373,7 +376,7 @@ class DiscreteFittedFrame(ttk.Frame):
             plt.plot(smoothX, smoothY, label=name)
 
         ttk.Label(
-            self, text=f"Fitted curves (K = {int(10**K)})",
+            self, text=f"Fitted curves (K = {ks[0]:.0f})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
         ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
@@ -417,7 +420,8 @@ class ResultsFrame(ttk.Frame):
             titration.kVarsCount() + titration.getConcVarsCount():]
 
         for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
-            kTable.addRow(boundName, [int(k), alpha if not np.isnan(alpha) else ""])
+            kTable.addRow(boundName,
+                          [np.rint(k), alpha if not np.isnan(alpha) else ""])
         kTable.pack(side="top", pady=15)
 
         sheet = tksheet.Sheet(
