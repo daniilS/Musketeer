@@ -191,6 +191,9 @@ def readCSV(filePath):
     titration = Titration()
     titration.title = os.path.basename(filePath)
     titration.continuous = False
+    # TODO: remove placeholder
+    titration.yQuantity = "δ"
+    titration.yUnit = "ppm"
 
     with open(filePath, "r", newline='') as inFile:
         data = np.genfromtxt(inFile, dtype=str, delimiter=",")
