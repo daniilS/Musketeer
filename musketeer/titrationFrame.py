@@ -161,12 +161,12 @@ class InputSpectraFrame(ttk.Frame):
             canvas, self, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.grid_anchor("center")
 
         self.plot()
 
@@ -241,12 +241,12 @@ class ContinuousFittedFrame(ttk.Frame):
             canvas, self, pack_toolbar=False
         )
         toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="")
+        toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.grid_anchor("center")
 
 
 class FittedFrame(ttk.Frame):
@@ -266,7 +266,7 @@ class FittedFrame(ttk.Frame):
             self.canvas, self, pack_toolbar=False
         )
         self.toolbar.update()
-        self.toolbar.grid(row=2, column=0, sticky="")
+        self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
@@ -278,7 +278,7 @@ class FittedFrame(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.grid_anchor("center")
 
     def plot(self, curves, fittedCurves, names):
         self.ax.clear()
