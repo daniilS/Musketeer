@@ -101,9 +101,12 @@ def readUV(filePath):
     titration.title = os.path.basename(filePath)
     # set default parameters for UV-Vis titrations
     titration.continuous = True
-    titration.labelX = "λ (nm)"
-    titration.labelY = "Abs (AU)"
-    titration.legendSuffix = "nm"
+    titration.yQuantity = "Abs"
+    titration.yUnit = "AU"
+    titration.xQuantity = "λ"
+    titration.xUnit = "nm"
+    titration.contributorQuantity = "ε"
+    titration.contributorUnit = "$M^{-1} cm^{-1}$"
 
     with open(filePath, "r", newline='') as inFile:
 
@@ -163,6 +166,10 @@ class CSVPopup(tk.Toplevel):
         self.additionTitlesCheckbutton.invoke()
         self.signalTitlesCheckbutton.invoke()
         self.additionsRowsRadiobutton.invoke()
+
+        # TODO: add a dropdown for "type of data", being one of UV, NMR,
+        # continuous, or discrete. Add six entries below it (for quantities
+        # and units), and have the UV and NMR options autofill them.
 
     def continueCommand(self):
         self.aborted = False
@@ -269,10 +276,13 @@ def readNMR(filePath):
         currentSignal = np.full(numRows, None)
         plottedPoints = np.copy(currentSignal)
         cycler = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
         titration = Titration()
         titration.title = os.path.basename(filePath)
         titration.continuous = False
         titration.additionTitles = np.array(additionTitles)
+        titration.yQuantity = "δ"
+        titration.yUnit = "ppm"
 
         popup = tk.Toplevel()
         popup.title("Pick signals")

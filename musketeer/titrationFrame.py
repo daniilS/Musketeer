@@ -188,9 +188,8 @@ class InputSpectraFrame(ttk.Frame):
             titration.processedData.T
         )
 
-        # TODO: fix hardcoding
-        ax.set_xlabel("λ (nm)")
-        ax.set_ylabel("Abs (AU)")
+        ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+        ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
 
         fig.tight_layout()
         fig.canvas.draw_idle()
@@ -226,8 +225,10 @@ class ContinuousFittedFrame(ttk.Frame):
             self, text=f"Fitted spectra (K = {ks[0]:.0f})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
-        ax.set_xlabel("λ / nm")
-        ax.set_ylabel("ε / $M^{-1} cm^{-1}$")
+        ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+        ax.set_ylabel(
+            f"{titration.contributorQuantity} / {titration.contributorUnit}"
+        )
         ax.legend()
 
         fig.tight_layout()
@@ -248,33 +249,48 @@ class ContinuousFittedFrame(ttk.Frame):
         self.columnconfigure(0, weight=1)
 
 
-class DiscreteFromContinuousFittedFrame(ttk.Frame):
+class FittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.plot()
 
-    def plot(self):
+    def populate(self):
         titration = self.titration
+        self.fig, self.ax = plt.subplots()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+
+        self.toolbar = NavigationToolbar2Tk(
+            self.canvas, self, pack_toolbar=False
+        )
+        self.toolbar.update()
+        self.toolbar.grid(row=2, column=0, sticky="")
+
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
-        fig, (ax) = plt.subplots()
+        ttk.Label(
+            self, text=f"Fitted curves (K = {ks[0]:.0f})",
+            font='-size 15'
+        ).grid(row=0, column=0, sticky="")
 
-        peakIndices = titration.getPeakIndices()
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
+        self.columnconfigure(0, weight=1)
 
-        curves = titration.processedData.T[peakIndices]
-        fittedCurves = titration.lastFittedCurves.T[peakIndices]
-        names = np.char.add(
-            titration.processedSignalTitlesStrings[peakIndices], " nm"
-        )
+    def plot(self, curves, fittedCurves, names):
+        self.ax.clear()
+
+        titration = self.titration
 
         guestConcs = titration.lastFreeConcs.T[-1]
-        # TODO: move to separate function, also use from DiscreteFittedFrame
         for curve, fittedCurve, name in zip(curves, fittedCurves, names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
             fittedCurve -= fittedZero
-            plt.scatter(guestConcs, curve)
+            self.ax.scatter(guestConcs, curve)
 
             smoothX = np.linspace(guestConcs.min(), guestConcs.max(), 100)
             # make sure the smooth curve actually goes through all the fitted
@@ -283,87 +299,36 @@ class DiscreteFromContinuousFittedFrame(ttk.Frame):
 
             spl = interp1d(guestConcs, fittedCurve, kind="quadratic")
             smoothY = spl(smoothX)
-            plt.plot(smoothX, smoothY, label=name)
+            self.ax.plot(smoothX, smoothY, label=name)
 
-        ttk.Label(
-            self, text=f"Fitted curves (K = {ks[0]:.0f})",
-            font='-size 15'
-        ).grid(row=0, column=0, sticky="")
-        ax.set_xlabel(f"[{titration.freeNames[1]}] / M")
-        ax.set_ylabel("ΔAbs / AU")
-        ax.legend()
-        fig.tight_layout()
+        self.ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
+        self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
+        self.ax.legend()
+        self.fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=self)
-        canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
-
-        toolbar = NavigationToolbar2Tk(
-            canvas, self, pack_toolbar=False
-        )
-        toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="")
-
-        self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.canvas.draw()
 
 
-class DiscreteFittedFrame(ttk.Frame):
-    def __init__(self, parent, titration, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.titration = titration
-        self.plot()
+class DiscreteFittedFrame(FittedFrame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        curves = self.titration.processedData.T
+        fittedCurves = self.titration.lastFittedCurves.T
+        names = self.titration.processedSignalTitlesStrings
+        self.populate()
+        self.plot(curves, fittedCurves, names)
 
-    def plot(self):
-        titration = self.titration
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
-        fig, (ax) = plt.subplots()
 
-        curves = titration.processedData.T
-        fittedCurves = titration.lastFittedCurves.T
-        names = titration.processedSignalTitlesStrings
-        guestConcs = titration.lastFreeConcs.T[-1]
-        for curve, fittedCurve, name in zip(curves, fittedCurves, names):
-            fittedZero = fittedCurve[0]
-            curve -= fittedZero
-            fittedCurve -= fittedZero
-            plt.scatter(guestConcs, curve)
-
-            smoothX = np.linspace(guestConcs.min(), guestConcs.max(), 100)
-            # make sure the smooth curve actually goes through all the fitted
-            # points
-            smoothX = np.unique(np.concatenate((smoothX, guestConcs)))
-
-            spl = interp1d(guestConcs, fittedCurve, kind="quadratic")
-            smoothY = spl(smoothX)
-            plt.plot(smoothX, smoothY, label=name)
-
-        ttk.Label(
-            self, text=f"Fitted curves (K = {ks[0]:.0f})",
-            font='-size 15'
-        ).grid(row=0, column=0, sticky="")
-        ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
-        ax.set_ylabel("Δδ / ppm")
-        ax.legend()
-        fig.tight_layout()
-
-        canvas = FigureCanvasTkAgg(fig, master=self)
-        canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
-
-        toolbar = NavigationToolbar2Tk(
-            canvas, self, pack_toolbar=False
-        )
-        toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="")
-
-        self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
-        self.columnconfigure(0, weight=1)
+class DiscreteFromContinuousFittedFrame(FittedFrame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        peakIndices = self.titration.getPeakIndices()
+        curves = self.titration.processedData.T[peakIndices]
+        fittedCurves = self.titration.lastFittedCurves.T[peakIndices]
+        peakTitles = self.titration.processedSignalTitlesStrings[peakIndices]
+        names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
+        self.populate()
+        self.plot(curves, fittedCurves, names)
 
 
 class ResultsFrame(ttk.Frame):
