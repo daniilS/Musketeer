@@ -49,10 +49,10 @@ class Titration():
     def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
         # get the total movement for each signal
         movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
-        # get the largest difference from the first point at each wavelength
+        # get the largest difference from the first point for each signal
         diff = self.processedData - self.processedData[0]
         maxDiff = np.max(abs(diff), axis=0)
-        # find the wavelengths with the largest total movement
+        # find the signals with the largest total movement
         peakIndices, peakProperties = find_peaks(movement, prominence=0)
         prominences = peakProperties["prominences"]
         # select the four most prominent peaks

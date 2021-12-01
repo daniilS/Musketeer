@@ -253,6 +253,9 @@ class FittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.guestConcs = titration.lastFreeConcs.T[-1]
+        self.normalisation = False
+        self.logScale = False
 
     def populate(self):
         titration = self.titration
@@ -275,18 +278,63 @@ class FittedFrame(ttk.Frame):
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
 
+        self.toggleButtonsFrame = ttk.Frame(self)
+        self.toggleButtonsFrame.grid(row=1, column=1, sticky="")
+        self.normalisationButton = ttk.Checkbutton(
+            self.toggleButtonsFrame, text="Normalise movement",
+            command=self.toggleNormalisation, style="Outline.Toolbutton"
+        )
+        self.normalisationButton.pack(pady=padding, fill="x")
+        self.logScaleButton = ttk.Checkbutton(
+            self.toggleButtonsFrame, text="Logarithmic x axis",
+            command=self.toggleLogScale, style="Outline.Toolbutton"
+        )
+        self.logScaleButton.pack(pady=padding, fill="x")
+
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
         self.grid_anchor("center")
 
-    def plot(self, curves, fittedCurves, names):
+    def toggleNormalisation(self):
+        self.normalisation = not self.normalisation
+        self.plot()
+
+    def toggleLogScale(self):
+        self.logScale = not self.logScale
+        if self.logScale:
+            self.ax.set_xscale("log")
+        else:
+            self.ax.set_xscale("linear")
+        self.canvas.draw()
+
+    def plot(self):
         self.ax.clear()
 
         titration = self.titration
 
-        guestConcs = titration.lastFreeConcs.T[-1]
-        for curve, fittedCurve, name in zip(curves, fittedCurves, names):
+        guestConcs = self.guestConcs
+
+        if self.normalisation:
+            curves = self.curves.T
+            # get the largest difference from the first point for each signal
+            diff = curves - curves[0]
+            maxDiff = np.max(abs(diff), axis=0)
+            curves = curves / maxDiff
+            curves = curves.T * 100
+
+            fittedCurves = self.fittedCurves.T
+            fittedCurves = fittedCurves / maxDiff
+            fittedCurves = fittedCurves.T * 100
+            self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")
+        else:
+            curves = self.curves
+            fittedCurves = self.fittedCurves
+            self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
+
+        for curve, fittedCurve, name in zip(curves,
+                                            fittedCurves,
+                                            self.names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
             fittedCurve -= fittedZero
@@ -301,8 +349,11 @@ class FittedFrame(ttk.Frame):
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
+        if self.logScale:
+            self.ax.set_xscale("log")
+        else:
+            self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
-        self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
         self.ax.legend()
         self.fig.tight_layout()
 
@@ -312,23 +363,23 @@ class FittedFrame(ttk.Frame):
 class DiscreteFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        curves = self.titration.processedData.T
-        fittedCurves = self.titration.lastFittedCurves.T
-        names = self.titration.processedSignalTitlesStrings
+        self.curves = self.titration.processedData.T
+        self.fittedCurves = self.titration.lastFittedCurves.T
+        self.names = self.titration.processedSignalTitlesStrings
         self.populate()
-        self.plot(curves, fittedCurves, names)
+        self.plot()
 
 
 class DiscreteFromContinuousFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         peakIndices = self.titration.getPeakIndices()
-        curves = self.titration.processedData.T[peakIndices]
-        fittedCurves = self.titration.lastFittedCurves.T[peakIndices]
+        self.curves = self.titration.processedData.T[peakIndices]
+        self.fittedCurves = self.titration.lastFittedCurves.T[peakIndices]
         peakTitles = self.titration.processedSignalTitlesStrings[peakIndices]
-        names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
+        self.names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
         self.populate()
-        self.plot(curves, fittedCurves, names)
+        self.plot()
 
 
 class ResultsFrame(ttk.Frame):
