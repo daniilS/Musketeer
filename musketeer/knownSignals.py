@@ -89,9 +89,6 @@ class GetKnownSpectra(moduleFrame.Strategy):
 
 
 class GetAllSpectra(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self):
         return np.full((
             len(self.titration.contributorNames()),

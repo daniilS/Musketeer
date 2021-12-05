@@ -4,8 +4,14 @@ import tkinter.ttk as ttk
 
 # all module strategies should be a subclass
 class Strategy():
-    # currently, the only thing it does is provide an empty popup method so
-    # that strategies not requiring a GUI don't need to explicitly define one
+    def __init__(self, titration):
+        self.titration = titration
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    # provide an empty popup method so that strategies not requiring a GUI
+    # don't need to explicitly define one
     def showPopup(self):
         pass
 

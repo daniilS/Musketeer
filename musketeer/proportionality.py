@@ -2,17 +2,11 @@ from . import moduleFrame
 
 
 class GetConcs(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self, signalVars, totalConcs):
         return signalVars
 
 
 class GetFraction(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self, signalVars, totalConcs):
         # divide by total host concs
         # TODO: support proportionality to other total concs

@@ -4,9 +4,6 @@ from . import moduleFrame
 
 
 class ResidualsSum(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self, residuals):
         return np.sum(residuals)
 
@@ -14,9 +11,6 @@ class ResidualsSum(moduleFrame.Strategy):
 class ResidualsSumScaled(moduleFrame.Strategy):
     # TODO: test & use
     # sum of the residuals, scaled by the number of data points for each signal
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self, residuals):
         numPoints = np.sum(
             self.titration.processedData != None, axis=0  # noqa: E711

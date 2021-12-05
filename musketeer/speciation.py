@@ -103,9 +103,6 @@ class SpeciationPopup(tk.Toplevel):
 
 
 class SpeciationCOGS(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def COGS(self, M, y, k, alphas):
         free = y.copy()
         bound = np.empty(len(k))
@@ -166,9 +163,6 @@ class SpeciationHGAB(SpeciationCOGS):
 
 
 class SpeciationCustom(SpeciationCOGS):
-    def __init__(self, titration):
-        self.titration = titration
-
     def showPopup(self):
         popup = SpeciationPopup(self.titration)
         popup.wait_window(popup)

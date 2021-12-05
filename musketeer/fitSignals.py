@@ -6,9 +6,6 @@ from . import moduleFrame
 
 
 class FitSignals(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     def __call__(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
         knownMask = ~np.isnan(knownSpectra[:, 0])
@@ -27,9 +24,6 @@ class FitSignals(moduleFrame.Strategy):
 
 
 class FitSignalsNonnegative(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-
     # TODO: account for known spectra
     def __call__(self, signalVars, knownSpectra):
         fittedSignals = np.empty((0, signalVars.shape[1]))
