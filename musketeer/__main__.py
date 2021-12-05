@@ -1,10 +1,10 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import os
 import ctypes
 
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook
+import importlib.resources as res
 import matplotlib.pyplot as plt
 import tkinter.messagebox as mb
 
@@ -16,7 +16,7 @@ patchMatplotlib.applyPatch()
 try:
     appId = u'daniilS.musketeer'
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
-except:  # noqa
+except Exception:
     pass
 
 
@@ -35,13 +35,14 @@ except tk.TclError:
     root.attributes("-zoomed", True)
 root.title("Musketeer")
 
-# should get the correct location no matter how the script is run
-# TODO: consider using importlib_resources
-__location__ = os.path.realpath(
-    os.path.join(os.getcwd(), os.path.dirname(__file__)))
-iconPath = os.path.join(__location__, "logo small.png")
-icon = tk.PhotoImage(file=iconPath)
-root.iconphoto(True, icon)
+try:
+    iconData = res.read_binary(__package__, "logo small.png")
+    icon = tk.PhotoImage(data=iconData)
+    root.iconphoto(True, icon)
+except Exception:
+    # Should currently never happen, but if anything changes about the API in
+    # the future, we can survive without an icon.
+    pass
 frame = ttk.Frame(root, padding=padding)
 frame.pack(expand=True, fill="both")
 
