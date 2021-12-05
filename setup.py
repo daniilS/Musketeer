@@ -5,7 +5,7 @@ with open("README.md") as readmeFile:
 
 setuptools.setup(
     name="musketeer",
-    version="0.0.2",
+    version="0.1.0",
     author="Daniil Soloviev",
     author_email="dos23@cam.ac.uk",
     description="A tool for fitting data from titration experiments.",
@@ -28,7 +28,7 @@ setuptools.setup(
         "numpy",
         "scipy",
         "matplotlib",
-        "ttkbootstrap",
+        "ttkbootstrap >=0.5.2, <1.0",
         "tkscrolledframe",
         "ttkwidgets",
         "tksheet"

@@ -103,6 +103,7 @@ class SpeciationPopup(tk.Toplevel):
 
 
 class SpeciationCOGS(moduleFrame.Strategy):
+    # TODO: see if this can be sped up using numba
     def COGS(self, M, y, k, alphas):
         free = y.copy()
         bound = np.empty(len(k))
