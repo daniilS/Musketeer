@@ -35,7 +35,7 @@ class FitSignalsNonnegative(moduleFrame.Strategy):
         fittedSignals = np.empty((0, signalVars.shape[1]))
         residuals = np.empty((1, 0))
         for signal in self.titration.processedData.T:
-            result = lsq_linear(signalVars, signal, (0, np.inf))
+            result = lsq_linear(signalVars, signal, (0, np.inf), method="bvls")
             fittedSignals = np.vstack((fittedSignals, result.x))
             residuals = np.append(residuals, result.cost)
         fittedSignals = fittedSignals.T
