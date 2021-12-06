@@ -345,7 +345,10 @@ class FittedFrame(ttk.Frame):
             # points
             smoothX = np.unique(np.concatenate((smoothX, guestConcs)))
 
-            spl = interp1d(guestConcs, fittedCurve, kind="quadratic")
+            # interp1d requires all x values to be unique
+            filter = np.concatenate((np.diff(guestConcs).astype(bool), [True]))
+            spl = interp1d(guestConcs[filter], fittedCurve[filter],
+                           kind="quadratic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
