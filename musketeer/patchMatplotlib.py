@@ -1,10 +1,13 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 
+import matplotlib
 from matplotlib import _c_internal_utils
 from matplotlib.backends._backend_tk import (NavigationToolbar2Tk, ToolTip,
                                              FigureManagerTk)
 from matplotlib.backend_bases import _Mode
+
+matplotlib.use("TkAgg")
 
 
 # updates the navigation toolbar to use ttk, and the correct ttkbootstrap style

@@ -7,6 +7,10 @@ from scipy.interpolate import interp1d
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
 import tkinter.messagebox as mb
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import (
+    NavigationToolbar2Tk, FigureCanvasTkAgg
+)
 
 from . import speciation
 from . import equilibriumConstants
@@ -19,18 +23,6 @@ from . import knownSignals
 from .style import padding
 from .scrolledFrame import ScrolledFrame
 from .table import Table
-
-# need to tell matplotlib to use the tkinter backend, otherwise the scale
-# of figures can get messed up if it would default to a different backend
-import matplotlib
-matplotlib.use("TkAgg")
-
-# TODO: stop using pyplot to avoid window closing issues?
-import matplotlib.pyplot as plt  # noqa
-from matplotlib.backends.backend_tkagg import (  # noqa
-    NavigationToolbar2Tk, FigureCanvasTkAgg
-)
-from matplotlib.backend_bases import key_press_handler  # noqa
 
 
 class TitrationFrame(ttk.Frame):
@@ -227,7 +219,7 @@ class ContinuousFittedFrame(ttk.Frame):
         ).grid(row=0, column=0, sticky="")
         ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         ax.set_ylabel(
-            f"{titration.contributorQuantity} / {titration.contributorUnit}"
+            f"{titration.deconvolutedQuantity} / {titration.deconvolutedUnit}"
         )
         ax.legend()
 
@@ -393,7 +385,8 @@ class ResultsFrame(ttk.Frame):
 
     def showResults(self):
         titration = self.titration
-        kTable = Table(self, 0, 0, ["K", "α"], rowOptions=("readonlyTitles"),
+        kTable = Table(self, 0, 0, ["K (M⁻ⁿ)", "α"],
+                       rowOptions=("readonlyTitles"),
                        columnOptions=("readonlyTitles"))
 
         ks = self.titration.knownKs.copy()

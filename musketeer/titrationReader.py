@@ -1,28 +1,41 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
+from collections import namedtuple
 
 import csv
 import numpy as np
 import os
 import re
-from pkg_resources import packaging
-
-from .titration import Titration
-
-# need to tell matplotlib to use the tkinter backend, otherwise the scale
-# of figures can get messed up if it would default to a different backend
-import matplotlib
-matplotlib.use("TkAgg")
-
-import matplotlib.pyplot as plt   # noqa
-from matplotlib.backends.backend_tkagg import (  # noqa
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import (
     NavigationToolbar2Tk, FigureCanvasTkAgg
 )
-from matplotlib.backend_bases import key_press_handler  # noqa
 
-universalCsvVersion = packaging.version.parse("1.0.0")
-padding = 10
+from .titration import Titration
+from .style import padding
+
+Params = namedtuple("Params", (
+    "continuous",
+    "yQuantity",
+    "yUnit",
+    "xQuantity",
+    "xUnit",
+    "deconvolutedQuantity",
+    "deconvolutedUnit"), defaults=[None] * 6
+)
+
+predefinedParams = {
+    "UV-Vis": Params(True, "λ", "nm", "Abs", "AU", "ε", "M⁻¹cm⁻¹"),
+    "NMR": Params(False, "δ", "ppm"),
+    "Continuous": Params(True),
+    "Discrete": Params(False),
+}
+
+
+def fillPredefinedParams(titration, params):
+    for k, v in params._asdict().items():
+        setattr(titration, k, v)
 
 
 def find_nearest(array, value):
@@ -59,6 +72,7 @@ def askFileTypeDialog(stringVar):
     optionMenu = ttk.OptionMenu(
         frame, stringVar, None, *fileTypes, style="Outline.TMenubutton"
     )
+    optionMenu.configure(width=max([len(s) for s in fileTypes]) + 1)
     optionMenu.pack(fill="x", pady=padding)
 
     button = ttk.Button(frame, text="Select", command=popup.destroy)
@@ -100,13 +114,7 @@ def readUV(filePath):
     titration = Titration()
     titration.title = os.path.basename(filePath)
     # set default parameters for UV-Vis titrations
-    titration.continuous = True
-    titration.yQuantity = "Abs"
-    titration.yUnit = "AU"
-    titration.xQuantity = "λ"
-    titration.xUnit = "nm"
-    titration.contributorQuantity = "ε"
-    titration.contributorUnit = "$M^{-1} cm^{-1}$"
+    fillPredefinedParams(titration, predefinedParams["UV-Vis"])
 
     with open(filePath, "r", newline='') as inFile:
 
@@ -167,9 +175,74 @@ class CSVPopup(tk.Toplevel):
         self.signalTitlesCheckbutton.invoke()
         self.additionsRowsRadiobutton.invoke()
 
-        # TODO: add a dropdown for "type of data", being one of UV, NMR,
-        # continuous, or discrete. Add six entries below it (for quantities
-        # and units), and have the UV and NMR options autofill them.
+        optionMenuVar = tk.StringVar(self)
+        optionMenu = ttk.OptionMenu(frame, optionMenuVar, None,
+                                    *predefinedParams.keys(),
+                                    style="Outline.TMenubutton",
+                                    command=self.setParams)
+        optionMenu.configure(width=max([len(s) for s in predefinedParams]) + 1)
+        optionMenu.pack(pady=2.5)
+
+        paramsFrame = ttk.Frame(frame)
+        paramsFrame.pack(expand=True, fill="both", pady=2.5)
+
+        self.continuous = tk.BooleanVar(self, False)
+        self.continuous.trace_add("write", self.toggleContinuous)
+        self.continuousWidget = ttk.Checkbutton(
+            paramsFrame, text="Continuous signals", variable=self.continuous)
+        self.continuousWidget.grid(row=0, column=0, columnspan=2)
+
+        self.yQuantityLabel = ttk.Label(paramsFrame, text="Measured quantity:")
+        self.yQuantityLabel.grid(row=1, column=0, sticky="w")
+        self.yUnitLabel = ttk.Label(paramsFrame, text="Unit:")
+        self.yUnitLabel.grid(row=1, column=1, sticky="w")
+        self.yQuantity = tk.StringVar(self)
+        self.yUnit = tk.StringVar(self)
+        self.yQuantityWidget = ttk.Entry(paramsFrame,
+                                         textvariable=self.yQuantity)
+        self.yQuantityWidget.grid(row=2, column=0, sticky="w")
+        self.yUnitWidget = ttk.Entry(paramsFrame, width=10,
+                                     textvariable=self.yUnit)
+        self.yUnitWidget.grid(row=2, column=1, sticky="w")
+
+        self.xQuantityLabel = ttk.Label(
+            paramsFrame, text="Continuous signals x-axis quantity:")
+        self.xQuantityLabel.grid(row=3, column=0, sticky="w")
+        self.xUnitLabel = ttk.Label(paramsFrame, text="Unit:")
+        self.xUnitLabel.grid(row=3, column=1, sticky="w")
+        self.xQuantity = tk.StringVar(self)
+        self.xUnit = tk.StringVar(self)
+        self.xQuantityWidget = ttk.Entry(paramsFrame,
+                                         textvariable=self.xQuantity)
+        self.xQuantityWidget.grid(row=4, column=0, sticky="w")
+        self.xUnitWidget = ttk.Entry(paramsFrame, width=10,
+                                     textvariable=self.xUnit)
+        self.xUnitWidget.grid(row=4, column=1, sticky="w")
+
+        self.deconvolutedQuantityLabel = ttk.Label(
+            paramsFrame, text="Deconvoluted signals y-axis quantity:")
+        self.deconvolutedQuantityLabel.grid(row=5, column=0, sticky="w")
+        self.deconvolutedUnitLabel = ttk.Label(paramsFrame, text="Unit:")
+        self.deconvolutedUnitLabel.grid(row=5, column=1, sticky="w")
+        self.deconvolutedQuantity = tk.StringVar(self)
+        self.deconvolutedUnit = tk.StringVar(self)
+        self.deconvolutedQuantityWidget = ttk.Entry(
+            paramsFrame, textvariable=self.deconvolutedQuantity)
+        self.deconvolutedQuantityWidget.grid(row=6, column=0, sticky="w")
+        self.deconvolutedUnitWidget = ttk.Entry(
+            paramsFrame, width=10, textvariable=self.deconvolutedUnit)
+        self.deconvolutedUnitWidget.grid(row=6, column=1, sticky="w")
+
+    def toggleContinuous(self, *args, **kwargs):
+        state = ["!disabled"] if self.continuous.get() else ["disabled"]
+        for param in Params._fields[-4:]:
+            getattr(self, param + "Widget").state(state)
+
+    def setParams(self, selection):
+        params = predefinedParams[selection]
+        for k, v in params._asdict().items():
+            if v is not None:
+                getattr(self, k).set(v)
 
     def continueCommand(self):
         self.aborted = False
@@ -190,10 +263,8 @@ def readCSV(filePath):
 
     titration = Titration()
     titration.title = os.path.basename(filePath)
-    titration.continuous = False
-    # TODO: remove placeholder
-    titration.yQuantity = "δ"
-    titration.yUnit = "ppm"
+    for param in Params._fields:
+        setattr(titration, param, getattr(popup, param).get())
 
     with open(filePath, "r", newline='') as inFile:
         data = np.genfromtxt(inFile, dtype=str, delimiter=",")
@@ -282,10 +353,8 @@ def readNMR(filePath):
 
         titration = Titration()
         titration.title = os.path.basename(filePath)
-        titration.continuous = False
         titration.additionTitles = np.array(additionTitles)
-        titration.yQuantity = "δ"
-        titration.yUnit = "ppm"
+        fillPredefinedParams(titration, predefinedParams["NMR"])
 
         popup = tk.Toplevel()
         popup.title("Pick signals")
