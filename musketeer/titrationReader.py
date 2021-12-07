@@ -294,6 +294,38 @@ def readCSV(filePath):
     return [titration]
 
 
+class NavigationToolbarHorizontal(NavigationToolbar2Tk):
+    def press_pan(self, event):
+        event.key = "x"
+        return super().press_pan(event)
+
+    def drag_pan(self, event):
+        event.key = "x"
+        return super().drag_pan(event)
+
+    def release_pan(self, event):
+        event.key = "x"
+        return super().release_pan(event)
+
+    def press_zoom(self, event):
+        event.key = "x"
+        return super().press_zoom(event)
+
+    def drag_zoom(self, event):
+        event.key = "x"
+        return super().drag_zoom(event)
+
+    def release_zoom(self, event):
+        event.key = "x"
+        return super().release_zoom(event)
+
+    def draw_rubberband(self, event, x0, y0, x1, y1):
+        axes = self.canvas.figure.get_axes()
+        y0 = axes[-1].bbox.intervaly[0]
+        y1 = axes[0].bbox.intervaly[1]
+        return super().draw_rubberband(event, x0, y0, x1, y1)
+
+
 def readNMR(filePath):
     # reads an MNova 1D peaks list
     additionTitles = []
@@ -328,8 +360,9 @@ def readNMR(filePath):
             currentPlotIntensities[2::3] = currentIntensities
             plotIntensities.append(currentPlotIntensities)
 
-        maxF = max(max(frequencies, key=max))
-        minF = min(min(frequencies, key=min))
+        maxF = max(max(frequencies))
+        minF = min(min(frequencies))
+        maxI = max(max(intensities))
 
         numRows = len(frequencies)
         fig, axList = plt.subplots(
@@ -343,6 +376,8 @@ def readNMR(filePath):
             x[-1] = minF - (0.1 * (maxF - minF))
             ax.plot(x, y, color="black")
             ax.axes.yaxis.set_visible(False)
+            ax.set_xlim(x[0], x[-1])
+            ax.set_ylim(0, 1.2 * maxI)
         fig.tight_layout()
 
         signals = []
@@ -425,7 +460,7 @@ def readNMR(filePath):
         canvas.mpl_connect("button_press_event", onClick)
         canvas.get_tk_widget().pack(side="bottom", fill="both", expand=True)
 
-        toolbar = NavigationToolbar2Tk(
+        toolbar = NavigationToolbarHorizontal(
             canvas, popup, pack_toolbar=False
         )
         toolbar.update()
