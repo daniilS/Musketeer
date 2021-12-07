@@ -7,10 +7,11 @@ import csv
 import numpy as np
 import os
 import re
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (
     NavigationToolbar2Tk, FigureCanvasTkAgg
 )
+import matplotlib as mpl
+from matplotlib.figure import Figure
 
 from .titration import Titration
 from .style import padding
@@ -365,7 +366,8 @@ def readNMR(filePath):
         maxI = max(max(intensities))
 
         numRows = len(frequencies)
-        fig, axList = plt.subplots(
+        fig = Figure()
+        axList = fig.subplots(
             numRows, 1, sharex=True, sharey=True,
             gridspec_kw={'hspace': 0, 'wspace': 0}
         )
@@ -384,7 +386,7 @@ def readNMR(filePath):
         titles = []
         currentSignal = np.full(numRows, None)
         plottedPoints = np.copy(currentSignal)
-        cycler = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        cycler = mpl.rcParams['axes.prop_cycle'].by_key()['color']
 
         titration = Titration()
         titration.title = os.path.basename(filePath)
@@ -471,11 +473,8 @@ def readNMR(filePath):
             ax.autoscale(False)
 
         popup.wait_window(popup)
-        plt.close("all")
 
         return [titration]
-
-        # plt.show()
 
 
 fileReaders = {

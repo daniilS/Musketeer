@@ -5,7 +5,6 @@ import ctypes
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook
 import importlib.resources as res
-import matplotlib.pyplot as plt
 import tkinter.messagebox as mb
 
 from . import titrationReader, patchMatplotlib, windowsHighDpiPatch
@@ -77,13 +76,4 @@ notebook = TitrationsNotebook(frame)
 notebook.pack(expand=True, fill="both")
 notebook.readFile()
 
-
-def closePlots():
-    plt.close("all")
-    root.destroy()
-
-
-# temporary workaround to prevent embedded matplotlib plots from keeping the
-# mainloop running
-root.protocol("WM_DELETE_WINDOW", closePlots)
 root.mainloop()

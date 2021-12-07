@@ -7,10 +7,10 @@ from scipy.interpolate import interp1d
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
 import tkinter.messagebox as mb
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (
     NavigationToolbar2Tk, FigureCanvasTkAgg
 )
+from matplotlib.figure import Figure
 
 from . import speciation
 from . import equilibriumConstants
@@ -137,7 +137,8 @@ class InputSpectraFrame(ttk.Frame):
         self.toSpinbox.set(f"{maxWL:.{decimals}f}")
         self.toSpinbox.pack(padx=padding, side="left")
 
-        self.fig, (self.ax) = plt.subplots()
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot()
 
         ttk.Button(
             rangeSelection, text="Update", command=self.updateWLRange
@@ -205,27 +206,28 @@ class ContinuousFittedFrame(ttk.Frame):
         titration = self.titration
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
-        fig, (ax) = plt.subplots()
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot()
 
         spectra = titration.lastFitResult
         names = titration.contributorNames()
         wavelengths = titration.processedSignalTitles
         for spectrum, name in zip(spectra, names):
-            plt.plot(wavelengths, spectrum, label=name)
+            self.ax.plot(wavelengths, spectrum, label=name)
 
         ttk.Label(
             self, text=f"Fitted spectra (K = {ks[0]:.0f})",
             font='-size 15'
         ).grid(row=0, column=0, sticky="")
-        ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
-        ax.set_ylabel(
+        self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+        self.ax.set_ylabel(
             f"{titration.deconvolutedQuantity} / {titration.deconvolutedUnit}"
         )
-        ax.legend()
+        self.ax.legend()
 
-        fig.tight_layout()
+        self.fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=self)
+        canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
@@ -251,7 +253,8 @@ class FittedFrame(ttk.Frame):
 
     def populate(self):
         titration = self.titration
-        self.fig, self.ax = plt.subplots()
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.draw()

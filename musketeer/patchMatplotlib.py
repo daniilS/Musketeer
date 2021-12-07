@@ -2,9 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import matplotlib
-from matplotlib import _c_internal_utils
-from matplotlib.backends._backend_tk import (NavigationToolbar2Tk, ToolTip,
-                                             FigureManagerTk)
+from matplotlib.backends._backend_tk import NavigationToolbar2Tk, ToolTip
 from matplotlib.backend_bases import _Mode
 
 matplotlib.use("TkAgg")
@@ -69,17 +67,8 @@ def showtip(self, text):
     label.pack(ipadx=1)
 
 
-# Matplotlib assumes that any window containing a canvas must be a plot popup,
-# so takes control over the DPI. Let's take away that entitlement.
-def emptyFunction(*args, **kwargs):
-    pass
-
-
 def applyPatch():
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
 
     ToolTip.showtip = showtip
-
-    _c_internal_utils.Win32_SetProcessDpiAwareness_max = emptyFunction
-    FigureManagerTk._update_window_dpi = emptyFunction
