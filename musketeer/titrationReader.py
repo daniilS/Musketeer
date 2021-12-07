@@ -26,7 +26,7 @@ Params = namedtuple("Params", (
 )
 
 predefinedParams = {
-    "UV-Vis": Params(True, "λ", "nm", "Abs", "AU", "ε", "M⁻¹cm⁻¹"),
+    "UV-Vis": Params(True, "Abs", "AU", "λ", "nm", "ε", "M⁻¹cm⁻¹"),
     "NMR": Params(False, "δ", "ppm"),
     "Continuous": Params(True),
     "Discrete": Params(False),

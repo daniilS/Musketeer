@@ -36,7 +36,7 @@ class StockTable(Table):
         self.label(0 - self.headerGridRows, 0, "Stock concentrations:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(1 - self.headerGridRows, 3,
-                                     ("nm", "μM", "mM", "M"), "mM")
+                                     ("nM", "μM", "mM", "M"), "mM")
 
         if hasattr(titration, "stockConcs"):
             self.populate(titration.stockConcs)
