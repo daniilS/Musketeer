@@ -72,7 +72,7 @@ class TitrationFrame(ttk.Frame):
             self.notebook.add(self.inputSpectraFrame, text="Input Spectra")
 
         self.rowconfigure(0, weight=1)
-        self.columnconfigure(1, weight=4)
+        self.columnconfigure(1, weight=1)
 
     def updatePlots(self):
         if hasattr(self, "inputSpectraFrame"):

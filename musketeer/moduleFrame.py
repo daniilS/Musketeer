@@ -43,6 +43,7 @@ class ModuleFrame(ttk.LabelFrame):
             self, self.stringVar, defaultValue, command=self.callback,
             *strategies, style="primary.Outline.TMenubutton"
         )
+        optionMenu.configure(width=30)
         # call the callback for the default value
         if self.setDefault:
             self.callback(defaultValue)

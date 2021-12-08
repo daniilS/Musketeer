@@ -17,7 +17,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Proportionality"
     dropdownLabelText = "What are the signals proportional to?"
     dropdownOptions = {
-        "Concentration": GetConcs,
-        "Mole fraction": GetFraction,
+        "Concentration (slow exchange)": GetConcs,
+        "Mole fraction (fast exchange)": GetFraction,
     }
     attributeName = "getProportionalSignals"
