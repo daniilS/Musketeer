@@ -4,16 +4,13 @@ import tkinter.ttk as ttk
 
 # all module strategies should be a subclass
 class Strategy():
+    popup = None
+
     def __init__(self, titration):
         self.titration = titration
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError()
-
-    # provide an empty popup method so that strategies not requiring a GUI
-    # don't need to explicitly define one
-    def showPopup(self):
-        pass
 
 
 class ModuleFrame(ttk.LabelFrame):
@@ -52,6 +49,13 @@ class ModuleFrame(ttk.LabelFrame):
     def callback(self, value):
         SelectedStrategy = self.dropdownOptions[value]
         selectedStrategy = SelectedStrategy(self.titration)
-        selectedStrategy.showPopup()
+        if selectedStrategy.popup is not None:
+            popup = selectedStrategy.popup(self.titration)
+            # if grab_set is called immediately, on some versions of macOS
+            # this leaves the Toplevel window unresponsive to mouse clicks
+            if not popup.winfo_viewable():
+                popup.wait_visibility()
+            popup.grab_set()
+            popup.wait_window()
         setattr(self.titration, self.attributeName, selectedStrategy)
         self.updatePlots()

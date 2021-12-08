@@ -160,7 +160,6 @@ class VolumesPopup(tk.Toplevel):
         super().__init__(*args, **kwargs)
         self.titration = titration
         self.title("Enter volumes")
-        self.grab_set()
 
         height = int(self.master.winfo_height() * 0.8)
         frame = ScrolledFrame(self, height=height, max_width=1500)
@@ -344,7 +343,6 @@ class ConcsPopup(tk.Toplevel):
         super().__init__(*args, **kwargs)
         self.titration = titration
         self.title("Enter concentrations")
-        self.grab_set()
 
         height = int(self.master.winfo_height() * 0.8)
         frame = ScrolledFrame(self, height=height, max_width=1500)
@@ -386,6 +384,8 @@ class ConcsPopup(tk.Toplevel):
 
 
 class GetTotalConcsFromVolumes(moduleFrame.Strategy):
+    popup = VolumesPopup
+
     def __init__(self, titration):
         self.titration = titration
         titration.getConcVarsCount = self.getConcVarsCount
@@ -410,10 +410,6 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
         return totalConcs
 
-    def showPopup(self):
-        popup = VolumesPopup(self.titration)
-        popup.wait_window(popup)
-
     @property
     def rowsWithBlanks(self):
         return np.isnan(np.sum(self.titration.stockConcs, 1))
@@ -427,16 +423,14 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
 
 class GetTotalConcs(moduleFrame.Strategy):
+    popup = ConcsPopup
+
     def __init__(self, titration):
         self.titration = titration
         titration.getConcVarsCount = self.getConcVarsCount
 
     def __call__(self, totalConcVars):
         return self.titration.totalConcs
-
-    def showPopup(self):
-        popup = ConcsPopup(self.titration)
-        popup.wait_window(popup)
 
     def getConcVarsCount(self):
         return 0

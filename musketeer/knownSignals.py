@@ -15,7 +15,6 @@ class KnownSpectraPopup(tk.Toplevel):
         super().__init__(*args, **kwargs)
         self.titration = titration
         self.title("Enter known spectra")
-        self.grab_set()
 
         self.sheet = Sheet(
             self,
@@ -68,6 +67,8 @@ class KnownSpectraPopup(tk.Toplevel):
 
 
 class GetKnownSpectra(moduleFrame.Strategy):
+    popup = KnownSpectraPopup
+
     def __init__(self, titration):
         self.titration = titration
         if not (hasattr(titration, 'knownSpectra')
@@ -82,10 +83,6 @@ class GetKnownSpectra(moduleFrame.Strategy):
 
     def __call__(self):
         return self.titration.knownSpectra
-
-    def showPopup(self):
-        popup = KnownSpectraPopup(self.titration)
-        popup.wait_window(popup)
 
 
 class GetAllSpectra(moduleFrame.Strategy):

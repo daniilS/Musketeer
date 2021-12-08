@@ -32,7 +32,6 @@ class KnownKsPopup(tk.Toplevel):
         super().__init__(*args, **kwargs)
         self.titration = titration
         self.title("Enter known equilibrium constants")
-        self.grab_set()
 
         height = int(self.master.winfo_height() * 0.4)
         frame = ScrolledFrame(self, height=height, max_width=1500)
@@ -74,6 +73,8 @@ class KnownKsPopup(tk.Toplevel):
 
 
 class GetKsKnown(moduleFrame.Strategy):
+    popup = KnownKsPopup
+
     def __init__(self, titration):
         self.titration = titration
         if not (hasattr(titration, 'knownKs')
@@ -93,10 +94,6 @@ class GetKsKnown(moduleFrame.Strategy):
         alphas = self.titration.knownAlphas[self.polymerIndices].copy()
         alphas[np.isnan(alphas)] = alphaVars
         return (ks, alphas)
-
-    def showPopup(self):
-        popup = KnownKsPopup(self.titration)
-        popup.wait_window(popup)
 
     @property
     def polymerIndices(self):

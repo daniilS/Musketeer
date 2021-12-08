@@ -63,7 +63,6 @@ class SpeciationPopup(tk.Toplevel):
         super().__init__(*args, **kwargs)
         self.titration = titration
         self.title("Enter speciation table")
-        self.grab_set()
 
         height = int(self.master.winfo_height() * 0.4)
         frame = ScrolledFrame(self, height=height, max_width=1500)
@@ -164,9 +163,7 @@ class SpeciationHGAB(SpeciationCOGS):
 
 
 class SpeciationCustom(SpeciationCOGS):
-    def showPopup(self):
-        popup = SpeciationPopup(self.titration)
-        popup.wait_window(popup)
+    popup = SpeciationPopup
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

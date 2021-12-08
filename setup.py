@@ -5,7 +5,7 @@ with open("README.md") as readmeFile:
 
 setuptools.setup(
     name="musketeer",
-    version="0.1.3",
+    version="0.1.4",
     author="Daniil Soloviev",
     author_email="dos23@cam.ac.uk",
     description="A tool for fitting data from titration experiments.",
