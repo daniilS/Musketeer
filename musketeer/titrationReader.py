@@ -10,6 +10,7 @@ import re
 from matplotlib.backends.backend_tkagg import (
     NavigationToolbar2Tk, FigureCanvasTkAgg
 )
+from matplotlib.backend_bases import _Mode
 import matplotlib as mpl
 from matplotlib.figure import Figure
 
@@ -280,6 +281,10 @@ def readCSV(filePath):
 
 
 class NavigationToolbarHorizontal(NavigationToolbar2Tk):
+    def __init__(self, pickPeak, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pickPeak = pickPeak
+
     def press_pan(self, event):
         event.key = "x"
         return super().press_pan(event)
@@ -301,8 +306,13 @@ class NavigationToolbarHorizontal(NavigationToolbar2Tk):
         return super().drag_zoom(event)
 
     def release_zoom(self, event):
+        # check if user clicked without dragging
+        shouldPickPeak = (not hasattr(self, "lastrect"))
         event.key = "x"
-        return super().release_zoom(event)
+        super().release_zoom(event)
+        if shouldPickPeak:
+            event.zoomClick = True
+            self.pickPeak(event)
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
         axes = self.canvas.figure.get_axes()
@@ -391,7 +401,7 @@ def readNMR(filePath):
             if e.inaxes is None:
                 return
             # zoom/pan click
-            if toolbar.mode != "":
+            if toolbar.mode != _Mode.NONE and not hasattr(e, "zoomClick"):
                 return
             i = np.where(axList == e.inaxes)[0][0]
 
@@ -447,7 +457,7 @@ def readNMR(filePath):
         canvas.get_tk_widget().pack(side="bottom", fill="both", expand=True)
 
         toolbar = NavigationToolbarHorizontal(
-            canvas, popup, pack_toolbar=False
+            onClick, canvas, popup, pack_toolbar=False
         )
         toolbar.update()
         toolbar.pack(side="left", padx=padding)
