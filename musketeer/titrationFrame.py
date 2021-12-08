@@ -97,7 +97,7 @@ class TitrationFrame(ttk.Frame):
             discreteFittedFrame = DiscreteFromContinuousFittedFrame(
                 nb, self.titration)
             nb.add(discreteFittedFrame,
-                   text="Fitted spectra (select wavelengths)")
+                   text=f"Fit at select {self.titration.xQuantity}")
         else:
             discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
             nb.add(discreteFittedFrame, text="Fitted signals")
@@ -106,6 +106,7 @@ class TitrationFrame(ttk.Frame):
         nb.add(resultsFrame, text="Results")
 
         self.notebook.select(str(nb))
+        nb.select(str(discreteFittedFrame))
 
 
 class InputSpectraFrame(ttk.Frame):
@@ -116,7 +117,10 @@ class InputSpectraFrame(ttk.Frame):
         rangeSelection = ttk.Frame(self)
         rangeSelection.grid(row=0, column=0, sticky="")
 
-        ttk.Label(rangeSelection, text="Wavelength range:").pack(side="left")
+        ttk.Label(
+            rangeSelection,
+            text=f"Range of {titration.xQuantity} to fit:"
+        ).pack(side="left")
 
         minWL = self.titration.signalTitles.min()
         maxWL = self.titration.signalTitles.max()
@@ -221,7 +225,7 @@ class ContinuousFittedFrame(ttk.Frame):
         ).grid(row=0, column=0, sticky="")
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         self.ax.set_ylabel(
-            f"{titration.deconvolutedQuantity} / {titration.deconvolutedUnit}"
+            f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹"
         )
         self.ax.legend()
 

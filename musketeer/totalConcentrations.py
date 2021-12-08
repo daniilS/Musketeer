@@ -80,11 +80,11 @@ class VolumesTable(Table):
 
         self.titration = titration
 
-        self.label(0 - self.headerGridRows, 0, "Addition volumes:", 4)
+        self.label(
+            0 - self.headerGridRows, 0, "Cumulative addition volumes:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(
-            1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL"
-        )
+            1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL")
         if hasattr(titration, "volumesUnit"):
             self.unit.set(titration.volumesUnit)
 

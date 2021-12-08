@@ -21,13 +21,11 @@ Params = namedtuple("Params", (
     "yQuantity",
     "yUnit",
     "xQuantity",
-    "xUnit",
-    "deconvolutedQuantity",
-    "deconvolutedUnit"), defaults=[None] * 6
+    "xUnit"), defaults=[None] * 4
 )
 
 predefinedParams = {
-    "UV-Vis": Params(True, "Abs", "AU", "λ", "nm", "ε", "M⁻¹cm⁻¹"),
+    "UV-Vis": Params(True, "Abs", "AU", "λ", "nm"),
     "NMR": Params(False, "δ", "ppm"),
     "Continuous": Params(True),
     "Discrete": Params(False),
@@ -220,23 +218,9 @@ class CSVPopup(tk.Toplevel):
                                      textvariable=self.xUnit)
         self.xUnitWidget.grid(row=4, column=1, sticky="w")
 
-        self.deconvolutedQuantityLabel = ttk.Label(
-            paramsFrame, text="Deconvoluted signals y-axis quantity:")
-        self.deconvolutedQuantityLabel.grid(row=5, column=0, sticky="w")
-        self.deconvolutedUnitLabel = ttk.Label(paramsFrame, text="Unit:")
-        self.deconvolutedUnitLabel.grid(row=5, column=1, sticky="w")
-        self.deconvolutedQuantity = tk.StringVar(self)
-        self.deconvolutedUnit = tk.StringVar(self)
-        self.deconvolutedQuantityWidget = ttk.Entry(
-            paramsFrame, textvariable=self.deconvolutedQuantity)
-        self.deconvolutedQuantityWidget.grid(row=6, column=0, sticky="w")
-        self.deconvolutedUnitWidget = ttk.Entry(
-            paramsFrame, width=10, textvariable=self.deconvolutedUnit)
-        self.deconvolutedUnitWidget.grid(row=6, column=1, sticky="w")
-
     def toggleContinuous(self, *args, **kwargs):
         state = ["!disabled"] if self.continuous.get() else ["disabled"]
-        for param in Params._fields[-4:]:
+        for param in Params._fields[-2:]:
             getattr(self, param + "Widget").state(state)
 
     def setParams(self, selection):
