@@ -51,11 +51,12 @@ class ModuleFrame(ttk.LabelFrame):
         selectedStrategy = SelectedStrategy(self.titration)
         if selectedStrategy.popup is not None:
             popup = selectedStrategy.popup(self.titration)
-            # if grab_set is called immediately, on some versions of macOS
-            # this leaves the Toplevel window unresponsive to mouse clicks
-            if not popup.winfo_viewable():
-                popup.wait_visibility()
-            popup.grab_set()
+            # On some versions of macOS, calling grab_set here sets the popup
+            # grab before the global grab on the menu is realeased, leaving
+            # the popup unresponsive to mouse events.
+            # TODO: find better place for callback that avoids this issue
+            if self._windowingsystem != "aqua":
+                popup.grab_set()
             popup.wait_window()
         setattr(self.titration, self.attributeName, selectedStrategy)
         self.updatePlots()
