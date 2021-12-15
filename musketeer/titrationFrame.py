@@ -246,7 +246,8 @@ class FittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.guestConcs = titration.lastFreeConcs.T[-1]
+        self.xQuantity = titration.freeNames[-1]
+        self.xConcs = titration.lastFreeConcs.T[-1]
         self.normalisation = False
         self.logScale = False
 
@@ -307,7 +308,12 @@ class FittedFrame(ttk.Frame):
 
         titration = self.titration
 
-        guestConcs = self.guestConcs
+        # xQuantity and xUnit for the fitted plot. Different from the xQuantity
+        # and xUnit in the titration object, which are used for the input
+        # spectra.
+        xQuantity = self.xQuantity
+        xUnit = titration.concsUnit
+        xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
         if self.normalisation:
             curves = self.curves.T
@@ -332,16 +338,16 @@ class FittedFrame(ttk.Frame):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
             fittedCurve -= fittedZero
-            self.ax.scatter(guestConcs, curve)
+            self.ax.scatter(xConcs, curve)
 
-            smoothX = np.linspace(guestConcs.min(), guestConcs.max(), 100)
+            smoothX = np.linspace(xConcs.min(), xConcs.max(), 100)
             # make sure the smooth curve actually goes through all the fitted
             # points
-            smoothX = np.unique(np.concatenate((smoothX, guestConcs)))
+            smoothX = np.unique(np.concatenate((smoothX, xConcs)))
 
             # interp1d requires all x values to be unique
-            filter = np.concatenate((np.diff(guestConcs).astype(bool), [True]))
-            spl = interp1d(guestConcs[filter], fittedCurve[filter],
+            filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
+            spl = interp1d(xConcs[filter], fittedCurve[filter],
                            kind="quadratic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
@@ -350,7 +356,7 @@ class FittedFrame(ttk.Frame):
             self.ax.set_xscale("log")
         else:
             self.ax.set_xscale("linear")
-        self.ax.set_xlabel(f"[{titration.freeNames[-1]}] / M")
+        self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
         self.ax.legend()
         self.fig.tight_layout()
 

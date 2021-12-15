@@ -37,6 +37,8 @@ class StockTable(Table):
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(1 - self.headerGridRows, 3,
                                      ("nM", "μM", "mM", "M"), "mM")
+        if hasattr(titration, "concsUnit"):
+            self.unit.set(titration.concsUnit)
 
         if hasattr(titration, "stockConcs"):
             self.populate(titration.stockConcs)
@@ -228,14 +230,14 @@ class VolumesPopup(tk.Toplevel):
         self.titration.unknownTotalConcsLinked = \
             self.unknownTotalConcsLinkedVar.get()
 
-        self.titration.stockConcs = stockConcs * prefixes[
-            self.stockTable.unit.get().strip("M")
-        ]
+        concsUnit = self.stockTable.unit.get()
+        self.titration.concsUnit = concsUnit
+        self.titration.stockConcs = stockConcs * prefixes[concsUnit.strip("M")]
 
-        self.titration.volumes = volumes * prefixes[
-            self.volumesTable.unit.get().strip("L")
-        ]
-        self.titration.volumesUnit = self.volumesTable.unit.get()
+        volumesUnit = self.volumesTable.unit.get()
+        self.titration.volumesUnit = volumesUnit
+        self.titration.volumes = volumes * prefixes[volumesUnit.strip("L")]
+
         self.titration.rowFilter = np.in1d(
             self.titration.additionTitles, self.volumesTable.rowTitles
         )
@@ -367,10 +369,9 @@ class ConcsPopup(tk.Toplevel):
             mb.showerror(title="Could not save data", message=e, parent=self)
             return
 
-        self.titration.totalConcs = totalConcs * prefixes[
-            self.concsTable.unit.get().strip("M")
-        ]
-        self.titration.concsUnit = self.concsTable.unit.get()
+        concsUnit = self.concsTable.unit.get()
+        self.titration.concsUnit = concsUnit
+        self.titration.totalConcs = totalConcs * prefixes[concsUnit.strip("M")]
 
         self.titration.rowFilter = np.in1d(
             self.titration.additionTitles, self.concsTable.rowTitles
