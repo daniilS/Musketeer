@@ -64,8 +64,9 @@ class Table(ttk.Frame):
         return entry
 
     def readonlyEntry(self, *args, **kwargs):
-        entry = self.entry(*args, **kwargs)
+        entry = self.entry(*args, style="TLabel", **kwargs)
         entry.state(["readonly"])
+        entry.grid(padx=5, pady=5)
         entry.configure(takefocus=False)
         return entry
 
@@ -151,7 +152,7 @@ class Table(ttk.Frame):
             )
         if "readonlyTitles" in self.columnOptions:
             newColumn[self.headerCells - 1] = self.readonlyEntry(
-                self.headerCells - 1, column, firstEntry
+                self.headerCells - 1, column, firstEntry, align="center"
             )
         elif "titles" in self.columnOptions:
             newColumn[self.headerCells - 1] = self.entry(
