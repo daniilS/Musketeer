@@ -36,8 +36,6 @@ class KnownKsPopup(tk.Toplevel):
         height = int(self.master.winfo_height() * 0.4)
         frame = ScrolledFrame(self, height=height, max_width=1500)
         frame.pack(expand=True, fill="both")
-        frame.bind_arrow_keys(self)
-        frame.bind_scroll_wheel(self)
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
         knownKsLabel = ttk.Label(

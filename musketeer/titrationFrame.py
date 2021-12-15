@@ -34,11 +34,6 @@ class TitrationFrame(ttk.Frame):
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
         scrolledFrame.grid(column=0, row=0, sticky="nesw")
-        # TODO: frame doesn't receive focus, so scroll wheel doesn't get bound.
-        # Fix by binding scroll wheel event to root, then trigger the scrolling
-        # method of the currently active notebook tab.
-        # scrolledFrame.bind_arrow_keys(self)
-        # scrolledFrame.bind_scroll_wheel(self)
         self.options = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 
         for mod in (

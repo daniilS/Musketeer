@@ -29,7 +29,6 @@ setuptools.setup(
         "scipy",
         "matplotlib",
         "ttkbootstrap >=0.5.2, <1.0",
-        "tkscrolledframe",
         "ttkwidgets",
         "tksheet"
     ],
