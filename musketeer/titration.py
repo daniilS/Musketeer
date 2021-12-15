@@ -82,7 +82,7 @@ class Titration():
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[:self.kVarsCount()]
         totalConcVars = ksAndTotalConcs[
-            self.kVarsCount():-self.alphaVarsCount()]
+            self.kVarsCount():-self.alphaVarsCount() or None]
         alphaVars = ksAndTotalConcs[
             self.kVarsCount() + self.getConcVarsCount():]
 
