@@ -72,6 +72,7 @@ class KnownKsPopup(tk.Toplevel):
 
 class GetKsKnown(moduleFrame.Strategy):
     popup = KnownKsPopup
+    popupAttributes = ("knownKs", "knownAlphas")
 
     def __init__(self, titration):
         self.titration = titration

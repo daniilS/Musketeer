@@ -249,7 +249,8 @@ class VolumesPopup(tk.Toplevel):
             totalVolumes = np.atleast_2d(np.sum(self.titration.volumes, 1)).T
             self.titration.totalConcs = moles / totalVolumes
         elif hasattr(self.titration, "totalConcs"):
-            del self.titration.totalConcs
+            # cannot use "del" since totalConcs is part of popupAttributes
+            self.titration.totalConcs = None
 
         self.destroy()
 
@@ -273,7 +274,7 @@ class ConcsTable(Table):
 
         self.label(self.headerCells - 1, 1, "Addition title:")
 
-        if hasattr(titration, "totalConcs"):
+        if hasattr(titration, "totalConcs") and titration.totalConcs is not None:
             self.populate(titration.totalConcs)
         else:
             self.populateDefault()
@@ -382,6 +383,16 @@ class ConcsPopup(tk.Toplevel):
 
 class GetTotalConcsFromVolumes(moduleFrame.Strategy):
     popup = VolumesPopup
+    popupAttributes = (
+        "stockTitles",
+        "unknownTotalConcsLinked",
+        "concsUnit",
+        "stockConcs",
+        "volumesUnit",
+        "volumes",
+        "rowFilter",
+        "totalConcs"
+    )
 
     def __init__(self, titration):
         self.titration = titration
@@ -421,6 +432,11 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
 class GetTotalConcs(moduleFrame.Strategy):
     popup = ConcsPopup
+    popupAttributes = (
+        "concsUnit",
+        "totalConcs",
+        "rowFilter"
+    )
 
     def __init__(self, titration):
         self.titration = titration

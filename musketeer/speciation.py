@@ -162,6 +162,7 @@ class SpeciationHGAB(SpeciationCOGS):
 
 class SpeciationCustom(SpeciationCOGS):
     popup = SpeciationPopup
+    popupAttributes = ("stoichiometries", "freeNames", "boundNames")
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

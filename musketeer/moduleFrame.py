@@ -5,6 +5,9 @@ import tkinter.ttk as ttk
 # all module strategies should be a subclass
 class Strategy():
     popup = None
+    # List of titration attributes that are set through the popup window, and
+    # can be loaded from / saved to a file.
+    popupAttributes = ()
 
     def __init__(self, titration):
         self.titration = titration
