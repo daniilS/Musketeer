@@ -15,7 +15,7 @@ prefixesDecimal = {
     "m": Decimal(1e-3),
     "u": Decimal(1e-6),
     "μ": Decimal(1e-6),
-    "n": Decimal(1e-9)
+    "n": Decimal(1e-9),
 }
 
 prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
@@ -27,16 +27,23 @@ class StockTable(Table):
             stockTitles = titration.stockTitles
         else:
             stockTitles = ("Stock 1", "Stock 2")
-        super().__init__(master, 2, 0, stockTitles, allowBlanks=True,
-                         rowOptions=("readonlyTitles", "delete"),
-                         columnOptions=("titles", "new", "delete"))
+        super().__init__(
+            master,
+            2,
+            0,
+            stockTitles,
+            allowBlanks=True,
+            rowOptions=("readonlyTitles", "delete"),
+            columnOptions=("titles", "new", "delete"),
+        )
 
         self.titration = titration
 
         self.label(0 - self.headerGridRows, 0, "Stock concentrations:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
-        _, self.unit = self.dropdown(1 - self.headerGridRows, 3,
-                                     ("nM", "μM", "mM", "M"), "mM")
+        _, self.unit = self.dropdown(
+            1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
+        )
         if hasattr(titration, "concsUnit"):
             self.unit.set(titration.concsUnit)
 
@@ -52,8 +59,9 @@ class StockTable(Table):
 
     def populate(self, stockConcs):
         for name, row in zip(self.titration.freeNames, stockConcs):
-            self.addRow(name, [self.convertConc(conc, "M", self.unit.get())
-                               for conc in row])
+            self.addRow(
+                name, [self.convertConc(conc, "M", self.unit.get()) for conc in row]
+            )
 
     def populateDefault(self):
         for name in self.titration.freeNames:
@@ -64,7 +72,8 @@ class StockTable(Table):
             return ""
         conc = Decimal(conc)
         convertedConc = float(
-            conc * prefixesDecimal[fromUnit.strip("M")]
+            conc
+            * prefixesDecimal[fromUnit.strip("M")]
             / prefixesDecimal[toUnit.strip("M")]
         )
         return f"{convertedConc:g}"  # strip trailing zeroes
@@ -76,17 +85,23 @@ class VolumesTable(Table):
             stockTitles = titration.stockTitles
         else:
             stockTitles = ("Stock 1", "Stock 2")
-        super().__init__(master, 2, 2, stockTitles, allowBlanks=False,
-                         rowOptions=("delete", "readonlyTitles"),
-                         columnOptions=())
+        super().__init__(
+            master,
+            2,
+            2,
+            stockTitles,
+            allowBlanks=False,
+            rowOptions=("delete", "readonlyTitles"),
+            columnOptions=(),
+        )
 
         self.titration = titration
 
-        self.label(
-            0 - self.headerGridRows, 0, "Cumulative addition volumes:", 4)
+        self.label(0 - self.headerGridRows, 0, "Cumulative addition volumes:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
         _, self.unit = self.dropdown(
-            1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL")
+            1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL"
+        )
         if hasattr(titration, "volumesUnit"):
             self.unit.set(titration.volumesUnit)
 
@@ -101,8 +116,10 @@ class VolumesTable(Table):
         for name, row in zip(
             self.titration.additionTitles[self.titration.rowFilter], volumes
         ):
-            self.addRow(name, [self.convertVolume(volume, "L", self.unit.get())
-                               for volume in row])
+            self.addRow(
+                name,
+                [self.convertVolume(volume, "L", self.unit.get()) for volume in row],
+            )
 
     def populateDefault(self):
         for name in self.titration.additionTitles:
@@ -128,13 +145,13 @@ class VolumesTable(Table):
         self.cells[1, column] = copyTitlesButton
 
     def copyFirst(self, column):
-        cells = self.cells[self.headerCells:, column]
+        cells = self.cells[self.headerCells :, column]
         first = cells[0].get()
         for cell in cells:
             cell.set(first)
 
     def copyFromTitles(self, column):
-        cells = self.cells[self.headerCells:]
+        cells = self.cells[self.headerCells :]
         for row in cells:
             title = row[1].get()
             volume = self.getVolumeFromString(title, self.unit.get())
@@ -151,7 +168,8 @@ class VolumesTable(Table):
     def convertVolume(self, volume, fromUnit, toUnit):
         volume = Decimal(volume)
         convertedVolume = float(
-            volume * prefixesDecimal[fromUnit.strip("L")]
+            volume
+            * prefixesDecimal[fromUnit.strip("L")]
             / prefixesDecimal[toUnit.strip("L")]
         )
         return f"{convertedVolume:g}"  # strip trailing zeroes
@@ -172,20 +190,18 @@ class VolumesPopup(tk.Toplevel):
         unknownConcsFrame = ttk.Frame(innerFrame, borderwidth=5)
         unknownConcsFrame.pack(expand=True, fill="both")
         unknownConcsLabel = ttk.Label(
-            unknownConcsFrame,
-            text="Leave cells blank for unknown concentrations."
+            unknownConcsFrame, text="Leave cells blank for unknown concentrations."
         )
         unknownConcsLabel.pack()
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
         if hasattr(titration, "unknownTotalConcsLinked"):
-            self.unknownTotalConcsLinkedVar.set(
-                self.titration.unknownTotalConcsLinked
-            )
+            self.unknownTotalConcsLinkedVar.set(self.titration.unknownTotalConcsLinked)
         else:
             self.unknownTotalConcsLinkedVar.set(True)
         unknownTotalConcsCheckbutton = ttk.Checkbutton(
-            unknownConcsFrame, variable=self.unknownTotalConcsLinkedVar,
-            text="Link unknown concentrations for the same species in different stocks"
+            unknownConcsFrame,
+            variable=self.unknownTotalConcsLinkedVar,
+            text="Link unknown concentrations for the same species in different stocks",
         )
         unknownTotalConcsCheckbutton.pack()
 
@@ -198,9 +214,7 @@ class VolumesPopup(tk.Toplevel):
         self.stockTable._deleteColumn = self.stockTable.deleteColumn
         self.stockTable.deleteColumn = self.deleteColumns
 
-        buttonFrame = ButtonFrame(
-            innerFrame, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(innerFrame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both")
 
     def addColumns(self):
@@ -227,8 +241,7 @@ class VolumesPopup(tk.Toplevel):
             return
 
         self.titration.stockTitles = stockTitles
-        self.titration.unknownTotalConcsLinked = \
-            self.unknownTotalConcsLinkedVar.get()
+        self.titration.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
 
         concsUnit = self.stockTable.unit.get()
         self.titration.concsUnit = concsUnit
@@ -260,9 +273,15 @@ class ConcsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
 
-        super().__init__(master, 2, 2, titration.freeNames, allowBlanks=False,
-                         rowOptions=("delete", "readonlyTitles"),
-                         columnOptions=("readonlyTitles"))
+        super().__init__(
+            master,
+            2,
+            2,
+            titration.freeNames,
+            allowBlanks=False,
+            rowOptions=("delete", "readonlyTitles"),
+            columnOptions=("readonlyTitles"),
+        )
 
         self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
@@ -283,8 +302,9 @@ class ConcsTable(Table):
         for name, row in zip(
             self.titration.additionTitles[self.titration.rowFilter], concs
         ):
-            self.addRow(name, [self.convertConc(conc, "M", self.unit.get())
-                               for conc in row])
+            self.addRow(
+                name, [self.convertConc(conc, "M", self.unit.get()) for conc in row]
+            )
 
     def populateDefault(self):
         for name in self.titration.additionTitles:
@@ -310,13 +330,13 @@ class ConcsTable(Table):
         self.cells[1, column] = copyTitlesButton
 
     def copyFirst(self, column):
-        cells = self.cells[self.headerCells:, column]
+        cells = self.cells[self.headerCells :, column]
         first = cells[0].get()
         for cell in cells:
             cell.set(first)
 
     def copyFromTitles(self, column):
-        cells = self.cells[self.headerCells:]
+        cells = self.cells[self.headerCells :]
         for row in cells:
             title = row[1].get()
             conc = self.getConcFromString(title, self.unit.get())
@@ -333,7 +353,8 @@ class ConcsTable(Table):
     def convertConc(self, conc, fromUnit, toUnit):
         conc = Decimal(conc)
         convertedConc = float(
-            conc * prefixesDecimal[fromUnit.strip("M")]
+            conc
+            * prefixesDecimal[fromUnit.strip("M")]
             / prefixesDecimal[toUnit.strip("M")]
         )
         return f"{convertedConc:g}"  # strip trailing zeroes
@@ -354,9 +375,7 @@ class ConcsPopup(tk.Toplevel):
         self.concsTable = ConcsTable(innerFrame, titration)
         self.concsTable.pack(expand=True, fill="both")
 
-        buttonFrame = ButtonFrame(
-            innerFrame, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(innerFrame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both")
 
     def reset(self):
@@ -391,7 +410,7 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
         "volumesUnit",
         "volumes",
         "rowFilter",
-        "totalConcs"
+        "totalConcs",
     )
 
     def __init__(self, titration):
@@ -407,8 +426,7 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
             for rowIndex, totalConcVar in zip(
                 np.where(self.rowsWithBlanks)[0], totalConcVars
             ):
-                stockConcs[rowIndex,
-                           np.isnan(stockConcs[rowIndex])] = totalConcVar
+                stockConcs[rowIndex, np.isnan(stockConcs[rowIndex])] = totalConcVar
         else:
             stockConcs[np.isnan(stockConcs)] = totalConcVars
 
@@ -432,11 +450,7 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
 class GetTotalConcs(moduleFrame.Strategy):
     popup = ConcsPopup
-    popupAttributes = (
-        "concsUnit",
-        "totalConcs",
-        "rowFilter"
-    )
+    popupAttributes = ("concsUnit", "totalConcs", "rowFilter")
 
     def __init__(self, titration):
         self.titration = titration
@@ -454,7 +468,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Enter concentrations or volumes:"
     dropdownOptions = {
         "Volumes": GetTotalConcsFromVolumes,
-        "Concentrations": GetTotalConcs
+        "Concentrations": GetTotalConcs,
     }
     attributeName = "getTotalConcs"
     setDefault = False

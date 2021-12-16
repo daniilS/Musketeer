@@ -9,8 +9,18 @@ from .style import padding, cellWidth
 class Table(ttk.Frame):
     width = cellWidth
 
-    def __init__(self, master, headerGridRows, headerCells, columnTitles=[], *,
-                 allowBlanks=False, rowOptions=[], columnOptions=[], **kwargs):
+    def __init__(
+        self,
+        master,
+        headerGridRows,
+        headerCells,
+        columnTitles=[],
+        *,
+        allowBlanks=False,
+        rowOptions=[],
+        columnOptions=[],
+        **kwargs
+    ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
         self.allowBlanks = allowBlanks
@@ -25,13 +35,19 @@ class Table(ttk.Frame):
         self.headerCells = headerCells + 2
         if "new" in rowOptions:
             self.newRowButton = self.button(
-                self.headerCells - 1, 0, "New row", self.addRow,
-                style="success.Outline.TButton"
+                self.headerCells - 1,
+                0,
+                "New row",
+                self.addRow,
+                style="success.Outline.TButton",
             )
         if "new" in columnOptions:
             self.newColumnButton = self.button(
-                self.headerCells - 2, 1, "New column", self.addColumn,
-                style="success.Outline.TButton"
+                self.headerCells - 2,
+                1,
+                "New column",
+                self.addColumn,
+                style="success.Outline.TButton",
             )
 
         self.initEmptyCells()
@@ -42,11 +58,8 @@ class Table(ttk.Frame):
 
     # all widget creation methods use cell rows, not grid rows, as arguments
 
-    def entry(self, row, column, text="", align="left", columnspan=1,
-              **kwargs):
-        entry = ttk.Entry(
-            self, width=self.width * columnspan, justify=align, **kwargs
-        )
+    def entry(self, row, column, text="", align="left", columnspan=1, **kwargs):
+        entry = ttk.Entry(self, width=self.width * columnspan, justify=align, **kwargs)
 
         def set(text=""):
             oldState = entry.state()
@@ -54,12 +67,15 @@ class Table(ttk.Frame):
             entry.delete(0, "end")
             entry.insert(0, text)
             entry.state(oldState)
+
         entry.set = set
 
         entry.set(text)
         entry.grid(
-            row=self.headerGridRows + row, column=column, sticky="nesw",
-            columnspan=columnspan
+            row=self.headerGridRows + row,
+            column=column,
+            sticky="nesw",
+            columnspan=columnspan,
         )
         return entry
 
@@ -73,37 +89,54 @@ class Table(ttk.Frame):
     def label(self, row, column, text="", columnspan=1, **kwargs):
         frame = ttk.Frame(self, width=self.width * columnspan, borderwidth=5)
         frame.grid(
-            row=self.headerGridRows + row, column=column, sticky="nesw",
-            columnspan=columnspan
+            row=self.headerGridRows + row,
+            column=column,
+            sticky="nesw",
+            columnspan=columnspan,
         )
         label = ttk.Label(frame, text=text, **kwargs)
         label.pack()
         return frame
 
-    def button(self, row, column, text="", command=None, columnspan=1,
-               style="Outline.TButton", **kwargs):
+    def button(
+        self,
+        row,
+        column,
+        text="",
+        command=None,
+        columnspan=1,
+        style="Outline.TButton",
+        **kwargs
+    ):
         button = ttk.Button(
-            self, text=text, command=command, style=style,
-            takefocus=False, **kwargs
+            self, text=text, command=command, style=style, takefocus=False, **kwargs
         )
         button.grid(
-            row=self.headerGridRows + row, column=column, sticky="nesw",
-            columnspan=columnspan, padx=1, pady=1
+            row=self.headerGridRows + row,
+            column=column,
+            sticky="nesw",
+            columnspan=columnspan,
+            padx=1,
+            pady=1,
         )
         return button
 
     def deleteRowButton(self, *args, **kwargs):
         button = self.button(*args, **kwargs)
-        button.configure(command=lambda: self.deleteRow(
-            button.grid_info()["row"] - self.headerGridRows
-        ))
+        button.configure(
+            command=lambda: self.deleteRow(
+                button.grid_info()["row"] - self.headerGridRows
+            )
+        )
         return button
 
     def deleteColumnButton(self, *args, **kwargs):
         button = self.button(*args, **kwargs)
-        button.configure(command=lambda button=button: self.deleteColumn(
-            button.grid_info()["column"]
-        ))
+        button.configure(
+            command=lambda button=button: self.deleteColumn(
+                button.grid_info()["column"]
+            )
+        )
         return button
 
     def dropdown(self, row, column, choices=[], default=None, columnspan=1):
@@ -111,13 +144,11 @@ class Table(ttk.Frame):
         if default is None:
             default = choices[0]
         optionMenu = ttk.OptionMenu(
-            self, stringVar, default, *choices,
-            style="Outline.TMenubutton"
+            self, stringVar, default, *choices, style="Outline.TMenubutton"
         )
         optionMenu.configure(takefocus=0)
         optionMenu.grid(
-            row=self.headerGridRows + row, column=column, sticky="nesw",
-            padx=1, pady=1
+            row=self.headerGridRows + row, column=column, sticky="nesw", padx=1, pady=1
         )
         return optionMenu, stringVar
 
@@ -194,10 +225,8 @@ class Table(ttk.Frame):
 
     @property
     def data(self):
-        data = np.full(self.cells[self.headerCells:, 2:].shape,
-                       self.convertData("0"))
-        for (row, column), cell in np.ndenumerate(self.cells[self.headerCells:,
-                                                             2:]):
+        data = np.full(self.cells[self.headerCells :, 2:].shape, self.convertData("0"))
+        for (row, column), cell in np.ndenumerate(self.cells[self.headerCells :, 2:]):
             data[row, column] = self.convertData(cell.get())
         return data
 
@@ -209,20 +238,16 @@ class Table(ttk.Frame):
 
     @property
     def rowTitles(self):
-        return np.array(
-            [title.get() for title in self.cells[self.headerCells:, 1]]
-        )
+        return np.array([title.get() for title in self.cells[self.headerCells :, 1]])
 
     @rowTitles.setter
     def rowTitles(self, titles):
-        for cell, title in zip(self.cells[self.headerCells:, 1], titles):
+        for cell, title in zip(self.cells[self.headerCells :, 1], titles):
             cell.set(title)
 
     @property
     def columnTitles(self):
-        return np.array(
-            [title.get() for title in self.cells[self.headerCells - 1, 2:]]
-        )
+        return np.array([title.get() for title in self.cells[self.headerCells - 1, 2:]])
 
     @columnTitles.setter
     def columnTitles(self, titles):
@@ -234,22 +259,23 @@ class Table(ttk.Frame):
         elif difference < 0:
             for _ in range(difference):
                 self.deleteColumn(self.cells.shape[1])
-        if ("titles" in self.columnOptions
-                or "readonlyTitles" in self.columnOptions):
-            for cell, title in zip(self.cells[self.headerCells - 1, 2:],
-                                   titles):
+        if "titles" in self.columnOptions or "readonlyTitles" in self.columnOptions:
+            for cell, title in zip(self.cells[self.headerCells - 1, 2:], titles):
                 cell.set(title)
 
 
 class ButtonFrame(ttk.Frame):
     def __init__(self, master, reset, save, cancel, *args, **kwargs):
         super().__init__(master, borderwidth=padding, *args, **kwargs)
-        self.resetButton = ttk.Button(self, text="Reset", command=reset,
-                                      style="danger.TButton")
+        self.resetButton = ttk.Button(
+            self, text="Reset", command=reset, style="danger.TButton"
+        )
         self.resetButton.pack(side="left", padx=padding)
-        self.saveButton = ttk.Button(self, text="Save", command=save,
-                                     style="success.TButton")
+        self.saveButton = ttk.Button(
+            self, text="Save", command=save, style="success.TButton"
+        )
         self.saveButton.pack(side="right", padx=padding)
-        self.cancelButton = ttk.Button(self, text="Cancel", command=cancel,
-                                       style="secondary.TButton")
+        self.cancelButton = ttk.Button(
+            self, text="Cancel", command=cancel, style="secondary.TButton"
+        )
         self.cancelButton.pack(side="right", padx=padding)

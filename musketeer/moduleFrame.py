@@ -3,7 +3,7 @@ import tkinter.ttk as ttk
 
 
 # all module strategies should be a subclass
-class Strategy():
+class Strategy:
     popup = None
     # List of titration attributes that are set through the popup window, and
     # can be loaded from / saved to a file.
@@ -24,11 +24,7 @@ class ModuleFrame(ttk.LabelFrame):
     setDefault = True
 
     def __init__(self, parent, titration, updatePlots, *args, **kwargs):
-        super().__init__(
-            parent, text=self.frameLabel, borderwidth=5,
-            *args, **kwargs
-
-        )
+        super().__init__(parent, text=self.frameLabel, borderwidth=5, *args, **kwargs)
         self.titration = titration
         self.updatePlots = updatePlots
 
@@ -40,8 +36,12 @@ class ModuleFrame(ttk.LabelFrame):
         strategies = list(self.dropdownOptions.keys())
         defaultValue = strategies[0] if self.setDefault else None
         optionMenu = ttk.OptionMenu(
-            self, self.stringVar, defaultValue, command=self.callback,
-            *strategies, style="primary.Outline.TMenubutton"
+            self,
+            self.stringVar,
+            defaultValue,
+            command=self.callback,
+            *strategies,
+            style="primary.Outline.TMenubutton"
         )
         optionMenu.configure(width=30)
         # call the callback for the default value

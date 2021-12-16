@@ -19,13 +19,21 @@ class SpeciationHG(moduleFrame.Strategy):
         K = ks[0]
         Htot, Gtot = totalConcs.T
         H = (
-            np.sqrt(Gtot**2 * K**2 - 2*Gtot*K*(Htot*K - 1) + (Htot*K + 1)**2)
-            - Gtot*K + Htot*K - 1
-        ) / (2*K)
+            np.sqrt(
+                Gtot ** 2 * K ** 2 - 2 * Gtot * K * (Htot * K - 1) + (Htot * K + 1) ** 2
+            )
+            - Gtot * K
+            + Htot * K
+            - 1
+        ) / (2 * K)
         G = (
-            np.sqrt(Htot**2 * K**2 - 2*Htot*K*(Gtot*K - 1) + (Gtot*K + 1)**2)
-            - Htot*K + Gtot*K - 1
-        ) / (2*K)
+            np.sqrt(
+                Htot ** 2 * K ** 2 - 2 * Htot * K * (Gtot * K - 1) + (Gtot * K + 1) ** 2
+            )
+            - Htot * K
+            + Gtot * K
+            - 1
+        ) / (2 * K)
         HG = H * G * K
 
         free = np.vstack((H, G)).T
@@ -48,9 +56,15 @@ class SpeciationTable(Table):
         else:
             stoichiometries = np.array([[1, 1]])
 
-        super().__init__(master, 0, 0, freeNames, allowBlanks=False,
-                         rowOptions=("titles", "new", "delete"),
-                         columnOptions=("titles", "new", "delete"))
+        super().__init__(
+            master,
+            0,
+            0,
+            freeNames,
+            allowBlanks=False,
+            rowOptions=("titles", "new", "delete"),
+            columnOptions=("titles", "new", "delete"),
+        )
         for boundName, stoichiometry in zip(boundNames, stoichiometries):
             self.addRow(boundName, stoichiometry)
 
@@ -80,9 +94,7 @@ class SpeciationPopup(tk.Toplevel):
 
     def reset(self):
         self.speciationTable.destroy()
-        self.speciationTable = SpeciationTable(
-            self.innerFrame, self.titration
-        )
+        self.speciationTable = SpeciationTable(self.innerFrame, self.titration)
         self.speciationTable.pack(expand=True, fill="both")
 
     def saveData(self):
@@ -115,19 +127,21 @@ class SpeciationCOGS(moduleFrame.Strategy):
         P = 1 / max(P)
         tol = 1e-7
         while True:
-            bound[complexes] = k[complexes] * np.prod(free**M[complexes, :], 1)
+            bound[complexes] = k[complexes] * np.prod(free ** M[complexes, :], 1)
             # cap the maximum guess to avoid divergence
             bound[polymers] = np.where(
                 free[polymerParents] * k[polymers] >= 1,
-                free[polymerParents]**2 * k[polymers] / P,
-                (2 - k[polymers] * free[polymerParents]) * (k[polymers] * free[polymerParents]**2) / (alphas * (1 - k[polymers] * free[polymerParents])**2)
+                free[polymerParents] ** 2 * k[polymers] / P,
+                (2 - k[polymers] * free[polymerParents])
+                * (k[polymers] * free[polymerParents] ** 2)
+                / (alphas * (1 - k[polymers] * free[polymerParents]) ** 2),
             )
             total = free + abs(M.T) @ bound  # total concentrations of species
             if all((total - y) <= tol * y):
                 break
             # to handle 0 total concentration
             invTotal = np.where(total == 0, 1, 1 / total)
-            free *= ((y * invTotal) ** P)
+            free *= (y * invTotal) ** P
         return free, bound
 
     def __call__(self, ks, totalConcs, alphas):
@@ -136,10 +150,7 @@ class SpeciationCOGS(moduleFrame.Strategy):
         bound = np.zeros((numPoints, self.titration.stoichiometries.shape[0]))
         for i in range(numPoints):
             free[i], bound[i] = self.COGS(
-                self.titration.stoichiometries,
-                totalConcs[i],
-                ks,
-                alphas
+                self.titration.stoichiometries, totalConcs[i], ks, alphas
             )
         return free, bound
 
@@ -172,6 +183,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "1:1 binding": SpeciationHG,
         "1:2 binding, identical sites": SpeciationHG2,
         "1:2 binding, different sites": SpeciationHGAB,
-        "Custom": SpeciationCustom
+        "Custom": SpeciationCustom,
     }
     attributeName = "speciation"

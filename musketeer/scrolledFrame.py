@@ -25,9 +25,11 @@ class ScrolledFrame(ttk.Frame):
             if not scrollbars:
                 scrollbars = self._DEFAULT_SCROLLBARS
             elif scrollbars not in self._VALID_SCROLLBARS:
-                raise ValueError("scrollbars parameter must be one of "
-                                 "'vertical', 'horizontal', 'both', or "
-                                 "'neither'")
+                raise ValueError(
+                    "scrollbars parameter must be one of "
+                    "'vertical', 'horizontal', 'both', or "
+                    "'neither'"
+                )
         else:
             scrollbars = self._DEFAULT_SCROLLBARS
 
@@ -49,10 +51,9 @@ class ScrolledFrame(ttk.Frame):
         self.grid_rowconfigure(0, weight=1)
 
         # Canvas to hold the interior widget
-        c = self._canvas = tk.Canvas(self,
-                                     borderwidth=0,
-                                     highlightthickness=0,
-                                     takefocus=0)
+        c = self._canvas = tk.Canvas(
+            self, borderwidth=0, highlightthickness=0, takefocus=0
+        )
 
         self.bind_mousewheel()
 
@@ -60,12 +61,8 @@ class ScrolledFrame(ttk.Frame):
         c.bind("<Configure>", self._resize_interior)
 
         # Scrollbars
-        xs = self._x_scrollbar = Scrollbar(self,
-                                           orient="horizontal",
-                                           command=c.xview)
-        ys = self._y_scrollbar = Scrollbar(self,
-                                           orient="vertical",
-                                           command=c.yview)
+        xs = self._x_scrollbar = Scrollbar(self, orient="horizontal", command=c.xview)
+        ys = self._y_scrollbar = Scrollbar(self, orient="vertical", command=c.yview)
         c.configure(xscrollcommand=xs.set, yscrollcommand=ys.set)
 
         # Lay out our widgets
@@ -162,9 +159,9 @@ class ScrolledFrame(ttk.Frame):
 
         # Add the interior widget to the canvas, and save its widget ID
         # for use in _resize_interior()
-        self._interior_id = self._canvas.create_window(0, 0,
-                                                       anchor="nw",
-                                                       window=self._interior)
+        self._interior_id = self._canvas.create_window(
+            0, 0, anchor="nw", window=self._interior
+        )
 
         # Call _update_scroll_region() when the interior widget is resized
         self._interior.bind("<Configure>", self._update_scroll_region)
@@ -226,8 +223,11 @@ class ScrolledFrame(ttk.Frame):
         horizontal_scroll = bool(event.state & 1)
         # only scroll if the inner frame doesn't fit fully
         if (
-            (horizontal_scroll and self._interior.winfo_reqwidth() < self._canvas.winfo_width())
-            or ((not horizontal_scroll) and self._interior.winfo_reqheight() < self._canvas.winfo_height())
+            horizontal_scroll
+            and self._interior.winfo_reqwidth() < self._canvas.winfo_width()
+        ) or (
+            (not horizontal_scroll)
+            and self._interior.winfo_reqheight() < self._canvas.winfo_height()
         ):
             return
 

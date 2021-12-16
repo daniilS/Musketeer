@@ -7,9 +7,7 @@ from scipy.interpolate import interp1d
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
 import tkinter.messagebox as mb
-from matplotlib.backends.backend_tkagg import (
-    NavigationToolbar2Tk, FigureCanvasTkAgg
-)
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from . import speciation
@@ -44,26 +42,24 @@ class TitrationFrame(ttk.Frame):
             proportionality,
             knownSignals,
             fitSignals,
-            combineResiduals
+            combineResiduals,
         ):
             moduleFrame = mod.ModuleFrame(
                 self.options, self.titration, self.updatePlots
             )
             moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
 
-        fitDataButton = ttk.Button(
-            self.options, text="Fit", command=self.tryFitData
-        )
+        fitDataButton = ttk.Button(self.options, text="Fit", command=self.tryFitData)
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         # tabs with different fits
-        self.notebook = InteractiveNotebook(self, padding=padding,
-                                            style="Flat.Interactive.TNotebook")
+        self.notebook = InteractiveNotebook(
+            self, padding=padding, style="Flat.Interactive.TNotebook"
+        )
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
         if self.titration.continuous:
-            self.inputSpectraFrame = InputSpectraFrame(self.notebook,
-                                                       self.titration)
+            self.inputSpectraFrame = InputSpectraFrame(self.notebook, self.titration)
             self.notebook.add(self.inputSpectraFrame, text="Input Spectra")
 
         self.rowconfigure(0, weight=1)
@@ -89,10 +85,10 @@ class TitrationFrame(ttk.Frame):
         if self.titration.continuous:
             continuousFittedFrame = ContinuousFittedFrame(nb, self.titration)
             nb.add(continuousFittedFrame, text="Fitted Spectra")
-            discreteFittedFrame = DiscreteFromContinuousFittedFrame(
-                nb, self.titration)
-            nb.add(discreteFittedFrame,
-                   text=f"Fit at select {self.titration.xQuantity}")
+            discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, self.titration)
+            nb.add(
+                discreteFittedFrame, text=f"Fit at select {self.titration.xQuantity}"
+            )
         else:
             discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
             nb.add(discreteFittedFrame, text="Fitted signals")
@@ -112,10 +108,9 @@ class InputSpectraFrame(ttk.Frame):
         rangeSelection = ttk.Frame(self)
         rangeSelection.grid(row=0, column=0, sticky="")
 
-        ttk.Label(
-            rangeSelection,
-            text=f"Range of {titration.xQuantity} to fit:"
-        ).pack(side="left")
+        ttk.Label(rangeSelection, text=f"Range of {titration.xQuantity} to fit:").pack(
+            side="left"
+        )
 
         minWL = self.titration.signalTitles.min()
         maxWL = self.titration.signalTitles.max()
@@ -139,19 +134,15 @@ class InputSpectraFrame(ttk.Frame):
         self.fig = Figure()
         self.ax = self.fig.add_subplot()
 
-        ttk.Button(
-            rangeSelection, text="Update", command=self.updateWLRange
-        ).pack(side="left")
-
-        canvas = FigureCanvasTkAgg(
-            self.fig, master=self
+        ttk.Button(rangeSelection, text="Update", command=self.updateWLRange).pack(
+            side="left"
         )
+
+        canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
-        toolbar = NavigationToolbar2Tk(
-            canvas, self, pack_toolbar=False
-        )
+        toolbar = NavigationToolbar2Tk(canvas, self, pack_toolbar=False)
         toolbar.update()
         toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
@@ -169,16 +160,13 @@ class InputSpectraFrame(ttk.Frame):
 
         ax.cla()
 
-        spectraColors = ["black"] +\
-            ["#80808080"] * (titration.numAdditions - 2) +\
-            ["tab:red"]
+        spectraColors = (
+            ["black"] + ["#80808080"] * (titration.numAdditions - 2) + ["tab:red"]
+        )
         colorCycler = cycler(color=spectraColors)
         ax.set_prop_cycle(colorCycler)
 
-        ax.plot(
-            titration.processedSignalTitles,
-            titration.processedData.T
-        )
+        ax.plot(titration.processedSignalTitles, titration.processedData.T)
 
         ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
@@ -189,9 +177,9 @@ class InputSpectraFrame(ttk.Frame):
     def updateWLRange(self):
         from_ = float(self.fromSpinbox.get())
         to = float(self.toSpinbox.get())
-        self.titration.columnFilter = \
-            (self.titration.signalTitles >= from_) & \
-            (self.titration.signalTitles <= to)
+        self.titration.columnFilter = (self.titration.signalTitles >= from_) & (
+            self.titration.signalTitles <= to
+        )
         self.plot()
 
 
@@ -204,7 +192,7 @@ class ContinuousFittedFrame(ttk.Frame):
     def plot(self):
         titration = self.titration
         ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
+        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
         self.fig = Figure()
         self.ax = self.fig.add_subplot()
 
@@ -214,14 +202,11 @@ class ContinuousFittedFrame(ttk.Frame):
         for spectrum, name in zip(spectra, names):
             self.ax.plot(wavelengths, spectrum, label=name)
 
-        ttk.Label(
-            self, text=f"Fitted spectra (K = {ks[0]:.0f})",
-            font='-size 15'
-        ).grid(row=0, column=0, sticky="")
-        self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
-        self.ax.set_ylabel(
-            f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹"
+        ttk.Label(self, text=f"Fitted spectra (K = {ks[0]:.0f})", font="-size 15").grid(
+            row=0, column=0, sticky=""
         )
+        self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+        self.ax.set_ylabel(f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹")
         self.ax.legend()
 
         self.fig.tight_layout()
@@ -230,9 +215,7 @@ class ContinuousFittedFrame(ttk.Frame):
         canvas.draw()
         canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
-        toolbar = NavigationToolbar2Tk(
-            canvas, self, pack_toolbar=False
-        )
+        toolbar = NavigationToolbar2Tk(canvas, self, pack_toolbar=False)
         toolbar.update()
         toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
@@ -260,29 +243,30 @@ class FittedFrame(ttk.Frame):
         self.canvas.draw()
         self.canvas.get_tk_widget().grid(row=1, column=0, sticky="")
 
-        self.toolbar = NavigationToolbar2Tk(
-            self.canvas, self, pack_toolbar=False
-        )
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
         self.toolbar.update()
         self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
         ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
-        ttk.Label(
-            self, text=f"Fitted curves (K = {ks[0]:.0f})",
-            font='-size 15'
-        ).grid(row=0, column=0, sticky="")
+        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
+        ttk.Label(self, text=f"Fitted curves (K = {ks[0]:.0f})", font="-size 15").grid(
+            row=0, column=0, sticky=""
+        )
 
         self.toggleButtonsFrame = ttk.Frame(self)
         self.toggleButtonsFrame.grid(row=1, column=1, sticky="")
         self.normalisationButton = ttk.Checkbutton(
-            self.toggleButtonsFrame, text="Normalise movement",
-            command=self.toggleNormalisation, style="Outline.Toolbutton"
+            self.toggleButtonsFrame,
+            text="Normalise movement",
+            command=self.toggleNormalisation,
+            style="Outline.Toolbutton",
         )
         self.normalisationButton.pack(pady=padding, fill="x")
         self.logScaleButton = ttk.Checkbutton(
-            self.toggleButtonsFrame, text="Logarithmic x axis",
-            command=self.toggleLogScale, style="Outline.Toolbutton"
+            self.toggleButtonsFrame,
+            text="Logarithmic x axis",
+            command=self.toggleLogScale,
+            style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
 
@@ -332,9 +316,7 @@ class FittedFrame(ttk.Frame):
             fittedCurves = self.fittedCurves
             self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
 
-        for curve, fittedCurve, name in zip(curves,
-                                            fittedCurves,
-                                            self.names):
+        for curve, fittedCurve, name in zip(curves, fittedCurves, self.names):
             fittedZero = fittedCurve[0]
             curve -= fittedZero
             fittedCurve -= fittedZero
@@ -347,8 +329,7 @@ class FittedFrame(ttk.Frame):
 
             # interp1d requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            spl = interp1d(xConcs[filter], fittedCurve[filter],
-                           kind="quadratic")
+            spl = interp1d(xConcs[filter], fittedCurve[filter], kind="quadratic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
@@ -393,21 +374,27 @@ class ResultsFrame(ttk.Frame):
 
     def showResults(self):
         titration = self.titration
-        kTable = Table(self, 0, 0, ["K (M⁻ⁿ)", "α"],
-                       rowOptions=("readonlyTitles"),
-                       columnOptions=("readonlyTitles"))
+        kTable = Table(
+            self,
+            0,
+            0,
+            ["K (M⁻ⁿ)", "α"],
+            rowOptions=("readonlyTitles"),
+            columnOptions=("readonlyTitles"),
+        )
 
         ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10**titration.lastKs[:titration.kVarsCount()]
+        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
 
         alphas = titration.knownAlphas.copy()
         polymerAlphas = alphas[np.any(titration.stoichiometries < 0, 1)]
-        polymerAlphas[np.isnan(polymerAlphas)] = 10**titration.lastKs[
-            titration.kVarsCount() + titration.getConcVarsCount():]
+        polymerAlphas[np.isnan(polymerAlphas)] = (
+            10
+            ** titration.lastKs[titration.kVarsCount() + titration.getConcVarsCount() :]
+        )
 
         for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
-            kTable.addRow(boundName,
-                          [np.rint(k), alpha if not np.isnan(alpha) else ""])
+            kTable.addRow(boundName, [np.rint(k), alpha if not np.isnan(alpha) else ""])
         kTable.pack(side="top", pady=15)
 
         sheet = tksheet.Sheet(
@@ -420,13 +407,15 @@ class ResultsFrame(ttk.Frame):
         sheet.enable_bindings()
         sheet.pack(side="top", pady=15, fill="x")
 
-        saveButton = ttk.Button(self, text="Save as CSV",
-                                command=self.saveCSV, style="success.TButton")
+        saveButton = ttk.Button(
+            self, text="Save as CSV", command=self.saveCSV, style="success.TButton"
+        )
         saveButton.pack(side="top", pady=15)
 
     def saveCSV(self):
-        fileName = fd.asksaveasfilename(filetypes=[("CSV file", "*.csv")],
-                                        defaultextension=".csv")
+        fileName = fd.asksaveasfilename(
+            filetypes=[("CSV file", "*.csv")], defaultextension=".csv"
+        )
         data = self.titration.lastFitResult
         rowTitles = np.atleast_2d(self.titration.contributorNames()).T
         columnTitles = np.append("", self.titration.processedSignalTitles)

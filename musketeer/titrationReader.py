@@ -7,9 +7,7 @@ import csv
 import numpy as np
 import os
 import re
-from matplotlib.backends.backend_tkagg import (
-    NavigationToolbar2Tk, FigureCanvasTkAgg
-)
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
 from matplotlib.backend_bases import _Mode
 import matplotlib as mpl
 from matplotlib.figure import Figure
@@ -17,12 +15,10 @@ from matplotlib.figure import Figure
 from .titration import Titration
 from .style import padding
 
-Params = namedtuple("Params", (
-    "continuous",
-    "yQuantity",
-    "yUnit",
-    "xQuantity",
-    "xUnit"), defaults=[None] * 4
+Params = namedtuple(
+    "Params",
+    ("continuous", "yQuantity", "yUnit", "xQuantity", "xUnit"),
+    defaults=[None] * 4,
 )
 
 predefinedParams = {
@@ -86,7 +82,7 @@ def getFilePath():
     # and disabling all internet connections seems to fix it. ???
     filePath = fd.askopenfilename(
         title="Select input file",
-        filetypes=[("csv files", "*.csv"), ("all files", "*.*")]
+        filetypes=[("csv files", "*.csv"), ("all files", "*.*")],
     )
     return filePath
 
@@ -116,7 +112,7 @@ def readUV(filePath):
     # set default parameters for UV-Vis titrations
     fillPredefinedParams(titration, predefinedParams["UV-Vis"])
 
-    with open(filePath, "r", newline='') as inFile:
+    with open(filePath, "r", newline="") as inFile:
 
         reader = csv.reader(inFile)
 
@@ -139,8 +135,9 @@ def readUV(filePath):
     titration.signalTitles = np.array(wavelengths, dtype=float)
     averageStep = abs(np.average(np.diff(titration.signalTitles)))
     titration.signalTitlesDecimals = int(-np.rint(np.log10(averageStep)))
-    titration.signalTitles = np.round(titration.signalTitles,
-                                      titration.signalTitlesDecimals)
+    titration.signalTitles = np.round(
+        titration.signalTitles, titration.signalTitlesDecimals
+    )
     # transpose data so that the column is the wavelength
     titration.rawData = np.array(absorbances, dtype=float).T
 
@@ -154,32 +151,37 @@ class CSVPopup(tk.Toplevel):
         frame = ttk.Frame(self, padding=15)
         frame.pack(expand=True, fill="both")
 
-        self.additionTitlesCheckbutton = ttk.Checkbutton(
-            frame, text="Addition titles")
-        self.signalTitlesCheckbutton = ttk.Checkbutton(
-            frame, text="Signal titles")
+        self.additionTitlesCheckbutton = ttk.Checkbutton(frame, text="Addition titles")
+        self.signalTitlesCheckbutton = ttk.Checkbutton(frame, text="Signal titles")
         self.additionsRowsRadiobutton = ttk.Radiobutton(
-            frame, value=0, text="Rows are additions, columns are signals")
+            frame, value=0, text="Rows are additions, columns are signals"
+        )
         self.additionsColumnsRadiobutton = ttk.Radiobutton(
-            frame, value=1, text="Rows are signals, columns are additions")
+            frame, value=1, text="Rows are signals, columns are additions"
+        )
         self.continueButton = ttk.Button(
-            frame, text="Continue", command=self.continueCommand)
+            frame, text="Continue", command=self.continueCommand
+        )
 
         self.additionTitlesCheckbutton.pack(pady=2.5)
         self.signalTitlesCheckbutton.pack(pady=2.5)
         self.additionsRowsRadiobutton.pack(pady=2.5)
         self.additionsColumnsRadiobutton.pack(pady=2.5)
-        self.continueButton.pack(pady=2.5, side='bottom')
+        self.continueButton.pack(pady=2.5, side="bottom")
 
         self.additionTitlesCheckbutton.invoke()
         self.signalTitlesCheckbutton.invoke()
         self.additionsRowsRadiobutton.invoke()
 
         optionMenuVar = tk.StringVar(self)
-        optionMenu = ttk.OptionMenu(frame, optionMenuVar, None,
-                                    *predefinedParams.keys(),
-                                    style="Outline.TMenubutton",
-                                    command=self.setParams)
+        optionMenu = ttk.OptionMenu(
+            frame,
+            optionMenuVar,
+            None,
+            *predefinedParams.keys(),
+            style="Outline.TMenubutton",
+            command=self.setParams
+        )
         optionMenu.configure(width=max([len(s) for s in predefinedParams]) + 1)
         optionMenu.pack(pady=2.5)
 
@@ -189,7 +191,8 @@ class CSVPopup(tk.Toplevel):
         self.continuous = tk.BooleanVar(self, False)
         self.continuous.trace_add("write", self.toggleContinuous)
         self.continuousWidget = ttk.Checkbutton(
-            paramsFrame, text="Continuous signals", variable=self.continuous)
+            paramsFrame, text="Continuous signals", variable=self.continuous
+        )
         self.continuousWidget.grid(row=0, column=0, columnspan=2)
 
         self.yQuantityLabel = ttk.Label(paramsFrame, text="Measured quantity:")
@@ -198,25 +201,22 @@ class CSVPopup(tk.Toplevel):
         self.yUnitLabel.grid(row=1, column=1, sticky="w")
         self.yQuantity = tk.StringVar(self)
         self.yUnit = tk.StringVar(self)
-        self.yQuantityWidget = ttk.Entry(paramsFrame,
-                                         textvariable=self.yQuantity)
+        self.yQuantityWidget = ttk.Entry(paramsFrame, textvariable=self.yQuantity)
         self.yQuantityWidget.grid(row=2, column=0, sticky="w")
-        self.yUnitWidget = ttk.Entry(paramsFrame, width=10,
-                                     textvariable=self.yUnit)
+        self.yUnitWidget = ttk.Entry(paramsFrame, width=10, textvariable=self.yUnit)
         self.yUnitWidget.grid(row=2, column=1, sticky="w")
 
         self.xQuantityLabel = ttk.Label(
-            paramsFrame, text="Continuous signals x-axis quantity:")
+            paramsFrame, text="Continuous signals x-axis quantity:"
+        )
         self.xQuantityLabel.grid(row=3, column=0, sticky="w")
         self.xUnitLabel = ttk.Label(paramsFrame, text="Unit:")
         self.xUnitLabel.grid(row=3, column=1, sticky="w")
         self.xQuantity = tk.StringVar(self)
         self.xUnit = tk.StringVar(self)
-        self.xQuantityWidget = ttk.Entry(paramsFrame,
-                                         textvariable=self.xQuantity)
+        self.xQuantityWidget = ttk.Entry(paramsFrame, textvariable=self.xQuantity)
         self.xQuantityWidget.grid(row=4, column=0, sticky="w")
-        self.xUnitWidget = ttk.Entry(paramsFrame, width=10,
-                                     textvariable=self.xUnit)
+        self.xUnitWidget = ttk.Entry(paramsFrame, width=10, textvariable=self.xUnit)
         self.xUnitWidget.grid(row=4, column=1, sticky="w")
 
     def toggleContinuous(self, *args, **kwargs):
@@ -232,12 +232,9 @@ class CSVPopup(tk.Toplevel):
 
     def continueCommand(self):
         self.aborted = False
-        self.hasSignalTitles = self.signalTitlesCheckbutton.instate(
-            ["selected"])
-        self.hasAdditionTitles = self.additionTitlesCheckbutton.instate(
-            ["selected"])
-        self.needTranspose = self.additionsColumnsRadiobutton.instate(
-            ["selected"])
+        self.hasSignalTitles = self.signalTitlesCheckbutton.instate(["selected"])
+        self.hasAdditionTitles = self.additionTitlesCheckbutton.instate(["selected"])
+        self.needTranspose = self.additionsColumnsRadiobutton.instate(["selected"])
         self.destroy()
 
 
@@ -252,7 +249,7 @@ def readCSV(filePath):
     for param in Params._fields:
         setattr(titration, param, getattr(popup, param).get())
 
-    with open(filePath, "r", newline='') as inFile:
+    with open(filePath, "r", newline="") as inFile:
         data = np.genfromtxt(inFile, dtype=str, delimiter=",")
         if popup.needTranspose:
             data = data.T
@@ -263,18 +260,22 @@ def readCSV(filePath):
         elif popup.hasAdditionTitles:
             titration.additionTitles = data[:, 0]
             titration.signalTitles = np.array(
-                ["Signal " + str(i) for i in data.shape[1]])
+                ["Signal " + str(i) for i in data.shape[1]]
+            )
             titration.rawData = data[:, 1:].astype(float)
         elif popup.hasSignalTitles:
             titration.additionTitles = np.array(
-                ["Addition " + str(i) for i in data.shape[0]])
+                ["Addition " + str(i) for i in data.shape[0]]
+            )
             titration.signalTitles = data[0, :]
             titration.rawData = data[1:, :].astype(float)
         else:
             titration.additionTitles = np.array(
-                ["Addition " + str(i) for i in data.shape[0]])
+                ["Addition " + str(i) for i in data.shape[0]]
+            )
             titration.signalTitles = np.array(
-                ["Signal " + str(i) for i in data.shape[1]])
+                ["Signal " + str(i) for i in data.shape[1]]
+            )
             titration.rawData = data
 
     return [titration]
@@ -307,7 +308,7 @@ class NavigationToolbarHorizontal(NavigationToolbar2Tk):
 
     def release_zoom(self, event):
         # check if user clicked without dragging
-        shouldPickPeak = (not hasattr(self, "lastrect"))
+        shouldPickPeak = not hasattr(self, "lastrect")
         event.key = "x"
         super().release_zoom(event)
         if shouldPickPeak:
@@ -329,7 +330,7 @@ def readNMR(filePath):
     plotFrequencies = []
     plotIntensities = []
 
-    with open(filePath, "r", newline='') as inFile:
+    with open(filePath, "r", newline="") as inFile:
         reader = csv.reader(inFile, delimiter="\t")
         for row in reader:
             if not row or not row[0]:
@@ -345,7 +346,9 @@ def readNMR(filePath):
             currentPlotFrequencies = [0]
             currentPlotFrequencies.extend(
                 # append each frequency three times to create peak
-                f for f in currentFrequencies for _ in range(3)
+                f
+                for f in currentFrequencies
+                for _ in range(3)
             )
             currentPlotFrequencies.append(0)
             plotFrequencies.append(currentPlotFrequencies)
@@ -362,8 +365,7 @@ def readNMR(filePath):
         numRows = len(frequencies)
         fig = Figure()
         axList = fig.subplots(
-            numRows, 1, sharex=True, sharey=True,
-            gridspec_kw={'hspace': 0, 'wspace': 0}
+            numRows, 1, sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0}
         )
         axList = np.flip(axList)
         axList[0].invert_xaxis()
@@ -380,7 +382,7 @@ def readNMR(filePath):
         titles = []
         currentSignal = np.full(numRows, None)
         plottedPoints = np.copy(currentSignal)
-        cycler = mpl.rcParams['axes.prop_cycle'].by_key()['color']
+        cycler = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
 
         titration = Titration()
         titration.title = os.path.basename(filePath)
@@ -424,7 +426,7 @@ def readNMR(filePath):
                 plottedPoints[i].remove()
                 pass
 
-            plottedPoints[i] = e.inaxes.plot(x, y, 'o', color=cycler[0])[0]
+            plottedPoints[i] = e.inaxes.plot(x, y, "o", color=cycler[0])[0]
             canvas.draw()
             canvas.flush_events()
 
@@ -435,7 +437,7 @@ def readNMR(filePath):
             currentSignal.fill(None)
             plottedPoints.fill(None)
 
-            entry.delete(0, 'end')
+            entry.delete(0, "end")
             entry.insert(0, "Signal title")
             cycler.pop(0)
 
@@ -445,11 +447,9 @@ def readNMR(filePath):
             popup.destroy()
 
         btn1 = ttk.Button(frame, text="Save signal", command=next)
-        btn2 = ttk.Button(
-            frame, text="Submit", style="success.TButton", command=save
-        )
+        btn2 = ttk.Button(frame, text="Submit", style="success.TButton", command=save)
         for widget in (entry, btn1, btn2):
-            widget.pack(side='left', padx=2, pady=5)
+            widget.pack(side="left", padx=2, pady=5)
 
         canvas = FigureCanvasTkAgg(fig, master=popup)
         canvas.draw()
@@ -474,5 +474,5 @@ def readNMR(filePath):
 fileReaders = {
     "UV-Vis csv file": readUV,
     "NMR peak list": readNMR,
-    "Universal csv file": readCSV
+    "Universal csv file": readCSV,
 }

@@ -43,6 +43,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     # TODO: add least squares with linear constraints
     dropdownOptions = {
         "Ordinary least squares": FitSignals,
-        "Nonnegative least squares": FitSignalsNonnegative
+        "Nonnegative least squares": FitSignalsNonnegative,
     }
     attributeName = "fitSignals"

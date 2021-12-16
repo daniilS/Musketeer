@@ -27,13 +27,10 @@ class KnownSpectraPopup(tk.Toplevel):
         self.sheet.pack(side="top", expand=True, fill="both")
         self.sheet.enable_bindings()
 
-        buttonFrame = ButtonFrame(
-            self, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(self, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
-        loadButton = ttk.Button(buttonFrame, text="Load from CSV",
-                                command=self.loadCSV)
+        loadButton = ttk.Button(buttonFrame, text="Load from CSV", command=self.loadCSV)
         loadButton.pack(side="left", padx=padding)
 
     def formatData(self, data):
@@ -54,9 +51,11 @@ class KnownSpectraPopup(tk.Toplevel):
             return
 
         if not np.all(np.any(np.isnan(data), 1) == np.all(np.isnan(data), 1)):
-            mb.showerror(title="Could not save data", parent=self,
-                         message="Please enter full spectra, or leave the entire row blank"
-                         )
+            mb.showerror(
+                title="Could not save data",
+                parent=self,
+                message="Please enter full spectra, or leave the entire row blank",
+            )
             return
 
         self.titration.knownSpectra = data
@@ -68,19 +67,22 @@ class KnownSpectraPopup(tk.Toplevel):
 
 class GetKnownSpectra(moduleFrame.Strategy):
     popup = KnownSpectraPopup
-    popupAttributes = ("knownSpectra")
+    popupAttributes = "knownSpectra"
 
     def __init__(self, titration):
         self.titration = titration
-        if not (hasattr(titration, 'knownSpectra')
-                and titration.knownSpectra.shape == (
-                    len(titration.contributorNames()),
-                    len(titration.processedSignalTitles))
-                ):
-            titration.knownSpectra = np.full((
-                len(self.titration.contributorNames()),
-                len(self.titration.processedSignalTitles)
-            ), np.nan)
+        if not (
+            hasattr(titration, "knownSpectra")
+            and titration.knownSpectra.shape
+            == (len(titration.contributorNames()), len(titration.processedSignalTitles))
+        ):
+            titration.knownSpectra = np.full(
+                (
+                    len(self.titration.contributorNames()),
+                    len(self.titration.processedSignalTitles),
+                ),
+                np.nan,
+            )
 
     def __call__(self):
         return self.titration.knownSpectra
@@ -88,10 +90,13 @@ class GetKnownSpectra(moduleFrame.Strategy):
 
 class GetAllSpectra(moduleFrame.Strategy):
     def __call__(self):
-        return np.full((
-            len(self.titration.contributorNames()),
-            len(self.titration.processedSignalTitles)
-        ), np.nan)
+        return np.full(
+            (
+                len(self.titration.contributorNames()),
+                len(self.titration.processedSignalTitles),
+            ),
+            np.nan,
+        )
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
@@ -99,6 +104,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Which spectra to optimise?"
     dropdownOptions = {
         "Optimise all spectra": GetAllSpectra,
-        "Specify some known spectra": GetKnownSpectra
+        "Specify some known spectra": GetKnownSpectra,
     }
     attributeName = "getKnownSpectra"

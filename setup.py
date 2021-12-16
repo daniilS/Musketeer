@@ -10,7 +10,7 @@ setuptools.setup(
     author_email="dos23@cam.ac.uk",
     description="A tool for fitting data from titration experiments.",
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -19,7 +19,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Topic :: Scientific/Engineering :: Chemistry"
+        "Topic :: Scientific/Engineering :: Chemistry",
     ],
     url="https://github.com/daniilS/Musketeer",
     packages=["musketeer"],
@@ -30,7 +30,7 @@ setuptools.setup(
         "matplotlib",
         "ttkbootstrap >=0.5.2, <1.0",
         "ttkwidgets",
-        "tksheet"
+        "tksheet",
     ],
-    python_requires=">=3.7"
+    python_requires=">=3.7",
 )

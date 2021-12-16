@@ -3,7 +3,7 @@ from scipy.optimize import minimize
 from scipy.signal import find_peaks
 
 
-class Titration():
+class Titration:
     def __init__(self):
         self.title = "Titration"
         # identical to [True, True, True, ..., True]
@@ -41,8 +41,12 @@ class Titration():
     @property
     def processedSignalTitlesStrings(self):
         if self.processedSignalTitles.dtype == float:
-            return np.array([f"{title:.{self.signalTitlesDecimals}f}"
-                             for title in self.processedSignalTitles])
+            return np.array(
+                [
+                    f"{title:.{self.signalTitlesDecimals}f}"
+                    for title in self.processedSignalTitles
+                ]
+            )
         else:
             return self.processedSignalTitles.astype(str)
 
@@ -62,16 +66,17 @@ class Titration():
         # Shoulder peaks can appear as inflection points rather than maxima.
         # We'll add the two most prominent inflection points from a first-order
         # approximation of the first derivative of the total movement:
-        inflectionIndices, inflectionProperties = \
-            find_peaks(-abs(np.diff(movement)), prominence=0)
+        inflectionIndices, inflectionProperties = find_peaks(
+            -abs(np.diff(movement)), prominence=0
+        )
         inflectionProminences = inflectionProperties["prominences"]
         inflectionFilter = inflectionProminences.argsort()[-maxShoulderPeaks:]
         largestInflectionsIndices = inflectionIndices[inflectionFilter]
 
         # combine the two arrays, without duplicates, and sort them
-        largestPeakIndices = np.sort(np.unique(np.concatenate(
-            (largestPeakIndices, largestInflectionsIndices)
-        )))
+        largestPeakIndices = np.sort(
+            np.unique(np.concatenate((largestPeakIndices, largestInflectionsIndices)))
+        )
 
         # discard peaks that don't move far enough away from the baseline
         # compared to the other peaks
@@ -80,11 +85,11 @@ class Titration():
 
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
-        kVars = ksAndTotalConcs[:self.kVarsCount()]
+        kVars = ksAndTotalConcs[: self.kVarsCount()]
         totalConcVars = ksAndTotalConcs[
-            self.kVarsCount():-self.alphaVarsCount() or None]
-        alphaVars = ksAndTotalConcs[
-            self.kVarsCount() + self.getConcVarsCount():]
+            self.kVarsCount() : -self.alphaVarsCount() or None
+        ]
+        alphaVars = ksAndTotalConcs[self.kVarsCount() + self.getConcVarsCount() :]
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
@@ -96,20 +101,20 @@ class Titration():
 
         signalVars = self.getSignalVars(freeConcs, boundConcs)
 
-        proportionalSignalVars = \
-            self.getProportionalSignals(signalVars, totalConcs)
+        proportionalSignalVars = self.getProportionalSignals(signalVars, totalConcs)
 
         knownSpectra = self.getKnownSpectra()
 
-        self.lastFitResult, residuals, self.lastFittedCurves = \
-            self.fitSignals(proportionalSignalVars, knownSpectra)
+        self.lastFitResult, residuals, self.lastFittedCurves = self.fitSignals(
+            proportionalSignalVars, knownSpectra
+        )
 
         combinedResiduals = self.combineResiduals(residuals)
 
         return combinedResiduals
 
     def optimisationFuncLog(self, logKsAndTotalConcs):
-        ksAndTotalConcs = 10**logKsAndTotalConcs
+        ksAndTotalConcs = 10 ** logKsAndTotalConcs
         return self.optimisationFunc(ksAndTotalConcs)
 
     def optimise(self):
@@ -117,7 +122,8 @@ class Titration():
         initialGuessConcs = np.full(self.getConcVarsCount(), -4)
         initialGuessAlphas = np.full(self.alphaVarsCount(), 0)
         initialGuess = np.concatenate(
-            (initialGuessKs, initialGuessConcs, initialGuessAlphas))
+            (initialGuessKs, initialGuessConcs, initialGuessAlphas)
+        )
 
         result = minimize(
             self.optimisationFuncLog, x0=initialGuess, method="Nelder-Mead"

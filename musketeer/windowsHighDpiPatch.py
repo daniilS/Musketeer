@@ -18,8 +18,7 @@ from tkinter import ttk
 def setEnhancedDpiScaling(rootWindow):
     # see if we are on a version of Windows that supports these syscalls
     try:
-        setThreadDpiAwarenessContext = \
-            ctypes.windll.user32.SetThreadDpiAwarenessContext
+        setThreadDpiAwarenessContext = ctypes.windll.user32.SetThreadDpiAwarenessContext
         monitorFromWindow = ctypes.windll.user32.MonitorFromWindow
     except:  # noqa
         return
@@ -27,8 +26,7 @@ def setEnhancedDpiScaling(rootWindow):
     MONITOR_DEFAULTTONULL = 0
     MONITOR_DEFAULTTONEAREST = 2
     monitorFromWindow.argtypes = (ctypes.c_int, ctypes.c_int)
-    originalMonitor = monitorFromWindow(rootWindow.winfo_id(),
-                                        MONITOR_DEFAULTTONEAREST)
+    originalMonitor = monitorFromWindow(rootWindow.winfo_id(), MONITOR_DEFAULTTONEAREST)
 
     DPI_AWARENESS_CONTEXT_UNAWARE = -1
     DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED = -5
@@ -43,8 +41,7 @@ def setEnhancedDpiScaling(rootWindow):
     # temporarily disable GDI scaling while a menu is being shown, if it
     # appears on a different monitor than the original one.
     def disableGdiScaling():
-        currentMonitor = monitorFromWindow(rootWindow.winfo_id(),
-                                           MONITOR_DEFAULTTONULL)
+        currentMonitor = monitorFromWindow(rootWindow.winfo_id(), MONITOR_DEFAULTTONULL)
         if currentMonitor != originalMonitor:
             setThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE)
 

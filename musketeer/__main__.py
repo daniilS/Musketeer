@@ -13,7 +13,7 @@ from .style import padding
 
 patchMatplotlib.applyPatch()
 try:
-    appId = u'daniilS.musketeer'
+    appId = u"daniilS.musketeer"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
 except Exception:
     pass
@@ -48,8 +48,14 @@ frame.pack(expand=True, fill="both")
 
 class TitrationsNotebook(InteractiveNotebook):
     def __init__(self, master, *args, **kwargs):
-        super().__init__(master, padding=padding, newtab=self.readFile,
-                         style="Flat.Interactive.TNotebook", *args, **kwargs)
+        super().__init__(
+            master,
+            padding=padding,
+            newtab=self.readFile,
+            style="Flat.Interactive.TNotebook",
+            *args,
+            **kwargs
+        )
 
     def readFile(self):
         fileReader = titrationReader.getFileReader()
@@ -61,8 +67,7 @@ class TitrationsNotebook(InteractiveNotebook):
         try:
             titrations = fileReader(filePath)
         except Exception as e:
-            mb.showerror(title="Failed to read file", message=e,
-                         parent=self)
+            mb.showerror(title="Failed to read file", message=e, parent=self)
             return
 
         # create a tab for each titration, and let the titration object handle

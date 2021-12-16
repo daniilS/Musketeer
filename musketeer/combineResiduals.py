@@ -12,9 +12,7 @@ class ResidualsSumScaled(moduleFrame.Strategy):
     # TODO: test & use
     # sum of the residuals, scaled by the number of data points for each signal
     def __call__(self, residuals):
-        numPoints = np.sum(
-            self.titration.processedData != None, axis=0  # noqa: E711
-        )
+        numPoints = np.sum(self.titration.processedData != None, axis=0)
         return np.sum(residuals / numPoints)
 
 
@@ -26,8 +24,5 @@ class ResidualsSumNormalised(moduleFrame.Strategy):
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Combine residuals"
     dropdownLabelText = "Method for combining residuals"
-    dropdownOptions = {
-        "Sum": ResidualsSum,
-        "Normalised sum": ResidualsSumNormalised
-    }
+    dropdownOptions = {"Sum": ResidualsSum, "Normalised sum": ResidualsSumNormalised}
     attributeName = "combineResiduals"

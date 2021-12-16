@@ -11,20 +11,30 @@ from .scrolledFrame import ScrolledFrame
 class KnownKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
-        super().__init__(master, 0, 0, ["Value", "α"], allowBlanks=True,
-                         rowOptions=("readonlyTitles"),
-                         columnOptions=("readonlyTitles")
-                         )
+        super().__init__(
+            master,
+            0,
+            0,
+            ["Value", "α"],
+            allowBlanks=True,
+            rowOptions=("readonlyTitles"),
+            columnOptions=("readonlyTitles"),
+        )
         self.populateDefault()
 
     def populateDefault(self):
-        for boundName, knownK, knownAlpha in zip(self.titration.boundNames,
-                                                 self.titration.knownKs,
-                                                 self.titration.knownAlphas):
-            self.addRow(boundName, [
-                knownK if not np.isnan(knownK) else "",
-                knownAlpha if not np.isnan(knownAlpha) else ""
-            ])
+        for boundName, knownK, knownAlpha in zip(
+            self.titration.boundNames,
+            self.titration.knownKs,
+            self.titration.knownAlphas,
+        ):
+            self.addRow(
+                boundName,
+                [
+                    knownK if not np.isnan(knownK) else "",
+                    knownAlpha if not np.isnan(knownAlpha) else "",
+                ],
+            )
 
 
 class KnownKsPopup(tk.Toplevel):
@@ -39,17 +49,14 @@ class KnownKsPopup(tk.Toplevel):
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
         knownKsLabel = ttk.Label(
-            innerFrame,
-            text="Enter known K values. Leave blank for unknown values."
+            innerFrame, text="Enter known K values. Leave blank for unknown values."
         )
         knownKsLabel.pack()
 
         self.knownKsTable = KnownKsTable(innerFrame, titration)
         self.knownKsTable.pack(expand=True, fill="both")
 
-        buttonFrame = ButtonFrame(
-            innerFrame, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(innerFrame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
     def reset(self):
@@ -76,13 +83,15 @@ class GetKsKnown(moduleFrame.Strategy):
 
     def __init__(self, titration):
         self.titration = titration
-        if not (hasattr(titration, 'knownKs')
-                and len(titration.knownKs) == titration.boundCount
-                ):
+        if not (
+            hasattr(titration, "knownKs")
+            and len(titration.knownKs) == titration.boundCount
+        ):
             titration.knownKs = np.full(titration.boundCount, np.nan)
-        if not (hasattr(titration, 'knownAlphas')
-                and len(titration.knownAlphas) == titration.boundCount
-                ):
+        if not (
+            hasattr(titration, "knownAlphas")
+            and len(titration.knownAlphas) == titration.boundCount
+        ):
             titration.knownAlphas = np.full(titration.boundCount, np.nan)
         titration.kVarsCount = self.kVarsCount
         titration.alphaVarsCount = self.alphaVarsCount
@@ -102,8 +111,8 @@ class GetKsKnown(moduleFrame.Strategy):
         return np.count_nonzero(np.isnan(self.titration.knownKs))
 
     def alphaVarsCount(self):
-        return np.count_nonzero(np.isnan(
-            self.titration.knownAlphas[self.polymerIndices])
+        return np.count_nonzero(
+            np.isnan(self.titration.knownAlphas[self.polymerIndices])
         )
 
 
@@ -131,8 +140,5 @@ class GetKsAll(moduleFrame.Strategy):
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Equilibrium constants"
     dropdownLabelText = "Which Ks to optimise?"
-    dropdownOptions = {
-        "Optimise all Ks": GetKsAll,
-        "Specify some known Ks": GetKsKnown
-    }
+    dropdownOptions = {"Optimise all Ks": GetKsAll, "Specify some known Ks": GetKsKnown}
     attributeName = "getKs"

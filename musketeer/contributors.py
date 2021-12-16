@@ -24,9 +24,7 @@ class GetSignalVarsAll(moduleFrame.Strategy):
         self.titration.contributorNames = self.contributorNames
 
     def contributorNames(self):
-        return np.concatenate(
-            (self.titration.freeNames, self.titration.boundNames)
-        )
+        return np.concatenate((self.titration.freeNames, self.titration.boundNames))
 
     def contributorsMatrix(self):
         totalCount = self.titration.freeCount + self.titration.boundCount
@@ -50,9 +48,7 @@ class GetSignalVarsHost(GetSignalVarsCustom):
         return self.filter().astype(bool).astype(int)
 
     def contributorNames(self):
-        allNames = np.concatenate(
-            (self.titration.freeNames, self.titration.boundNames)
-        )
+        allNames = np.concatenate((self.titration.freeNames, self.titration.boundNames))
         return allNames[self.filter().astype(bool)]
 
     def contributorsMatrix(self):
@@ -67,6 +63,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownOptions = {
         "Only host species": GetSignalVarsHost,
         "All species": GetSignalVarsAll,
-        "Custom": GetSignalVarsCustom
+        "Custom": GetSignalVarsCustom,
     }
     attributeName = "getSignalVars"

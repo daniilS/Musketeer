@@ -14,18 +14,25 @@ def _Button(self, text, image_file, toggle, command):
         PhotoImage = tk.PhotoImage
     else:
         from PIL.ImageTk import PhotoImage
-    image = (PhotoImage(master=self, file=image_file)
-             if image_file is not None else None)
+    image = PhotoImage(master=self, file=image_file) if image_file is not None else None
     if not toggle:
         b = ttk.Button(
-            master=self, text=text, image=image, command=command,
-            style="Outline.TButton"
+            master=self,
+            text=text,
+            image=image,
+            command=command,
+            style="Outline.TButton",
         )
     else:
         var = tk.IntVar(master=self)
         b = ttk.Checkbutton(
-            master=self, text=text, image=image, command=command,
-            variable=var, style="Outline.Toolbutton")
+            master=self,
+            text=text,
+            image=image,
+            command=command,
+            variable=var,
+            style="Outline.Toolbutton",
+        )
         b.var = var
     b._ntimage = image
     b.pack(side=tk.LEFT)
@@ -34,7 +41,7 @@ def _Button(self, text, image_file, toggle, command):
 
 def _update_buttons_checked(self):
     # sync button checkstates to match active mode
-    for text, mode in [('Zoom', _Mode.ZOOM), ('Pan', _Mode.PAN)]:
+    for text, mode in [("Zoom", _Mode.ZOOM), ("Pan", _Mode.PAN)]:
         if text in self._buttons:
             if self.mode == mode:
                 self._buttons[text].var.set(1)
@@ -57,13 +64,14 @@ def showtip(self, text):
     tw.wm_geometry("+%d+%d" % (x, y))
     try:
         # For Mac OS
-        tw.tk.call("::tk::unsupported::MacWindowStyle",
-                   "style", tw._w,
-                   "help", "noActivates")
+        tw.tk.call(
+            "::tk::unsupported::MacWindowStyle", "style", tw._w, "help", "noActivates"
+        )
     except tk.TclError:
         pass
-    label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                     relief=tk.SOLID, borderwidth=1)
+    label = tk.Label(
+        tw, text=self.text, justify=tk.LEFT, relief=tk.SOLID, borderwidth=1
+    )
     label.pack(ipadx=1)
 
 
