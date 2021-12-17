@@ -113,9 +113,7 @@ class VolumesTable(Table):
             self.populateDefault()
 
     def populate(self, volumes):
-        for name, row in zip(
-            self.titration.additionTitles[self.titration.rowFilter], volumes
-        ):
+        for name, row in zip(self.titration.processedAdditionTitles, volumes):
             self.addRow(
                 name,
                 [self.convertVolume(volume, "L", self.unit.get()) for volume in row],
@@ -299,9 +297,7 @@ class ConcsTable(Table):
             self.populateDefault()
 
     def populate(self, concs):
-        for name, row in zip(
-            self.titration.additionTitles[self.titration.rowFilter], concs
-        ):
+        for name, row in zip(self.titration.processedAdditionTitles, concs):
             self.addRow(
                 name, [self.convertConc(conc, "M", self.unit.get()) for conc in row]
             )

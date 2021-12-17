@@ -50,6 +50,10 @@ class Titration:
         else:
             return self.processedSignalTitles.astype(str)
 
+    @property
+    def processedAdditionTitles(self):
+        return self.additionTitles[self.rowFilter]
+
     def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
         # get the total movement for each signal
         movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
