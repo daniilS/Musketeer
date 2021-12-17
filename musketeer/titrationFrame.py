@@ -1,3 +1,4 @@
+import os
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 
@@ -10,17 +11,117 @@ import tkinter.messagebox as mb
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from . import __version__
 from . import speciation
 from . import equilibriumConstants
 from . import totalConcentrations
 from . import contributors
 from . import proportionality
+from . import knownSignals
 from . import fitSignals
 from . import combineResiduals
-from . import knownSignals
 from .style import padding
 from .scrolledFrame import ScrolledFrame
 from .table import Table
+
+titrationModules = [
+    speciation,
+    equilibriumConstants,
+    totalConcentrations,
+    contributors,
+    proportionality,
+    knownSignals,
+    fitSignals,
+    combineResiduals,
+]
+
+
+class SaveLoadFrame(ttk.Frame):
+    def __init__(self, parent, titration, moduleFrames, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.titration = titration
+        self.moduleFrames = moduleFrames
+
+        loadOptionsButton = ttk.Button(
+            self,
+            text="Load Options",
+            style="primary.Outline.TButton",
+            command=self.loadOptions,
+        )
+        loadOptionsButton.grid(sticky="nesw", pady=(padding, padding / 2))
+
+        saveOptionsButton = ttk.Button(
+            self,
+            text="Save Options",
+            style="success.Outline.TButton",
+            command=self.saveOptions,
+        )
+        saveOptionsButton.grid(sticky="nesw", pady=padding / 2)
+
+        saveDataButton = ttk.Button(
+            self,
+            text="Save Processed Data",
+            style="success.Outline.TButton",
+            command=self.saveData,
+        )
+        saveDataButton.grid(sticky="nesw", pady=padding / 2)
+
+        self.columnconfigure(0, weight=1)
+
+    def loadOptions(self):
+        fileName = fd.askopenfilename(
+            title="Load options from file",
+            filetypes=[("NumPy archive", "*.npz"), ("all files", "*.*")],
+        )
+        with np.load(fileName) as options:
+            # TODO: check file version against current
+            # TODO: show popup to choose which modules should be loaded
+            for moduleName, dropdownValue in zip(
+                options["moduleNames"], options["dropdownValues"]
+            ):
+                moduleFrame = self.moduleFrames[moduleName]
+                moduleFrame.stringVar.set(dropdownValue)
+                attributeName = moduleFrame.attributeName
+                Strategy = moduleFrame.dropdownOptions[dropdownValue]
+                strategy = Strategy(self.titration)
+                setattr(self.titration, attributeName, strategy)
+                for attr in strategy.popupAttributes:
+                    # TODO: check if attribute is actually present in options
+                    attrValue = options[attr]
+                    if attrValue.shape == ():
+                        attrValue = attrValue.item()
+                    setattr(self.titration, attr, attrValue)
+
+    def saveOptions(self):
+        # TODO: handle errors
+        # TODO: warn if rowFilter has been set
+        # TODO: show popup to choose which modules should be saved
+        options = {"version": __version__}
+        moduleNames = np.array(list(self.moduleFrames.keys()))
+        dropdownValues = np.array([])
+
+        for moduleFrame in self.moduleFrames.values():
+            dropdownValue = moduleFrame.stringVar.get()
+            dropdownValues = np.append(dropdownValues, dropdownValue)
+
+            Strategy = moduleFrame.dropdownOptions[dropdownValue]
+            for attr in Strategy.popupAttributes:
+                options[attr] = getattr(self.titration, attr)
+
+        options["moduleNames"] = moduleNames
+        options["dropdownValues"] = dropdownValues
+
+        initialfile = os.path.splitext(self.titration.title)[0] + "_options"
+        fileName = fd.asksaveasfilename(
+            title="Save options to file",
+            filetypes=[("NumPy archive", "*.npz")],
+            initialfile=initialfile,
+            defaultextension=".npz",
+        )
+        np.savez(fileName, **options)
+
+    def saveData(self):
+        pass
 
 
 class TitrationFrame(ttk.Frame):
@@ -32,25 +133,28 @@ class TitrationFrame(ttk.Frame):
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
         scrolledFrame.grid(column=0, row=0, sticky="nesw")
-        self.options = scrolledFrame.display_widget(ttk.Frame, stretch=True)
+        self.options = scrolledFrame.display_widget(
+            ttk.Frame, stretch=True, padding=(0, 0, padding, 0)
+        )
 
-        for mod in (
-            speciation,
-            equilibriumConstants,
-            totalConcentrations,
-            contributors,
-            proportionality,
-            knownSignals,
-            fitSignals,
-            combineResiduals,
-        ):
+        self.moduleFrames = {}
+        for mod in titrationModules:
             moduleFrame = mod.ModuleFrame(
                 self.options, self.titration, self.updatePlots
             )
+            self.moduleFrames[mod.__name__] = moduleFrame
             moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
 
         fitDataButton = ttk.Button(self.options, text="Fit", command=self.tryFitData)
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
+
+        separator = ttk.Separator(self.options, orient="horizontal")
+        separator.grid(sticky="nesw", pady=padding)
+
+        saveLoadFrame = SaveLoadFrame(self.options, self.titration, self.moduleFrames)
+        saveLoadFrame.grid(sticky="nesw")
+
+        self.options.columnconfigure(0, weight=1)
 
         # tabs with different fits
         self.notebook = InteractiveNotebook(
@@ -413,8 +517,12 @@ class ResultsFrame(ttk.Frame):
         saveButton.pack(side="top", pady=15)
 
     def saveCSV(self):
+        initialfile = os.path.splitext(self.titration.title)[0] + "_fit"
         fileName = fd.asksaveasfilename(
-            filetypes=[("CSV file", "*.csv")], defaultextension=".csv"
+            title="Save fitted spectra",
+            initialfile=initialfile,
+            filetypes=[("CSV file", "*.csv")],
+            defaultextension=".csv",
         )
         data = self.titration.lastFitResult
         rowTitles = np.atleast_2d(self.titration.contributorNames()).T

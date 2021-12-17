@@ -409,7 +409,6 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
         "stockConcs",
         "volumesUnit",
         "volumes",
-        "rowFilter",
         "totalConcs",
     )
 
@@ -450,7 +449,10 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
 class GetTotalConcs(moduleFrame.Strategy):
     popup = ConcsPopup
-    popupAttributes = ("concsUnit", "totalConcs", "rowFilter")
+    popupAttributes = (
+        "concsUnit",
+        "totalConcs",
+    )
 
     def __init__(self, titration):
         self.titration = titration
