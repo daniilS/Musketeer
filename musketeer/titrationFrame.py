@@ -121,7 +121,18 @@ class SaveLoadFrame(ttk.Frame):
         np.savez(fileName, **options)
 
     def saveData(self):
-        pass
+        initialfile = os.path.splitext(self.titration.title)[0] + "_processed_input"
+        fileName = fd.asksaveasfilename(
+            title="Save processed input data as a universal CSV file",
+            initialfile=initialfile,
+            filetypes=[("CSV file", "*.csv")],
+            defaultextension=".csv",
+        )
+        data = self.titration.processedData
+        rowTitles = np.atleast_2d(self.titration.processedAdditionTitles).T
+        columnTitles = np.append("", self.titration.processedSignalTitles)
+        output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
+        np.savetxt(fileName, output, fmt="%s", delimiter=",")
 
 
 class TitrationFrame(ttk.Frame):
