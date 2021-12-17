@@ -1,4 +1,5 @@
 import os
+import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 
@@ -73,6 +74,9 @@ class SaveLoadFrame(ttk.Frame):
             title="Load options from file",
             filetypes=[("NumPy archive", "*.npz"), ("all files", "*.*")],
         )
+        if fileName == "":
+            return
+
         with np.load(fileName) as options:
             # TODO: check file version against current
             # TODO: show popup to choose which modules should be loaded
@@ -95,12 +99,91 @@ class SaveLoadFrame(ttk.Frame):
     def saveOptions(self):
         # TODO: handle errors
         # TODO: warn if rowFilter has been set
-        # TODO: show popup to choose which modules should be saved
-        options = {"version": __version__}
-        moduleNames = np.array(list(self.moduleFrames.keys()))
+        popup = tk.Toplevel()
+        popup.title("Choose which options to save")
+        popupFrame = ttk.Frame(popup, padding=15)
+        popupFrame.pack(expand=True, fill="both")
+
+        if (
+            (
+                isinstance(self.titration.rowFilter, slice)
+                and self.titration.rowFilter != slice(None)
+            )
+            or (
+                isinstance(self.titration.rowFilter, np.ndarray)
+                and not self.titration.rowFilter.all()
+            )
+            or (
+                type(self.titration.columnFilter) == slice
+                and self.titration.columnFilter != slice(None)
+            )
+            or (
+                isinstance(self.titration.columnFilter, np.ndarray)
+                and not self.titration.columnFilter.all()
+            )
+        ):
+            # row or column filter is active
+            warningLabel = ttk.Label(
+                popupFrame,
+                text=(
+                    "The input data has been modified,\n"
+                    "so it may need to be saved as a\n"
+                    "universal CSV file for some options\n"
+                    "to be applied to it."
+                ),
+            )
+            warningLabel.pack(pady=(5, 15))
+            if "::tk::icons::warning" in popup.image_names():
+                warningLabel.configure(image="::tk::icons::warning", compound="left")
+
+        label = ttk.Label(popupFrame, text="Choose which options to save:")
+        label.pack(pady=(5, 15))
+
+        popup.checkbuttons = {}
+        popup.saved = False
+
+        for name, moduleFrame in self.moduleFrames.items():
+            if moduleFrame.stringVar.get() == "":
+                continue
+            checkbutton = ttk.Checkbutton(popupFrame, text=moduleFrame.frameLabel)
+            checkbutton.state(["selected"])
+            checkbutton.pack(anchor="w", pady=2.5)
+            popup.checkbuttons[name] = checkbutton
+
+        buttonsFrame = ttk.Frame(popupFrame)
+        buttonsFrame.pack(expand=True, fill="x")
+
+        cancelButton = ttk.Button(
+            buttonsFrame,
+            text="Cancel",
+            style="secondary.TButton",
+            command=popup.destroy,
+        )
+        cancelButton.grid(row=0, column=0, pady=5)
+
+        saveButton = ttk.Button(
+            buttonsFrame,
+            text="Save",
+            style="success.TButton",
+            command=lambda: self.getSelectedOptions(popup),
+        )
+        saveButton.grid(row=0, column=1, pady=5)
+
+        for col in range(2):
+            buttonsFrame.columnconfigure(col, weight=1)
+
+        popup.resizable(False, False)
+        popup.wait_window()
+        if not popup.saved:
+            return
+
+        options = {}
+        moduleNames = np.array(popup.selectedOptions)
+
         dropdownValues = np.array([])
 
-        for moduleFrame in self.moduleFrames.values():
+        for name in moduleNames:
+            moduleFrame = self.moduleFrames[name]
             dropdownValue = moduleFrame.stringVar.get()
             dropdownValues = np.append(dropdownValues, dropdownValue)
 
@@ -108,6 +191,7 @@ class SaveLoadFrame(ttk.Frame):
             for attr in Strategy.popupAttributes:
                 options[attr] = getattr(self.titration, attr)
 
+        options["version"] = __version__
         options["moduleNames"] = moduleNames
         options["dropdownValues"] = dropdownValues
 
@@ -118,7 +202,18 @@ class SaveLoadFrame(ttk.Frame):
             initialfile=initialfile,
             defaultextension=".npz",
         )
+        if fileName == "":
+            return
+
         np.savez(fileName, **options)
+
+    def getSelectedOptions(self, popup):
+        popup.selectedOptions = []
+        for name, checkbutton in popup.checkbuttons.items():
+            if checkbutton.instate(["selected"]):
+                popup.selectedOptions.append(name)
+        popup.saved = True
+        popup.destroy()
 
     def saveData(self):
         initialfile = os.path.splitext(self.titration.title)[0] + "_processed_input"
@@ -494,8 +589,8 @@ class ResultsFrame(ttk.Frame):
             0,
             0,
             ["K (M⁻ⁿ)", "α"],
-            rowOptions=("readonlyTitles"),
-            columnOptions=("readonlyTitles"),
+            rowOptions="readonlyTitles",
+            columnOptions="readonlyTitles",
         )
 
         ks = self.titration.knownKs.copy()
