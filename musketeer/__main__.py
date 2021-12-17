@@ -75,6 +75,7 @@ class TitrationsNotebook(InteractiveNotebook):
         for titration in titrations:
             titrationFrame = TitrationFrame(self, titration, padding=padding)
             self.add(titrationFrame, text=titration.title, sticky="nesw")
+            self.select(str(titrationFrame))
 
 
 notebook = TitrationsNotebook(frame)

@@ -278,6 +278,14 @@ def readCSV(filePath):
             )
             titration.rawData = data
 
+    if titration.continuous:
+        titration.signalTitles = titration.signalTitles.astype(float)
+        averageStep = abs(np.average(np.diff(titration.signalTitles)))
+        titration.signalTitlesDecimals = int(-np.rint(np.log10(averageStep)))
+        titration.signalTitles = np.round(
+            titration.signalTitles, titration.signalTitlesDecimals
+        )
+
     return [titration]
 
 
