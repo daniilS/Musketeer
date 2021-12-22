@@ -17,8 +17,8 @@ class KnownKsTable(Table):
             0,
             ["Value", "α"],
             allowBlanks=True,
-            rowOptions=("readonlyTitles"),
-            columnOptions=("readonlyTitles"),
+            rowOptions=("readonlyTitles",),
+            columnOptions=("readonlyTitles",),
         )
         self.populateDefault()
 

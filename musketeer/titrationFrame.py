@@ -589,8 +589,8 @@ class ResultsFrame(ttk.Frame):
             0,
             0,
             ["K (M⁻ⁿ)", "α"],
-            rowOptions="readonlyTitles",
-            columnOptions="readonlyTitles",
+            rowOptions=("readonlyTitles",),
+            columnOptions=("readonlyTitles",),
         )
 
         ks = self.titration.knownKs.copy()

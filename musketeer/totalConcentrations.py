@@ -259,8 +259,8 @@ class VolumesPopup(tk.Toplevel):
             moles = self.titration.volumes @ self.titration.stockConcs.T
             totalVolumes = np.atleast_2d(np.sum(self.titration.volumes, 1)).T
             self.titration.totalConcs = moles / totalVolumes
-        elif hasattr(self.titration, "totalConcs"):
-            # cannot use "del" since totalConcs is part of popupAttributes
+        else:
+            # Titration needs a totalConcs attribute since it is part of popupAttributes
             self.titration.totalConcs = None
 
         self.destroy()
@@ -278,7 +278,7 @@ class ConcsTable(Table):
             titration.freeNames,
             allowBlanks=False,
             rowOptions=("delete", "readonlyTitles"),
-            columnOptions=("readonlyTitles"),
+            columnOptions=("readonlyTitles",),
         )
 
         self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
