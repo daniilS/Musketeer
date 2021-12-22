@@ -259,9 +259,10 @@ class VolumesPopup(tk.Toplevel):
             moles = self.titration.volumes @ self.titration.stockConcs.T
             totalVolumes = np.atleast_2d(np.sum(self.titration.volumes, 1)).T
             self.titration.totalConcs = moles / totalVolumes
-        else:
-            # Titration needs a totalConcs attribute since it is part of popupAttributes
-            self.titration.totalConcs = None
+        elif hasattr(self.titration, "totalConcs"):
+            # TODO: Find a way to store totalConcs in the options file, only if they're
+            # present
+            del self.titration.totalConcs
 
         self.destroy()
 
@@ -291,7 +292,7 @@ class ConcsTable(Table):
 
         self.label(self.headerCells - 1, 1, "Addition title:")
 
-        if hasattr(titration, "totalConcs") and titration.totalConcs is not None:
+        if hasattr(titration, "totalConcs"):
             self.populate(titration.totalConcs)
         else:
             self.populateDefault()
@@ -405,7 +406,6 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
         "stockConcs",
         "volumesUnit",
         "volumes",
-        "totalConcs",
     )
 
     def __init__(self, titration):
