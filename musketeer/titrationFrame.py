@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
+import packaging.version
 
 import numpy as np
 import tksheet
@@ -24,6 +25,8 @@ from . import combineResiduals
 from .style import padding
 from .scrolledFrame import ScrolledFrame
 from .table import Table
+
+warningIcon = "::tk::icons::warning"
 
 titrationModules = [
     speciation,
@@ -83,6 +86,8 @@ class SaveLoadFrame(ttk.Frame):
             for moduleName, dropdownValue in zip(
                 options["moduleNames"], options["dropdownValues"]
             ):
+                if moduleName not in self.moduleFrames:
+                    continue  # TODO
                 moduleFrame = self.moduleFrames[moduleName]
                 moduleFrame.stringVar.set(dropdownValue)
                 attributeName = moduleFrame.attributeName
@@ -98,43 +103,10 @@ class SaveLoadFrame(ttk.Frame):
 
     def saveOptions(self):
         # TODO: handle errors
-        # TODO: warn if rowFilter has been set
         popup = tk.Toplevel()
         popup.title("Choose which options to save")
         popupFrame = ttk.Frame(popup, padding=15)
         popupFrame.pack(expand=True, fill="both")
-
-        if (
-            (
-                isinstance(self.titration.rowFilter, slice)
-                and self.titration.rowFilter != slice(None)
-            )
-            or (
-                isinstance(self.titration.rowFilter, np.ndarray)
-                and not self.titration.rowFilter.all()
-            )
-            or (
-                type(self.titration.columnFilter) == slice
-                and self.titration.columnFilter != slice(None)
-            )
-            or (
-                isinstance(self.titration.columnFilter, np.ndarray)
-                and not self.titration.columnFilter.all()
-            )
-        ):
-            # row or column filter is active
-            warningLabel = ttk.Label(
-                popupFrame,
-                text=(
-                    "The input data has been modified,\n"
-                    "so it may need to be saved as a\n"
-                    "universal CSV file for some options\n"
-                    "to be applied to it."
-                ),
-            )
-            warningLabel.pack(pady=(5, 15))
-            if "::tk::icons::warning" in popup.image_names():
-                warningLabel.configure(image="::tk::icons::warning", compound="left")
 
         label = ttk.Label(popupFrame, text="Choose which options to save:")
         label.pack(pady=(5, 15))
@@ -143,10 +115,11 @@ class SaveLoadFrame(ttk.Frame):
         popup.saved = False
 
         for name, moduleFrame in self.moduleFrames.items():
-            if moduleFrame.stringVar.get() == "":
-                continue
             checkbutton = ttk.Checkbutton(popupFrame, text=moduleFrame.frameLabel)
-            checkbutton.state(["selected"])
+            if moduleFrame.stringVar.get() == "":
+                checkbutton.state(["disabled"])
+            else:
+                checkbutton.state(["selected"])
             checkbutton.pack(anchor="w", pady=2.5)
             popup.checkbuttons[name] = checkbutton
 
@@ -171,6 +144,44 @@ class SaveLoadFrame(ttk.Frame):
 
         for col in range(2):
             buttonsFrame.columnconfigure(col, weight=1)
+
+        # Only create the warning label now, so that we know what width to make it
+        if (
+            (
+                isinstance(self.titration.rowFilter, slice)
+                and self.titration.rowFilter != slice(None)
+            )
+            or (
+                isinstance(self.titration.rowFilter, np.ndarray)
+                and not self.titration.rowFilter.all()
+            )
+            or (
+                type(self.titration.columnFilter) == slice
+                and self.titration.columnFilter != slice(None)
+            )
+            or (
+                isinstance(self.titration.columnFilter, np.ndarray)
+                and not self.titration.columnFilter.all()
+            )
+        ):
+            # row or column filter is active
+            warningLabel = ttk.Label(
+                popupFrame,
+                text=(
+                    "The input data has been modified, so it may need to be saved as a"
+                    " universal CSV file for some options to be applied to it."
+                ),
+            )
+            if warningIcon in popup.image_names():
+                warningLabel.configure(
+                    image=warningIcon,
+                    compound="left",
+                    wraplength=popup.winfo_reqwidth()
+                    - popup.tk.call("image", "width", warningIcon),
+                )
+            else:
+                warningLabel.configure(wraplength=popup.winfo_reqwidth())
+            warningLabel.pack(before=label)
 
         popup.resizable(False, False)
         popup.wait_window()

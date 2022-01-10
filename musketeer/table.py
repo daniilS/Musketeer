@@ -272,7 +272,7 @@ class ButtonFrame(ttk.Frame):
         )
         self.resetButton.pack(side="left", padx=padding)
         self.saveButton = ttk.Button(
-            self, text="Save", command=save, style="success.TButton"
+            self, text="OK", command=save, style="success.TButton"
         )
         self.saveButton.pack(side="right", padx=padding)
         self.cancelButton = ttk.Button(
