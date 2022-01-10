@@ -1,17 +1,135 @@
 # Based on https://github.com/bmjcode/tkScrolledFrame by
 import sys
+import time
 import tkinter as tk
 import tkinter.ttk as ttk
+from packaging.version import parse as v_parse
 
 # TODO: replace with custom implementation to solve flickering issues
 from ttkwidgets.autohidescrollbar import AutoHideScrollbar
 
 
 class ScrolledFrame(ttk.Frame):
+    fps = 60
+    interval = 1 / fps
+    steps = int(fps / 10)
+
+    mousewheel_bindings = None
+
+    def bind_mousewheel(self):
+        if self.mousewheel_bindings is not None:
+            return False
+        else:
+            events = (
+                ("<MouseWheel",)
+                if self.use_TIP474
+                else ("<MouseWheel>", "<Button-4>", "<Button-5>")
+            )
+            ScrolledFrame.mousewheel_bindings = [
+                self.bind_all(event, self.deliver_event, add=True) for event in events
+            ]
+
+    def deliver_event(self, event):
+        widget = event.widget
+
+        event_name = f"<{event.type._name_}>"
+        if any(
+            [
+                event_name in widget._bind(("bind", tag), None, None, None)
+                for tag in widget.bindtags()
+                if tag not in ("all", widget.winfo_toplevel()._w)
+            ]
+        ):
+            return  # Widget has its own mouse wheel binding
+        # Can't check for whether the widget is the toplevel in the loop condition, as
+        # wm_manage could turn a ScrolledFrame into a toplevel window.
+        while True:
+            if isinstance(widget, ScrolledFrame):
+                break
+            if widget == widget.winfo_toplevel():
+                return  # event occurred outside of any ScrolledFrames
+            widget = widget.nametowidget(widget.winfo_parent())
+        widget.process_event(event)
+
+    def process_event(self, event):
+        orient = "horizontal" if bool(event.state & 1) else "vertical"
+        # only scroll if the inner frame doesn't fit fully
+        if (
+            orient == "horizontal"
+            and self._interior.winfo_reqwidth() < self._canvas.winfo_width()
+        ) or (
+            orient == "vertical"
+            and self._interior.winfo_reqheight() < self._canvas.winfo_height()
+        ):
+            return
+
+        if sys.platform.startswith("darwin") and not self.use_TIP474:
+            # macOS, pre Tk 8.7
+            self.scroll_canvas(orient, "scroll", -1 * event.delta, "units")
+
+        elif event.num == 4:
+            # Unix - scroll up
+            self.scroll_canvas(orient, "scroll", -1, "units")
+
+        elif event.num == 5:
+            # Unix - scroll down
+            self.scroll_canvas(orient, "scroll", 1, "units")
+
+        else:
+            # Windows
+            self.scroll_canvas(
+                orient, "scroll", str(-1 * (event.delta // 120)), "units"
+            )
+
+    def scroll_canvas_x(self, *args):
+        return self.scroll_canvas("horizontal", *args)
+
+    def scroll_canvas_y(self, *args):
+        return self.scroll_canvas("vertical", *args)
+
+    def scroll_canvas(self, orient, *args):
+        view = "yview" if orient == "vertical" else "xview"
+        if args[0] == "moveto":
+            currentTime = time.perf_counter()
+            if currentTime - self.lastTime >= self.interval:
+                setview = (
+                    self._canvas.yview if orient == "vertical" else self._canvas.xview
+                )
+                setview(*args)
+                self.lastTime = currentTime
+            else:
+                nextTime = self.lastTime + self.interval
+                delay = nextTime - currentTime
+                if delay <= 2 * self.interval:
+                    self.lastTime = nextTime
+                    # avoid the overhead of creating a new Python function and calling it
+                    # from Tk
+                    self.tk.eval(
+                        f"after {int(1000 * delay)} [list"
+                        f" {self._canvas._w} {view} {' '.join(args)}]"
+                    )
+        elif args[0] == "scroll" and args[2] == "units":
+            for i in range(self.steps):
+                totalSize = (
+                    self._canvas.winfo_height()
+                    if orient == "vertical"
+                    else self._canvas.winfo_width()
+                )
+                distance = int(args[1]) * totalSize / 20 / self.steps
+                self.tk.eval(
+                    f"after {int(i * 1000 * self.interval)} [list"
+                    f" {self._canvas._w} {view} scroll {int(distance * (1 + i))} units]"
+                )
+
     def __init__(self, master=None, autohide=True, max_width=None, **kw):
         """Return a new scrollable frame widget."""
+        self.lastTime = 0
 
         super().__init__(master)
+
+        # Check if we should use the MouseWheel behaviour from TIP 474 introduced in
+        # Tk 8.7
+        self.use_TIP474 = v_parse(self.tk.getvar("tk_version")) >= v_parse("8.7")
 
         # Hold these names for the interior widget
         self._interior = None
@@ -61,9 +179,18 @@ class ScrolledFrame(ttk.Frame):
         c.bind("<Configure>", self._resize_interior)
 
         # Scrollbars
-        xs = self._x_scrollbar = Scrollbar(self, orient="horizontal", command=c.xview)
-        ys = self._y_scrollbar = Scrollbar(self, orient="vertical", command=c.yview)
-        c.configure(xscrollcommand=xs.set, yscrollcommand=ys.set)
+        xs = self._x_scrollbar = Scrollbar(
+            self, orient="horizontal", command=self.scroll_canvas_x
+        )
+        ys = self._y_scrollbar = Scrollbar(
+            self, orient="vertical", command=self.scroll_canvas_y
+        )
+        c.configure(
+            xscrollcommand=xs.set,
+            yscrollcommand=ys.set,
+            xscrollincrement=1,
+            yscrollincrement=1,
+        )
 
         # Lay out our widgets
         c.grid(row=0, column=0, sticky="nsew")
@@ -96,21 +223,6 @@ class ScrolledFrame(ttk.Frame):
             tk.Frame.configure(self, **{key: value})
 
     # ------------------------------------------------------------------------
-
-    def bind_mousewheel(self):
-        for event in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self.winfo_toplevel().bind(event, self.scroll_binding, add=True)
-
-    def scroll_binding(self, event):
-        widget = event.widget
-        if not str(widget).startswith(str(self)):
-            return  # Cursor outside of the frame
-        if (
-            "<MouseWheel>" in widget.tk.call("bind", widget.winfo_class())
-            or "<MouseWheel>" in widget.bind()
-        ):
-            return  # Widget has its own mouse wheel binding
-        self._scroll_canvas(event)
 
     def cget(self, key):
         """Return the resource value for a KEY given as string."""
@@ -215,39 +327,6 @@ class ScrolledFrame(ttk.Frame):
                 if self._max_width is not None:
                     requested_width = min(self._max_width, requested_width)
                 self._canvas.config(width=requested_width)
-
-    def _scroll_canvas(self, event):
-        """Scroll the canvas."""
-
-        c = self._canvas
-        horizontal_scroll = bool(event.state & 1)
-        # only scroll if the inner frame doesn't fit fully
-        if (
-            horizontal_scroll
-            and self._interior.winfo_reqwidth() < self._canvas.winfo_width()
-        ) or (
-            (not horizontal_scroll)
-            and self._interior.winfo_reqheight() < self._canvas.winfo_height()
-        ):
-            return
-
-        scroll = c.xview_scroll if horizontal_scroll else c.yview_scroll
-
-        if sys.platform.startswith("darwin"):
-            # macOS
-            scroll(-1 * event.delta, "units")
-
-        elif event.num == 4:
-            # Unix - scroll up
-            scroll(-1, "units")
-
-        elif event.num == 5:
-            # Unix - scroll down
-            scroll(1, "units")
-
-        else:
-            # Windows
-            scroll(-1 * (event.delta // 120), "units")
 
     def _update_scroll_region(self, event):
         """Update the scroll region when the interior widget is resized."""
