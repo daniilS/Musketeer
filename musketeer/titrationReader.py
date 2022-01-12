@@ -133,8 +133,29 @@ def readUV(filePath):
 
     titration.additionTitles = np.array(titleRow)
     titration.signalTitles = np.array(wavelengths, dtype=float)
-    averageStep = abs(np.average(np.diff(titration.signalTitles)))
-    titration.signalTitlesDecimals = int(-np.rint(np.log10(averageStep)))
+    averageStep = abs(
+        (titration.signalTitles[-1] - titration.signalTitles[0])
+        / (len(titration.signalTitles) - 1)
+    )
+    print(averageStep)
+    # First pass to round 99.90 -> 99.90, 99.99 -> 100.0
+    averageStep = np.round(averageStep, int(np.ceil(-np.log10(averageStep)) + 3))
+    print(averageStep)
+    # Second pass to round 99.90 -> 99.90 -> 99.9, 99.99 -> 100.0 -> 100
+    titration.averageStep = np.round(
+        averageStep, int(np.ceil(-np.log10(averageStep)) + 2)
+    )
+    print(titration.averageStep)
+    if averageStep >= 1.00:
+        titration.signalTitlesDecimals = 0
+    else:
+        leadingZeros = int(np.ceil(-np.log10(averageStep)))
+        titration.signalTitlesDecimals = (
+            leadingZeros
+            - 1
+            + len(str(round(averageStep * 10 ** (leadingZeros + 2))).rstrip("0"))
+        )
+
     titration.signalTitles = np.round(
         titration.signalTitles, titration.signalTitlesDecimals
     )
