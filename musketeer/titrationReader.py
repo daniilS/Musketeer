@@ -340,9 +340,9 @@ def readNMR(filePath):
             currentPlotIntensities[2::3] = currentIntensities
             plotIntensities.append(currentPlotIntensities)
 
-        maxF = max(max(frequencies))
-        minF = min(min(frequencies))
-        maxI = max(max(intensities))
+        maxF = max(max(f) for f in frequencies)
+        minF = min(min(f) for f in frequencies)
+        maxI = max(max(i) for i in intensities)
 
         numRows = len(frequencies)
         fig = Figure()
