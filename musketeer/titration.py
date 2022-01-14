@@ -39,6 +39,41 @@ class Titration:
         return self.signalTitles[self.columnFilter]
 
     @property
+    def signalTitles(self):
+        return self._signalTitles
+
+    @signalTitles.setter
+    def signalTitles(self, titles):
+        try:
+            _signalTitles = np.array(titles, dtype=float)
+        except ValueError:
+            self._signalTitles = np.array(titles, dtype=str)
+            self.continuous = False
+            return
+
+        self.continuous = True
+
+        averageStep = abs(
+            (_signalTitles[-1] - _signalTitles[0]) / (len(_signalTitles) - 1)
+        )
+        # Round to 3 significant figures
+        self.averageStep = np.round(
+            averageStep, int(np.ceil(-np.log10(averageStep)) + 2)
+        )
+        if self.averageStep >= 1.00:
+            self.signalTitlesDecimals = 0
+        else:
+            leadingZeros = int(np.ceil(-np.log10(self.averageStep)))
+            self.signalTitlesDecimals = (
+                leadingZeros
+                - 1
+                + len(
+                    str(round(self.averageStep * 10 ** (leadingZeros + 2))).rstrip("0")
+                )
+            )
+        self._signalTitles = np.round(_signalTitles, self.signalTitlesDecimals)
+
+    @property
     def processedSignalTitlesStrings(self):
         if self.processedSignalTitles.dtype == float:
             return np.array(
