@@ -87,15 +87,18 @@ class SaveLoadFrame(ttk.Frame):
                 options["moduleNames"], options["dropdownValues"]
             ):
                 if moduleName not in self.moduleFrames:
-                    continue  # TODO
+                    continue
                 moduleFrame = self.moduleFrames[moduleName]
+                if dropdownValue not in moduleFrame.dropdownOptions:
+                    continue
                 moduleFrame.stringVar.set(dropdownValue)
                 attributeName = moduleFrame.attributeName
                 Strategy = moduleFrame.dropdownOptions[dropdownValue]
                 strategy = Strategy(self.titration)
                 setattr(self.titration, attributeName, strategy)
                 for attr in strategy.popupAttributes:
-                    # TODO: check if attribute is actually present in options
+                    if attr not in options:
+                        continue
                     attrValue = options[attr]
                     if attrValue.shape == ():
                         attrValue = attrValue.item()
