@@ -8,6 +8,24 @@ from .table import Table, ButtonFrame
 from .scrolledFrame import ScrolledFrame
 
 
+class SpeciationDimerisation(moduleFrame.Strategy):
+    def __init__(self, titration):
+        self.titration = titration
+        titration.freeNames = np.array(["Host"])
+        titration.stoichiometries = np.array([[1]])
+        titration.boundNames = np.array(["H2"])
+
+    def __call__(self, ks, totalConcs, alphas):
+        K = ks[0]
+        Htot = totalConcs.T[0]
+        H = (-1 + np.sqrt(1 + 8 * Htot * K)) / 4 * K
+        H2 = (1 + 4 * Htot * K - np.sqrt(1 + 8 * Htot * K)) / 4 * K
+
+        free = np.atleast_2d(H).T
+        bound = np.atleast_2d(H2).T
+        return free, bound
+
+
 class SpeciationHG(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
@@ -184,6 +202,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "1:1 binding": SpeciationHG,
         "1:2 binding, identical sites": SpeciationHG2,
         "1:2 binding, different sites": SpeciationHGAB,
+        "Dimerisation": SpeciationDimerisation,
         "Custom": SpeciationCustom,
     }
     attributeName = "speciation"
