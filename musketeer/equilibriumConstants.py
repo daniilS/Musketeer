@@ -99,20 +99,16 @@ class GetKsKnown(moduleFrame.Strategy):
     def __call__(self, kVars, alphaVars):
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = kVars
-        alphas = self.titration.knownAlphas[self.polymerIndices].copy()
+        alphas = self.titration.knownAlphas[self.titration.polymerIndices].copy()
         alphas[np.isnan(alphas)] = alphaVars
         return (ks, alphas)
-
-    @property
-    def polymerIndices(self):
-        return np.any(self.titration.stoichiometries < 0, 1)
 
     def kVarsCount(self):
         return np.count_nonzero(np.isnan(self.titration.knownKs))
 
     def alphaVarsCount(self):
         return np.count_nonzero(
-            np.isnan(self.titration.knownAlphas[self.polymerIndices])
+            np.isnan(self.titration.knownAlphas[self.titration.polymerIndices])
         )
 
 
