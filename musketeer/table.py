@@ -24,12 +24,16 @@ class Table(ttk.Frame):
         rowOptions=[],
         columnOptions=[],
         boldTitles=False,
+        callback="",
         **kwargs
     ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
         self.allowBlanks = allowBlanks
         super().__init__(master, padding=padding, **kwargs)
+        if callback != "":
+            callback = self.register(callback)
+        self.callback = callback
 
         if Table.titleFont is None:
             Table.titleFont = font.nametofont("TkTextFont").copy()
@@ -70,7 +74,14 @@ class Table(ttk.Frame):
     # all widget creation methods use cell rows, not grid rows, as arguments
 
     def entry(self, row, column, text="", align="left", columnspan=1, **kwargs):
-        entry = ttk.Entry(self, width=self.width * columnspan, justify=align, **kwargs)
+        entry = ttk.Entry(
+            self,
+            width=self.width * columnspan,
+            justify=align,
+            validate="focus",
+            validatecommand=self.callback,
+            **kwargs
+        )
 
         def set(text=""):
             oldState = entry.state()

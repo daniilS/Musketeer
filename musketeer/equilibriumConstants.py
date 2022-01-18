@@ -2,6 +2,7 @@ import numpy as np
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
+from tkinter import font
 
 from . import moduleFrame
 from .table import Table, ButtonFrame
@@ -14,7 +15,7 @@ class CustomKsTable(Table):
         if hasattr(titration, "kVarsNames"):
             kVarsNames = titration.kVarsNames
         else:
-            kVarsNames = titration.boundNames.copy()
+            kVarsNames = [f"K_{name}" for name in titration.boundNames]
         if hasattr(titration, "ksMatrix"):
             ksMatrix = titration.ksMatrix
         else:
@@ -26,16 +27,21 @@ class CustomKsTable(Table):
             knownKs = np.where(np.isnan(titration.knownKs), "", titration.knownKs)
         else:
             knownKs = np.full(ksMatrix.shape[0], "")
-        self.width = max([len(title) for title in titration.boundNames]) + 5
+        columnTitles = np.append(
+            [f"Global K for {name}" for name in titration.boundNames], "Value"
+        )
+        self.width = max([len(title) for title in columnTitles]) + 1
+
         super().__init__(
             master,
             0,
             0,
-            np.append(titration.boundNames, "Value"),
+            columnTitles,
             allowBlanks=True,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
             boldTitles=True,
+            callback=self.createLabels,
         )
         self.addConstantsRow()
         for name, contributions, value in zip(kVarsNames, ksMatrix, knownKs):
@@ -48,8 +54,40 @@ class CustomKsTable(Table):
             ksConstants = np.append(np.full(len(self.columnTitles) - 1, "1"), "")
         oldRowOptions = self.rowOptions
         self.rowOptions = ("readonlyTitles",)
-        self.addRow("Constant", ksConstants)
+        self.addRow("Statistical factor", ksConstants)
         self.rowOptions = oldRowOptions
+
+    def createLabels(self, *args, **kwargs):
+        try:
+            labels = []
+            superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+            variables = self.rowTitles[1:]
+            for globalK, statFactor, variableFactors in zip(
+                self.columnTitles[:-1],
+                self.data[0, :-1],
+                self.data[1:, :-1].T.astype(int),
+            ):
+                label = f"{globalK} = {statFactor:g}"
+                for variable, factor in zip(variables, variableFactors):
+                    if factor == 0 or factor == "":
+                        continue
+                    label += f" × {variable}"
+                    if factor == 1:
+                        continue
+                    label += "".join(
+                        [superscripts[int(digit)] for digit in str(factor)]
+                    )
+                labels.append(label)
+            self.label.configure(text="\n".join(labels))
+        except Exception:
+            pass
+        return True
+
+    def convertData(self, number):
+        if number == "":
+            return np.nan
+        else:
+            return float(number)
 
 
 class CustomKsPopup(tk.Toplevel):
@@ -66,6 +104,16 @@ class CustomKsPopup(tk.Toplevel):
 
         self.customKsTable = CustomKsTable(self.innerFrame, titration)
         self.customKsTable.pack(expand=True, fill="both")
+
+        self.labelFont = font.nametofont("TkTextFont").copy()
+        self.labelFont["size"] = "12"
+
+        self.equationsLabel = ttk.Label(
+            self.innerFrame, anchor="center", font=self.labelFont, padding=5
+        )
+        self.equationsLabel.pack(expand=True, fill="both")
+        self.customKsTable.label = self.equationsLabel
+        self.customKsTable.createLabels()
 
         buttonFrame = ButtonFrame(
             self.innerFrame, self.reset, self.saveData, self.destroy
