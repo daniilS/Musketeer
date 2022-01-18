@@ -524,11 +524,13 @@ class FittedFrame(ttk.Frame):
         xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
         if self.normalisation:
-            curves = self.curves.T
+            curves = self.curves.T.copy()
             # get the largest difference from the first point for each signal
             diff = curves - curves[0]
             maxDiff = np.max(abs(diff), axis=0)
             curves = curves / maxDiff
+            if abs(min(diff)) > abs(max(diff)):
+                curves = -1 * curves
             curves = curves.T * 100
 
             fittedCurves = self.fittedCurves.T
