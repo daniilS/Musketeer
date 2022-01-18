@@ -29,7 +29,7 @@ class ContributorsTable(Table):
             master,
             0,
             0,
-            np.concatenate((titration.freeNames, titration.boundNames)),
+            columnTitles,
             allowBlanks=False,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
