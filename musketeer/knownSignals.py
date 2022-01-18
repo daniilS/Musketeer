@@ -67,7 +67,7 @@ class KnownSpectraPopup(tk.Toplevel):
 
 class GetKnownSpectra(moduleFrame.Strategy):
     popup = KnownSpectraPopup
-    popupAttributes = "knownSpectra"
+    popupAttributes = ("knownSpectra",)
 
     def __init__(self, titration):
         self.titration = titration
