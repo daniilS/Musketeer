@@ -8,6 +8,124 @@ from .table import Table, ButtonFrame
 from .scrolledFrame import ScrolledFrame
 
 
+class CustomKsTable(Table):
+    def __init__(self, master, titration):
+        self.titration = titration
+        if hasattr(titration, "kVarsNames"):
+            kVarsNames = titration.kVarsNames
+        else:
+            kVarsNames = titration.boundNames.copy()
+        if hasattr(titration, "ksMatrix"):
+            ksMatrix = titration.ksMatrix
+        else:
+            ksMatrix = np.identity(titration.boundCount, dtype=int)
+        if (
+            hasattr(titration, "knownKs")
+            and len(titration.knownKs) == ksMatrix.shape[0]
+        ):
+            knownKs = np.where(np.isnan(titration.knownKs), "", titration.knownKs)
+        else:
+            knownKs = np.full(ksMatrix.shape[0], "")
+        self.width = max([len(title) for title in titration.boundNames]) + 5
+        super().__init__(
+            master,
+            0,
+            0,
+            np.append(titration.boundNames, "Value"),
+            allowBlanks=True,
+            rowOptions=("titles", "new", "delete"),
+            columnOptions=("readonlyTitles",),
+            boldTitles=True,
+        )
+        self.addConstantsRow()
+        for name, contributions, value in zip(kVarsNames, ksMatrix, knownKs):
+            self.addRow(name, np.append(contributions, value))
+
+    def addConstantsRow(self):
+        if hasattr(self.titration, "ksConstants"):
+            ksConstants = self.titration.ksConstants
+        else:
+            ksConstants = np.append(np.full(len(self.columnTitles) - 1, "1"), "")
+        oldRowOptions = self.rowOptions
+        self.rowOptions = ("readonlyTitles",)
+        self.addRow("Constant", ksConstants)
+        self.rowOptions = oldRowOptions
+
+
+class CustomKsPopup(tk.Toplevel):
+    def __init__(self, titration, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.titration = titration
+        self.title("Enter relationships between Ks")
+
+        height = int(self.master.winfo_height() * 0.4)
+        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame.pack(expand=True, fill="both")
+
+        self.innerFrame = frame.display_widget(ttk.Frame, stretch=True)
+
+        self.customKsTable = CustomKsTable(self.innerFrame, titration)
+        self.customKsTable.pack(expand=True, fill="both")
+
+        buttonFrame = ButtonFrame(
+            self.innerFrame, self.reset, self.saveData, self.destroy
+        )
+        buttonFrame.pack(expand=False, fill="both", side="bottom")
+
+    def reset(self):
+        self.customKsTable.destroy()
+        self.customKsTable = CustomKsTable(self.innerFrame, self.titration)
+        self.customKsTable.pack(expand=True, fill="both")
+
+    def saveData(self):
+        try:
+            _contributorsMatrix = self.customKsTable.data
+        except Exception as e:
+            mb.showerror(title="Could not save data", message=e, parent=self)
+            return
+
+        self.titration._contributorsMatrix = _contributorsMatrix
+        self.titration._contributorNames = self.customKsTable.rowTitles
+
+        self.destroy()
+
+
+class GetKsCustom(moduleFrame.Strategy):
+    popup = CustomKsPopup
+
+    popupAttributes = ("knownKs", "knownAlphas")
+
+    def __init__(self, titration):
+        self.titration = titration
+        if not (
+            hasattr(titration, "knownKs")
+            and len(titration.knownKs) == titration.boundCount
+        ):
+            titration.knownKs = np.full(titration.boundCount, np.nan)
+        if not (
+            hasattr(titration, "knownAlphas")
+            and len(titration.knownAlphas) == titration.boundCount
+        ):
+            titration.knownAlphas = np.full(titration.boundCount, np.nan)
+        titration.kVarsCount = self.kVarsCount
+        titration.alphaVarsCount = self.alphaVarsCount
+
+    def __call__(self, kVars, alphaVars):
+        ks = self.titration.knownKs.copy()
+        ks[np.isnan(ks)] = kVars
+        alphas = self.titration.knownAlphas[self.titration.polymerIndices].copy()
+        alphas[np.isnan(alphas)] = alphaVars
+        return (ks, alphas)
+
+    def kVarsCount(self):
+        return np.count_nonzero(np.isnan(self.titration.knownKs))
+
+    def alphaVarsCount(self):
+        return np.count_nonzero(
+            np.isnan(self.titration.knownAlphas[self.titration.polymerIndices])
+        )
+
+
 class KnownKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
@@ -116,7 +234,6 @@ class GetKsAll(moduleFrame.Strategy):
     # when every equilibrium constant is unknown and independent
     def __init__(self, titration):
         self.titration = titration
-        titration.ksMatrix = np.identity(titration.boundCount)
         titration.kVarsCount = self.kVarsCount
         titration.alphaVarsCount = self.alphaVarsCount
 
@@ -136,5 +253,9 @@ class GetKsAll(moduleFrame.Strategy):
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Equilibrium constants"
     dropdownLabelText = "Which Ks to optimise?"
-    dropdownOptions = {"Optimise all Ks": GetKsAll, "Specify some known Ks": GetKsKnown}
+    dropdownOptions = {
+        "Optimise all Ks": GetKsAll,
+        "Specify some known Ks": GetKsKnown,
+        "Custom": GetKsCustom,
+    }
     attributeName = "getKs"
