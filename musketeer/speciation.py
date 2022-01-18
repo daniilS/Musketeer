@@ -64,6 +64,7 @@ class SpeciationTable(Table):
             allowBlanks=False,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("titles", "new", "delete"),
+            boldTitles=True,
         )
         for boundName, stoichiometry in zip(boundNames, stoichiometries):
             self.addRow(boundName, stoichiometry)

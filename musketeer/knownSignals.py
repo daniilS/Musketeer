@@ -19,7 +19,7 @@ class KnownSpectraPopup(tk.Toplevel):
         self.sheet = Sheet(
             self,
             data=self.formatData(titration.knownSpectra),
-            headers=list(titration.processedSignalTitles),
+            headers=list(titration.processedSignalTitlesStrings),
             row_index=list(titration.contributorNames()),
             set_all_heights_and_widths=True,
         )

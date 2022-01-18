@@ -1,5 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+from tkinter import font
 
 import numpy as np
 
@@ -8,6 +9,9 @@ from .style import padding, cellWidth
 
 class Table(ttk.Frame):
     width = cellWidth
+
+    titleFont = None
+    fitToText = "New column"
 
     def __init__(
         self,
@@ -19,12 +23,19 @@ class Table(ttk.Frame):
         allowBlanks=False,
         rowOptions=[],
         columnOptions=[],
+        boldTitles=False,
         **kwargs
     ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
         self.allowBlanks = allowBlanks
         super().__init__(master, padding=padding, **kwargs)
+
+        if Table.titleFont is None:
+            Table.titleFont = font.nametofont("TkTextFont").copy()
+            Table.titleFont["weight"] = "bold"
+        if not boldTitles:
+            self.titleFont = "TkTextFont"
 
         # Grid rows at the top that will be left empty for a subclass to fill
         # in with other widgets.
@@ -163,9 +174,9 @@ class Table(ttk.Frame):
         if "delete" in self.rowOptions:
             newRow[0] = self.deleteRowButton(row, 0, "Delete")
         if "readonlyTitles" in self.rowOptions:
-            newRow[1] = self.readonlyEntry(row, 1, firstEntry)
+            newRow[1] = self.readonlyEntry(row, 1, firstEntry, font=self.titleFont)
         elif "titles" in self.rowOptions:
-            newRow[1] = self.entry(row, 1, firstEntry)
+            newRow[1] = self.entry(row, 1, firstEntry, font=self.titleFont)
         for column in range(self.cells.shape[1] - 2):
             entry = self.entry(row, 2 + column, align="right")
             if data is not None:
@@ -183,11 +194,15 @@ class Table(ttk.Frame):
             )
         if "readonlyTitles" in self.columnOptions:
             newColumn[self.headerCells - 1] = self.readonlyEntry(
-                self.headerCells - 1, column, firstEntry, align="center"
+                self.headerCells - 1,
+                column,
+                firstEntry,
+                align="center",
+                font=self.titleFont,
             )
         elif "titles" in self.columnOptions:
             newColumn[self.headerCells - 1] = self.entry(
-                self.headerCells - 1, column, firstEntry
+                self.headerCells - 1, column, firstEntry, font=self.titleFont
             )
         for row in range(self.headerCells, self.cells.shape[0]):
             entry = self.entry(row, column, align="right")
