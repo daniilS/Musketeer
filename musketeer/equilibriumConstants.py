@@ -106,7 +106,7 @@ class CustomKsPopup(tk.Toplevel):
         self.customKsTable.pack(expand=True, fill="both")
 
         self.labelFont = font.nametofont("TkTextFont").copy()
-        self.labelFont["size"] = "12"
+        self.labelFont["size"] = int(1.3 * self.labelFont["size"])
 
         self.equationsLabel = ttk.Label(
             self.innerFrame, anchor="center", font=self.labelFont, padding=5
@@ -123,7 +123,9 @@ class CustomKsPopup(tk.Toplevel):
     def reset(self):
         self.customKsTable.destroy()
         self.customKsTable = CustomKsTable(self.innerFrame, self.titration)
-        self.customKsTable.pack(expand=True, fill="both")
+        self.customKsTable.pack(before=self.equationsLabel, expand=True, fill="both")
+        self.customKsTable.label = self.equationsLabel
+        self.customKsTable.createLabels()
 
     def saveData(self):
         try:
@@ -141,7 +143,7 @@ class CustomKsPopup(tk.Toplevel):
 class GetKsCustom(moduleFrame.Strategy):
     popup = CustomKsPopup
 
-    popupAttributes = ("knownKs", "knownAlphas")
+    popupAttributes = ("ksMatrix", "knownKs")
 
     def __init__(self, titration):
         self.titration = titration
