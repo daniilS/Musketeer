@@ -304,7 +304,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Equilibrium constants"
     dropdownLabelText = "Which Ks to optimise?"
     dropdownOptions = {
-        "Optimise all Ks": GetKsAll,
+        "Fit all Ks": GetKsAll,
         "Specify some known Ks": GetKsKnown,
         "Custom": GetKsCustom,
     }
