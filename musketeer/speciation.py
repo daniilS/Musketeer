@@ -182,14 +182,6 @@ class SpeciationHG2(SpeciationCOGS):
         titration.boundNames = np.array(["HG", "HG2"])
 
 
-class SpeciationHGAB(SpeciationCOGS):
-    def __init__(self, titration):
-        self.titration = titration
-        titration.freeNames = np.array(["Host", "Guest"])
-        titration.stoichiometries = np.array([[1, 1], [1, 1], [1, 2]])
-        titration.boundNames = np.array(["HGa", "HGb", "HG2"])
-
-
 class SpeciationCustom(SpeciationCOGS):
     popup = SpeciationPopup
     popupAttributes = ("stoichiometries", "freeNames", "boundNames")
@@ -200,8 +192,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Select a binding isotherm:"
     dropdownOptions = {
         "1:1 binding": SpeciationHG,
-        "1:2 binding, identical sites": SpeciationHG2,
-        "1:2 binding, different sites": SpeciationHGAB,
+        "1:2 binding": SpeciationHG2,
         "Dimerisation": SpeciationDimerisation,
         "Custom": SpeciationCustom,
     }
