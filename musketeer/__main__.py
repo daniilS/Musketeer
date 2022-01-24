@@ -19,6 +19,21 @@ except Exception:
     pass
 
 
+DEBUG = True
+olderror = mb.showerror
+
+
+def newshowerror(title, message, *args, **kwargs):
+    import traceback
+
+    if DEBUG:
+        message = traceback.format_exc()
+    return olderror(title, message, *args, **kwargs)
+
+
+mb.showerror = newshowerror
+
+
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
 ttkStyle = ttkbootstrap.Style(theme="lumen")
