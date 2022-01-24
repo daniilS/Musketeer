@@ -529,12 +529,13 @@ class FittedFrame(ttk.Frame):
             diff = curves - curves[0]
             maxDiff = np.max(abs(diff), axis=0)
             curves = curves / maxDiff
-            if abs(min(diff)) > abs(max(diff)):
-                curves = -1 * curves
+            negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
+            curves[:, negatives] *= -1
             curves = curves.T * 100
 
             fittedCurves = self.fittedCurves.T
             fittedCurves = fittedCurves / maxDiff
+            fittedCurves[:, negatives] *= -1
             fittedCurves = fittedCurves.T * 100
             self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")
         else:
