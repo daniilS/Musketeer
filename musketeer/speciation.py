@@ -18,8 +18,8 @@ class SpeciationDimerisation(moduleFrame.Strategy):
     def __call__(self, ks, totalConcs, alphas):
         K = ks[0]
         Htot = totalConcs.T[0]
-        H = (-1 + np.sqrt(1 + 8 * Htot * K)) / 4 * K
-        H2 = (1 + 4 * Htot * K - np.sqrt(1 + 8 * Htot * K)) / 4 * K
+        H = (-1 + np.sqrt(1 + 8 * Htot * K)) / (4 * K)
+        H2 = (1 + 4 * Htot * K - np.sqrt(1 + 8 * Htot * K)) / (8 * K)
 
         free = np.atleast_2d(H).T
         bound = np.atleast_2d(H2).T
