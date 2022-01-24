@@ -12,7 +12,7 @@ class SpeciationDimerisation(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         titration.freeNames = np.array(["Host"])
-        titration.stoichiometries = np.array([[1]])
+        titration.stoichiometries = np.array([[2]])
         titration.boundNames = np.array(["H2"])
 
     def __call__(self, ks, totalConcs, alphas):
