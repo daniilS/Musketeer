@@ -454,7 +454,7 @@ class FittedFrame(ttk.Frame):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
         self.xQuantity = titration.freeNames[-1]
-        self.xConcs = titration.lastFreeConcs.T[-1]
+        self.xConcs = titration.lastTotalConcs.T[-1]
         self.normalisation = False
         self.logScale = False
 

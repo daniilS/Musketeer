@@ -138,6 +138,7 @@ class Titration:
         # to the function as arguments
         ks, alphas = self.getKs(kVars, alphaVars)
         totalConcs = self.getTotalConcs(totalConcVars)
+        self.lastTotalConcs = totalConcs
 
         freeConcs, boundConcs = self.speciation(ks, totalConcs, alphas)
         self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
