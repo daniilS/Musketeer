@@ -51,7 +51,7 @@ class ContributorsPopup(tk.Toplevel):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
-        self.title("Enter signal components")
+        self.title("Enter the contributing states")
 
         height = int(self.master.winfo_height() * 0.4)
         frame = ScrolledFrame(self, height=height, max_width=1500)
@@ -73,8 +73,8 @@ class ContributorsPopup(tk.Toplevel):
             wraplength=self.innerFrame.winfo_reqwidth(),
             padding=padding * 2,
             text=(
-                "On each row, enter a component that contributes to the observed"
-                " signal. For each column, specify how many of the component that"
+                "On each row, enter a state that contributes to the observed"
+                " signal. For each column, specify how many of the state that"
                 " species contains."
             ),
         )
@@ -164,8 +164,8 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Contributors"
     dropdownLabelText = "What contributes to the signals?"
     dropdownOptions = {
-        "Host molecules": GetSignalVarsHost,
-        "All species": GetSignalVarsAll,
+        "Only Host": GetSignalVarsHost,
+        "All": GetSignalVarsAll,
         "Custom": GetSignalVarsCustom,
     }
     attributeName = "getSignalVars"

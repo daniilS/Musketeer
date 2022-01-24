@@ -21,3 +21,4 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "Mole fraction (fast exchange)": GetFraction,
     }
     attributeName = "getProportionalSignals"
+    setDefault = False

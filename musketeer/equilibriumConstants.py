@@ -328,11 +328,11 @@ class GetKsAll(moduleFrame.Strategy):
 
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Equilibrium constants"
-    dropdownLabelText = "Which Ks to fit?"
+    dropdownLabelText = "Fix any K values?"
     dropdownOptions = {
-        "Fit all Ks": GetKsAll,
+        "No, optimise all Ks": GetKsAll,
         "Assume second binding weak": GetKsNonspecific,
-        "Specify some known Ks": GetKsKnown,
+        "Fix some known Ks": GetKsKnown,
         "Custom": GetKsCustom,
     }
     attributeName = "getKs"
