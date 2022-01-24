@@ -680,14 +680,14 @@ class SpeciationFrame(ttk.Frame):
             / totalConcentrations.prefixes[xUnit.strip("M")]
         )
 
-        freeConcs = titration.lastFreeConcs[additionsFilter, self.freeIndex]
+        freeConcs = titration.lastFreeConcs[additionsFilter, :][:, self.freeIndex]
         freeName = self.speciesVar.get()
 
         factor = abs(titration.stoichiometries[:, self.freeIndex])
         boundFilter = factor.astype(bool)
 
         boundConcs = titration.lastBoundConcs * factor
-        boundConcs = boundConcs[additionsFilter, boundFilter]
+        boundConcs = boundConcs[additionsFilter, :][:, boundFilter]
         boundNames = titration.boundNames[boundFilter]
 
         curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
