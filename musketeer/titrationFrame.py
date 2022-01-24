@@ -317,6 +317,9 @@ class TitrationFrame(ttk.Frame):
             discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
             nb.add(discreteFittedFrame, text="Fitted signals")
 
+        speciationFrame = SpeciationFrame(nb, self.titration)
+        nb.add(speciationFrame, text="Speciation")
+
         resultsFrame = ResultsFrame(nb, self.titration)
         nb.add(resultsFrame, text="Results")
 
@@ -591,6 +594,127 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
         self.names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
         self.populate()
         self.plot()
+
+
+class SpeciationFrame(ttk.Frame):
+    def __init__(self, parent, titration, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.titration = titration
+        self.xQuantity = titration.freeNames[-1]
+        self.xConcs = titration.lastTotalConcs.T[-1]
+        self.speciesVar = tk.StringVar(self)
+        self.logScale = False
+        self.populate()
+        self.plot()
+
+    def populate(self):
+        titration = self.titration
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
+        self.toolbar.update()
+        self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
+
+        self.optionsFrame = ttk.Frame(self)
+        self.optionsFrame.grid(row=1, column=1, sticky="")
+        self.speciesLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="Select species:"
+        )
+        self.speciesLabel.pack(pady=padding, fill="x")
+
+        self.speciesDropdown = ttk.OptionMenu(
+            self.optionsFrame,
+            self.speciesVar,
+            titration.freeNames[0],
+            command=lambda *args: self.plot(),
+            *titration.freeNames,
+            style="primary.Outline.TMenubutton",
+        )
+        self.speciesDropdown.pack()
+        self.logScaleButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Logarithmic x axis",
+            command=self.toggleLogScale,
+            style="Outline.Toolbutton",
+        )
+        self.logScaleButton.pack(pady=padding, fill="x")
+
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
+        self.grid_anchor("center")
+
+    def toggleLogScale(self):
+        self.logScale = not self.logScale
+        if self.logScale:
+            self.ax.set_xscale("log")
+        else:
+            self.ax.set_xscale("linear")
+        self.canvas.draw()
+
+    @property
+    def freeIndex(self):
+        return np.where(self.titration.freeNames == self.speciesVar.get())[0][0]
+
+    def plot(self):
+        self.ax.clear()
+
+        titration = self.titration
+
+        # xQuantity and xUnit for the fitted plot. Different from the xQuantity
+        # and xUnit in the titration object, which are used for the input
+        # spectra.
+        totalConcs = titration.lastTotalConcs[:, self.freeIndex]
+        additionsFilter = totalConcs != 0
+        totalConcs = totalConcs[additionsFilter]
+
+        xQuantity = self.xQuantity
+        xUnit = titration.concsUnit
+        xConcs = (
+            self.xConcs[additionsFilter]
+            / totalConcentrations.prefixes[xUnit.strip("M")]
+        )
+
+        freeConcs = titration.lastFreeConcs[additionsFilter, self.freeIndex]
+        freeName = self.speciesVar.get()
+
+        factor = abs(titration.stoichiometries[:, self.freeIndex])
+        boundFilter = factor.astype(bool)
+
+        boundConcs = titration.lastBoundConcs * factor
+        boundConcs = boundConcs[additionsFilter, boundFilter]
+        boundNames = titration.boundNames[boundFilter]
+
+        curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
+        names = np.append(freeName, boundNames)
+        self.ax.set_ylabel(f"% of {freeName}")
+
+        for curve, name in zip(curves, names):
+            smoothX = np.linspace(xConcs.min(), xConcs.max(), 100)
+            # make sure the smooth curve actually goes through all the fitted
+            # points
+            smoothX = np.unique(np.concatenate((smoothX, xConcs)))
+
+            # interp1d requires all x values to be unique
+            filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
+            spl = interp1d(xConcs[filter], curve[filter], kind="quadratic")
+            smoothY = spl(smoothX)
+            self.ax.plot(smoothX, smoothY, label=name)
+
+        if self.logScale:
+            self.ax.set_xscale("log")
+        else:
+            self.ax.set_xscale("linear")
+        self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
+        self.ax.legend()
+        self.fig.tight_layout()
+
+        self.canvas.draw()
 
 
 class ResultsFrame(ttk.Frame):
