@@ -280,6 +280,32 @@ class GetKsKnown(moduleFrame.Strategy):
         )
 
 
+class GetKsNonspecific(moduleFrame.Strategy):
+    def __init__(self, titration):
+        self.titration = titration
+        titration.kVarsCount = self.kVarsCount
+        titration.alphaVarsCount = self.alphaVarsCount
+
+    def __call__(self, kVars, alphaVars):
+        # TODO: consider replacing fixed value with percentage of 2:1 K
+        arbitrarilySmallK = 0.001
+        self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
+        self.titration.knownKs[self.trimerIndices()] = arbitrarilySmallK
+        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
+        ks = np.full(self.titration.boundCount, arbitrarilySmallK)
+        ks[~self.trimerIndices()] = kVars
+        return (ks, alphaVars)
+
+    def trimerIndices(self):
+        return self.titration.stoichiometries.sum(axis=1) == 3
+
+    def kVarsCount(self):
+        return self.titration.boundCount - np.count_nonzero(self.trimerIndices())
+
+    def alphaVarsCount(self):
+        return self.titration.polymerCount
+
+
 class GetKsAll(moduleFrame.Strategy):
     # when every equilibrium constant is unknown and independent
     def __init__(self, titration):
@@ -302,9 +328,10 @@ class GetKsAll(moduleFrame.Strategy):
 
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Equilibrium constants"
-    dropdownLabelText = "Which Ks to optimise?"
+    dropdownLabelText = "Which Ks to fit?"
     dropdownOptions = {
         "Fit all Ks": GetKsAll,
+        "Assume second binding weak": GetKsNonspecific,
         "Specify some known Ks": GetKsKnown,
         "Custom": GetKsCustom,
     }
