@@ -2,7 +2,12 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import matplotlib
-from matplotlib.backends._backend_tk import NavigationToolbar2Tk, ToolTip
+from matplotlib.backends._backend_tk import (
+    NavigationToolbar2Tk,
+    FigureCanvasTk,
+    ToolTip,
+    cursord,
+)
 from matplotlib.backend_bases import _Mode
 
 matplotlib.use("TkAgg")
@@ -75,8 +80,20 @@ def showtip(self, text):
     label.pack(ipadx=1)
 
 
+def set_cursor(self, cursor):
+    try:
+        self._tkcanvas.configure(cursor=cursord[cursor])
+    except tk.TclError:
+        pass
+
+
 def applyPatch():
+    # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
 
+    # implements mpl GH PR #22294
+    FigureCanvasTk.set_cursor = set_cursor
+
+    # implements mpl GH PR #22078
     ToolTip.showtip = showtip
