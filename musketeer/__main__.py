@@ -26,7 +26,7 @@ olderror = mb.showerror
 def newshowerror(title, message, *args, **kwargs):
     import traceback
 
-    if DEBUG:
+    if DEBUG and isinstance(message, Exception):
         message = traceback.format_exc()
     return olderror(title, message, *args, **kwargs)
 

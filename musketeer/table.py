@@ -1,5 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.messagebox as mb
 from tkinter import font
 
 import numpy as np
@@ -25,7 +26,7 @@ class Table(ttk.Frame):
         columnOptions=[],
         boldTitles=False,
         callback="",
-        **kwargs
+        **kwargs,
     ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
@@ -80,7 +81,7 @@ class Table(ttk.Frame):
             justify=align,
             validate="focus",
             validatecommand=self.callback,
-            **kwargs
+            **kwargs,
         )
 
         def set(text=""):
@@ -99,6 +100,9 @@ class Table(ttk.Frame):
             sticky="nesw",
             columnspan=columnspan,
         )
+
+        entry.bind("<<Paste>>", lambda *args: self.paste(entry))
+
         return entry
 
     def readonlyEntry(self, *args, **kwargs):
@@ -128,7 +132,7 @@ class Table(ttk.Frame):
         command=None,
         columnspan=1,
         style="Outline.TButton",
-        **kwargs
+        **kwargs,
     ):
         button = ttk.Button(
             self, text=text, command=command, style=style, takefocus=False, **kwargs
@@ -248,6 +252,33 @@ class Table(ttk.Frame):
         if self.allowBlanks and number == "":
             return np.nan
         return float(number)
+
+    def paste(self, entry):
+        info = entry.grid_info()
+        row, column = info["row"], info["column"]
+        rows, columns = self.cells[row - self.headerGridRows :, column:].shape
+        pasteContent = self.clipboard_get()
+        if "\n" not in pasteContent and "\r" not in pasteContent:
+            # Handle as a regular paste. Copying a single cell or row from Excel should
+            # still end the string with a newline.
+            return
+        lines = pasteContent.splitlines()
+        if len(lines) > rows:
+            mb.showerror(
+                title="Paste error",
+                message=f"Cannot paste {len(lines)} lines into {rows} rows.",
+                parent=self,
+            )
+            return "break"
+        for rowOffset, line in enumerate(lines):
+            for columnOffset, value in enumerate(line.split("\t", columns - 1)):
+                self.cells[
+                    row - self.headerGridRows + rowOffset, column + columnOffset
+                ].set(value)
+        self.cells[
+            row - self.headerGridRows + rowOffset, column + columnOffset
+        ].focus_set()
+        return "break"
 
     @property
     def data(self):
