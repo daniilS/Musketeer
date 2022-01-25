@@ -102,6 +102,8 @@ class Table(ttk.Frame):
         )
 
         entry.bind("<<Paste>>", lambda *args: self.paste(entry))
+        entry.bind("<Tab>", lambda *args: self.tab(entry))
+        entry.bind("<Shift-Tab>", lambda *args: self.shiftTab(entry))
 
         return entry
 
@@ -253,10 +255,42 @@ class Table(ttk.Frame):
             return np.nan
         return float(number)
 
+    def tab(self, entry):
+        info = entry.grid_info()
+        row, column = info["row"] - self.headerGridRows, info["column"]
+        rows, columns = self.cells.shape
+        while not (row == rows - 1 and column == columns - 1):
+            column += 1
+            if column >= columns:
+                column = 0
+                row += 1
+            nextCell = self.cells[row, column]
+            if isinstance(nextCell, tk.Widget) and nextCell.tk.call(
+                "::tk::FocusOK", nextCell
+            ):
+                nextCell.focus_set()
+                return "break"
+
+    def shiftTab(self, entry):
+        info = entry.grid_info()
+        row, column = info["row"] - self.headerGridRows, info["column"]
+        rows, columns = self.cells.shape
+        while not ((row == 0 and column == 0)):
+            column -= 1
+            if column < 0:
+                column = columns - 1
+                row -= 1
+            prevCell = self.cells[row, column]
+            if isinstance(prevCell, tk.Widget) and prevCell.tk.call(
+                "::tk::FocusOK", prevCell
+            ):
+                prevCell.focus_set()
+                return "break"
+
     def paste(self, entry):
         info = entry.grid_info()
-        row, column = info["row"], info["column"]
-        rows, columns = self.cells[row - self.headerGridRows :, column:].shape
+        row, column = info["row"] - self.headerGridRows, info["column"]
+        rows, columns = self.cells[row:, column:].shape
         pasteContent = self.clipboard_get()
         if "\n" not in pasteContent and "\r" not in pasteContent:
             # Handle as a regular paste. Copying a single cell or row from Excel should
@@ -272,12 +306,8 @@ class Table(ttk.Frame):
             return "break"
         for rowOffset, line in enumerate(lines):
             for columnOffset, value in enumerate(line.split("\t", columns - 1)):
-                self.cells[
-                    row - self.headerGridRows + rowOffset, column + columnOffset
-                ].set(value)
-        self.cells[
-            row - self.headerGridRows + rowOffset, column + columnOffset
-        ].focus_set()
+                self.cells[row + rowOffset, column + columnOffset].set(value)
+        self.cells[row + rowOffset, column + columnOffset].focus_set()
         return "break"
 
     @property
