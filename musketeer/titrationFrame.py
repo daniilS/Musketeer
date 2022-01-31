@@ -3,6 +3,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 import packaging.version
+from copy import deepcopy
 
 import numpy as np
 import tksheet
@@ -306,21 +307,21 @@ class TitrationFrame(ttk.Frame):
         nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
         self.notebook.add(nb, text=f"Fit {self.numFits}")
 
+        titrationCopy = deepcopy(self.titration)
+
         if self.titration.continuous:
-            continuousFittedFrame = ContinuousFittedFrame(nb, self.titration)
+            continuousFittedFrame = ContinuousFittedFrame(nb, titrationCopy)
             nb.add(continuousFittedFrame, text="Fitted Spectra")
-            discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, self.titration)
-            nb.add(
-                discreteFittedFrame, text=f"Fit at select {self.titration.xQuantity}"
-            )
+            discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, titrationCopy)
+            nb.add(discreteFittedFrame, text=f"Fit at select {titrationCopy.xQuantity}")
         else:
-            discreteFittedFrame = DiscreteFittedFrame(nb, self.titration)
+            discreteFittedFrame = DiscreteFittedFrame(nb, titrationCopy)
             nb.add(discreteFittedFrame, text="Fitted signals")
 
-        speciationFrame = SpeciationFrame(nb, self.titration)
+        speciationFrame = SpeciationFrame(nb, titrationCopy)
         nb.add(speciationFrame, text="Speciation")
 
-        resultsFrame = ResultsFrame(nb, self.titration)
+        resultsFrame = ResultsFrame(nb, titrationCopy)
         nb.add(resultsFrame, text="Results")
 
         self.notebook.select(str(nb))
