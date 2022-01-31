@@ -307,6 +307,7 @@ class TitrationFrame(ttk.Frame):
         nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
         self.notebook.add(nb, text=f"Fit {self.numFits}")
 
+        # TODO: link titrationCopy to options frame as well
         titrationCopy = deepcopy(self.titration)
 
         if self.titration.continuous:
