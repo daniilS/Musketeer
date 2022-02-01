@@ -232,7 +232,7 @@ def readCSV(filePath):
         setattr(titration, param, getattr(popup, param).get())
 
     with open(filePath, "r", newline="") as inFile:
-        data = np.genfromtxt(inFile, dtype=str, delimiter=",")
+        data = np.loadtxt(inFile, dtype=str, delimiter=",", ndmin=2)
         if popup.needTranspose:
             data = data.T
         if popup.hasAdditionTitles and popup.hasSignalTitles:
