@@ -530,16 +530,18 @@ class FittedFrame(ttk.Frame):
 
         if self.normalisation:
             curves = self.curves.T.copy()
-            # get the largest difference from the first point for each signal
+            fittedCurves = self.fittedCurves.T.copy()
+            # normalise so that all the fitted curves have the same amplitude
+            fittedDiff = self.fittedCurves.T - self.fittedCurves.T[0]
+            maxFittedDiff = np.max(abs(fittedDiff), axis=0)
+            curves = curves / maxFittedDiff
+
             diff = curves - curves[0]
-            maxDiff = np.max(abs(diff), axis=0)
-            curves = curves / maxDiff
             negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
             curves[:, negatives] *= -1
             curves = curves.T * 100
 
-            fittedCurves = self.fittedCurves.T
-            fittedCurves = fittedCurves / maxDiff
+            fittedCurves = fittedCurves / maxFittedDiff
             fittedCurves[:, negatives] *= -1
             fittedCurves = fittedCurves.T * 100
             self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")
@@ -554,14 +556,16 @@ class FittedFrame(ttk.Frame):
             fittedCurve -= fittedZero
             self.ax.scatter(xConcs, curve)
 
-            smoothX = np.linspace(xConcs.min(), xConcs.max(), 100)
-            # make sure the smooth curve actually goes through all the fitted
-            # points
-            smoothX = np.unique(np.concatenate((smoothX, xConcs)))
+            # add step - 1 points between each data point
+            step = 10
+            smoothXCount = (xConcs.size - 1) * step + 1
+            smoothX = np.interp(
+                np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
+            )
 
             # interp1d requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            spl = interp1d(xConcs[filter], fittedCurve[filter], kind="quadratic")
+            spl = interp1d(xConcs[filter], fittedCurve[filter], kind="cubic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
@@ -697,14 +701,16 @@ class SpeciationFrame(ttk.Frame):
         self.ax.set_ylabel(f"% of {freeName}")
 
         for curve, name in zip(curves, names):
-            smoothX = np.linspace(xConcs.min(), xConcs.max(), 100)
-            # make sure the smooth curve actually goes through all the fitted
-            # points
-            smoothX = np.unique(np.concatenate((smoothX, xConcs)))
+            # add step - 1 points between each data point
+            step = 10
+            smoothXCount = (xConcs.size - 1) * step + 1
+            smoothX = np.interp(
+                np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
+            )
 
             # interp1d requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            spl = interp1d(xConcs[filter], curve[filter], kind="quadratic")
+            spl = interp1d(xConcs[filter], curve[filter], kind="cubic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
