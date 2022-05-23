@@ -565,6 +565,10 @@ class FittedFrame(ttk.Frame):
 
             # interp1d requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
+            if xConcs[filter].size < 3:
+                # cannot do spline interpolation with fewer than 3 unique x-values
+                self.ax.plot(xConcs, fittedCurve, label=name)
+                continue
             spl = interp1d(xConcs[filter], fittedCurve[filter], kind="cubic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
@@ -710,6 +714,10 @@ class SpeciationFrame(ttk.Frame):
 
             # interp1d requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
+            if xConcs[filter].size < 3:
+                # cannot do spline interpolation with fewer than 3 unique x-values
+                self.ax.plot(xConcs, curve, label=name)
+                continue
             spl = interp1d(xConcs[filter], curve[filter], kind="cubic")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
