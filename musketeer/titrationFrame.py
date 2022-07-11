@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import numpy as np
 import tksheet
-from scipy.interpolate import interp1d
+from scipy.interpolate import make_interp_spline
 from cycler import cycler
 from ttkbootstrap.widgets import InteractiveNotebook
 import tkinter.messagebox as mb
@@ -563,13 +563,15 @@ class FittedFrame(ttk.Frame):
                 np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
             )
 
-            # interp1d requires all x values to be unique
+            # make_interp_spline requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
             if xConcs[filter].size < 3:
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, fittedCurve, label=name)
                 continue
-            spl = interp1d(xConcs[filter], fittedCurve[filter], kind="cubic")
+            spl = make_interp_spline(
+                xConcs[filter], fittedCurve[filter], bc_type="natural"
+            )
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
@@ -712,13 +714,13 @@ class SpeciationFrame(ttk.Frame):
                 np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
             )
 
-            # interp1d requires all x values to be unique
+            # make_interp_spline requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
             if xConcs[filter].size < 3:
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, curve, label=name)
                 continue
-            spl = interp1d(xConcs[filter], curve[filter], kind="cubic")
+            spl = make_interp_spline(xConcs[filter], curve[filter], bc_type="natural")
             smoothY = spl(smoothX)
             self.ax.plot(smoothX, smoothY, label=name)
 
