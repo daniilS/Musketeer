@@ -264,9 +264,14 @@ def readCSV(filePath):
 
 
 class NavigationToolbarHorizontal(NavigationToolbar2Tk):
-    def __init__(self, pickPeak, *args, **kwargs):
+    def __init__(self, pickPeak, callback, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pickPeak = pickPeak
+        self.callback = callback
+
+    def _update_view(self):
+        super()._update_view()
+        self.callback()
 
     def press_pan(self, event):
         event.key = "x"
@@ -278,7 +283,8 @@ class NavigationToolbarHorizontal(NavigationToolbar2Tk):
 
     def release_pan(self, event):
         event.key = "x"
-        return super().release_pan(event)
+        super().release_pan(event)
+        self.callback()
 
     def press_zoom(self, event):
         event.key = "x"
@@ -296,6 +302,7 @@ class NavigationToolbarHorizontal(NavigationToolbar2Tk):
         if shouldPickPeak:
             event.zoomClick = True
             self.pickPeak(event)
+        self.callback()
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
         axes = self.canvas.figure.get_axes()
@@ -342,7 +349,6 @@ def readNMR(filePath):
 
         maxF = max(max(f) for f in frequencies)
         minF = min(min(f) for f in frequencies)
-        maxI = max(max(i) for i in intensities)
 
         numRows = len(frequencies)
         fig = Figure()
@@ -357,7 +363,6 @@ def readNMR(filePath):
             ax.plot(x, y, color="black")
             ax.axes.yaxis.set_visible(False)
             ax.set_xlim(x[0], x[-1])
-            ax.set_ylim(0, 1.2 * maxI)
         fig.tight_layout()
 
         signals = []
@@ -379,6 +384,17 @@ def readNMR(filePath):
 
         entry = ttk.Entry(frame)
         entry.insert(0, "Signal title")
+
+        flatI = np.concatenate(intensities)
+        flatF = np.concatenate(frequencies)
+
+        def rescale():
+            maxF, minF = axList[0].get_xlim()
+            filteredI = flatI[(minF <= flatF) & (flatF <= maxF)]
+            if len(filteredI) > 0:
+                ax.set_ylim(0, 1.2 * np.max(filteredI))
+
+        rescale()
 
         def onClick(e):
             # click outside of plot area
@@ -439,7 +455,7 @@ def readNMR(filePath):
         canvas.get_tk_widget().pack(side="bottom", fill="both", expand=True)
 
         toolbar = NavigationToolbarHorizontal(
-            onClick, canvas, popup, pack_toolbar=False
+            onClick, rescale, canvas, popup, pack_toolbar=False
         )
         toolbar.update()
         toolbar.pack(side="left", padx=padding)
