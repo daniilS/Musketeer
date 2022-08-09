@@ -461,6 +461,7 @@ class FittedFrame(ttk.Frame):
         self.xQuantity = titration.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.normalisation = False
+        self.smooth = True
         self.logScale = False
 
     def populate(self):
@@ -498,6 +499,13 @@ class FittedFrame(ttk.Frame):
             style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
+        self.smoothButton = ttk.Checkbutton(
+            self.toggleButtonsFrame,
+            text="Smooth curves",
+            command=self.toggleSmooth,
+            style="Outline.Toolbutton",
+        )
+        self.smoothButton.pack(pady=padding, fill="x")
 
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -515,6 +523,10 @@ class FittedFrame(ttk.Frame):
         else:
             self.ax.set_xscale("linear")
         self.canvas.draw()
+
+    def toggleSmooth(self):
+        self.smooth = not self.smooth
+        self.plot()
 
     def plot(self):
         self.ax.clear()
@@ -565,7 +577,7 @@ class FittedFrame(ttk.Frame):
 
             # make_interp_spline requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            if xConcs[filter].size < 3:
+            if (not self.smooth) or xConcs[filter].size < 3:
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, fittedCurve, label=name)
                 continue
@@ -616,6 +628,7 @@ class SpeciationFrame(ttk.Frame):
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.speciesVar = tk.StringVar(self)
         self.logScale = False
+        self.smooth = True
         self.populate()
         self.plot()
 
@@ -655,6 +668,13 @@ class SpeciationFrame(ttk.Frame):
             style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
+        self.smoothButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Smooth curves",
+            command=self.toggleSmooth,
+            style="Outline.Toolbutton",
+        )
+        self.smoothButton.pack(pady=padding, fill="x")
 
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -668,6 +688,10 @@ class SpeciationFrame(ttk.Frame):
         else:
             self.ax.set_xscale("linear")
         self.canvas.draw()
+
+    def toggleSmooth(self):
+        self.smooth = not self.smooth
+        self.plot()
 
     @property
     def freeIndex(self):
@@ -716,7 +740,7 @@ class SpeciationFrame(ttk.Frame):
 
             # make_interp_spline requires all x values to be unique
             filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            if xConcs[filter].size < 3:
+            if (not self.smooth) or xConcs[filter].size < 3:
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, curve, label=name)
                 continue
