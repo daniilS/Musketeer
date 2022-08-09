@@ -258,7 +258,7 @@ def readCSV(filePath):
             titration.signalTitles = np.array(
                 ["Signal " + str(i + 1) for i in range(data.shape[1])]
             )
-            titration.rawData = data
+            titration.rawData = data.astype(float)
 
     return [titration]
 
