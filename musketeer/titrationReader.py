@@ -5,6 +5,7 @@ from collections import namedtuple
 
 import csv
 import numpy as np
+from numpy import ma
 import os
 import re
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
@@ -238,19 +239,19 @@ def readCSV(filePath):
         if popup.hasAdditionTitles and popup.hasSignalTitles:
             titration.additionTitles = data[1:, 0]
             titration.signalTitles = data[0, 1:]
-            titration.rawData = data[1:, 1:].astype(float)
+            rawData = data[1:, 1:]
         elif popup.hasAdditionTitles:
             titration.additionTitles = data[:, 0]
             titration.signalTitles = np.array(
                 ["Signal " + str(i + 1) for i in range(data.shape[1] - 1)]
             )
-            titration.rawData = data[:, 1:].astype(float)
+            rawData = data[:, 1:]
         elif popup.hasSignalTitles:
             titration.additionTitles = np.array(
                 ["Addition " + str(i + 1) for i in range(data.shape[0] - 1)]
             )
             titration.signalTitles = data[0, :]
-            titration.rawData = data[1:, :].astype(float)
+            rawData = data[1:, :]
         else:
             titration.additionTitles = np.array(
                 ["Addition " + str(i + 1) for i in range(data.shape[0])]
@@ -258,8 +259,10 @@ def readCSV(filePath):
             titration.signalTitles = np.array(
                 ["Signal " + str(i + 1) for i in range(data.shape[1])]
             )
-            titration.rawData = data.astype(float)
+            rawData = data
 
+    rawData[rawData == ""] = "nan"
+    titration.rawData = ma.masked_invalid(rawData.astype(float))
     return [titration]
 
 
@@ -440,7 +443,7 @@ def readNMR(filePath):
             cycler.pop(0)
 
         def save():
-            titration.rawData = np.array(signals, dtype=float).T
+            titration.rawData = ma.masked_invalid(np.array(signals, dtype=float).T)
             titration.signalTitles = np.array(titles)
             popup.destroy()
 
