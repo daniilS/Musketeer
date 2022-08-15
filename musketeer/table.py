@@ -313,17 +313,25 @@ class Table(ttk.Frame):
         return "break"
 
     @property
+    def dataCells(self):
+        return self.cells[self.headerCells :, 2:]
+
+    @property
     def data(self):
-        data = np.full(self.cells[self.headerCells :, 2:].shape, self.convertData("0"))
-        for (row, column), cell in np.ndenumerate(self.cells[self.headerCells :, 2:]):
+        data = np.full(self.dataCells.shape, self.convertData("0"))
+        for (row, column), cell in np.ndenumerate(self.dataCells):
             data[row, column] = self.convertData(cell.get())
         return data
 
     @data.setter
     def data(self, data):
-        # TODO: handle number of columns
-        for row in data:
-            self.addRow("", row)
+        if self.dataCells.shape != data.shape:
+            raise ValueError(
+                "Requested data shape {data.shape} does not match table shape"
+                " {cells.shape}."
+            )
+        for cell, datum in zip(self.dataCells.flat, data.flat):
+            cell.set(datum)
 
     @property
     def rowTitles(self):
