@@ -309,7 +309,7 @@ class Table(ttk.Frame):
         for rowOffset, line in enumerate(lines):
             for columnOffset, value in enumerate(line.split("\t", columns - 1)):
                 self.cells[row + rowOffset, column + columnOffset].set(value)
-        self.cells[row + rowOffset, column + columnOffset].focus_set()
+        self.setFocus(self.cells[row + rowOffset, column + columnOffset])
         return "break"
 
     @property
