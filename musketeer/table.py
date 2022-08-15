@@ -255,6 +255,9 @@ class Table(ttk.Frame):
             return np.nan
         return float(number)
 
+    def setFocus(self, widget):
+        widget.tk.eval(f"tk::TabToWindow {widget._w}")
+
     def tab(self, entry):
         info = entry.grid_info()
         row, column = info["row"] - self.headerGridRows, info["column"]
@@ -268,7 +271,7 @@ class Table(ttk.Frame):
             if isinstance(nextCell, tk.Widget) and nextCell.tk.call(
                 "::tk::FocusOK", nextCell
             ):
-                nextCell.focus_set()
+                self.setFocus(nextCell)
                 return "break"
 
     def shiftTab(self, entry):
@@ -284,7 +287,7 @@ class Table(ttk.Frame):
             if isinstance(prevCell, tk.Widget) and prevCell.tk.call(
                 "::tk::FocusOK", prevCell
             ):
-                prevCell.focus_set()
+                self.setFocus(prevCell)
                 return "break"
 
     def paste(self, entry):
