@@ -79,19 +79,18 @@ class Table(ttk.Frame):
             self,
             width=self.width * columnspan,
             justify=align,
-            validate="focus",
-            validatecommand=self.callback,
             **kwargs,
         )
 
-        def set(text=""):
-            oldState = entry.state()
-            entry.state(["!disabled", "!readonly"])
-            entry.delete(0, "end")
-            entry.insert(0, text)
-            entry.state(oldState)
-
-        entry.set = set
+        entry.stringVar = tk.StringVar(entry)
+        entry.configure(textvariable=entry.stringVar)
+        if self.callback != "":
+            # Callback is registered once for the entire table, but StringVar.trace_add
+            # only supports python functions.
+            self.tk.eval(
+                f"trace add variable {entry.stringVar._name} write {self.callback}"
+            )
+        entry.set = entry.stringVar.set
 
         entry.set(text)
         entry.grid(
