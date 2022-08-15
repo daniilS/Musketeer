@@ -171,7 +171,6 @@ class FitSignalsCustom(FitSignalsConstrained):
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Fit signals"
     dropdownLabelText = "Fit signals to curve using:"
-    # TODO: add least squares with linear constraints
     dropdownOptions = {
         "Ordinary least squares": FitSignals,
         "Nonnegative least squares": FitSignalsNonnegative,
