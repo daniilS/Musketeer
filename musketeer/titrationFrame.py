@@ -786,8 +786,8 @@ class ResultsFrame(ttk.Frame):
             ** titration.lastKs[titration.kVarsCount() + titration.getConcVarsCount() :]
         )
 
-        for boundName, k, alpha in zip(self.titration.boundNames, ks, alphas):
-            kTable.addRow(boundName, [np.rint(k), alpha if not np.isnan(alpha) else ""])
+        for kVarName, k, alpha in zip(self.titration.kVarsNames, ks, alphas):
+            kTable.addRow(kVarName, [np.rint(k), alpha if not np.isnan(alpha) else ""])
         kTable.pack(side="top", pady=15)
 
         sheet = tksheet.Sheet(

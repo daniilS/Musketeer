@@ -40,6 +40,10 @@ class ContributorsTable(Table):
         ):
             self.addRow(name, contributions)
 
+    def newRow(self):
+        defaultEntries = np.full(self.dataCells.shape[1], "0")
+        self.addRow("New state", defaultEntries)
+
     def convertData(self, number):
         if number.isdigit():
             return int(number)

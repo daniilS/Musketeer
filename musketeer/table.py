@@ -49,12 +49,13 @@ class Table(ttk.Frame):
         # subclass to fill in with widgets that should be treated as cells.
         # Two rows are reserved for column titles and delete buttons.
         self.headerCells = headerCells + 2
+
         if "new" in rowOptions:
             self.newRowButton = self.button(
                 self.headerCells - 1,
                 0,
                 "New row",
-                self.addRow,
+                self.newRow,
                 style="success.Outline.TButton",
             )
         if "new" in columnOptions:
@@ -62,7 +63,7 @@ class Table(ttk.Frame):
                 self.headerCells - 2,
                 1,
                 "New column",
-                self.addColumn,
+                self.newColumn,
                 style="success.Outline.TButton",
             )
 
@@ -227,6 +228,14 @@ class Table(ttk.Frame):
             newColumn[row] = entry
 
         self.cells = np.hstack((self.cells, newColumn[:, None]))
+
+    # So that subclasses can specify default values when new rows/columns are added
+    # by a button press.
+    def newColumn(self):
+        self.addColumn()
+
+    def newRow(self):
+        self.addRow()
 
     def deleteRow(self, row):
         for element in self.cells[row]:

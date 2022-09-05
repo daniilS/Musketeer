@@ -47,15 +47,26 @@ class CustomKsTable(Table):
         for name, contributions, value in zip(kVarsNames, ksMatrix, knownKs):
             self.addRow(name, np.append(contributions, value))
 
+    def newRow(self):
+        defaultEntries = np.full(self.dataCells.shape[1], "0")
+        defaultEntries[-1] = ""
+        self.addRow("New variable", defaultEntries)
+
     def addConstantsRow(self):
         if hasattr(self.titration, "ksConstants"):
             ksConstants = self.titration.ksConstants
         else:
-            ksConstants = np.append(np.full(len(self.columnTitles) - 1, "1"), "")
+            ksConstants = np.full(len(self.columnTitles) - 1, "1")
+        # Value column doesn't have a statistical factor
+        ksConstants = np.append(ksConstants, "")
         oldRowOptions = self.rowOptions
         self.rowOptions = ("readonlyTitles",)
         self.addRow("Statistical factor", ksConstants)
         self.rowOptions = oldRowOptions
+
+        # Value column doesn't have a statistical factor
+        self.cells[-1, -1].configure(style="TLabel", takefocus=False)
+        self.cells[-1, -1].state(["readonly"])
 
     def createLabels(self, *args, **kwargs):
         try:
@@ -129,51 +140,49 @@ class CustomKsPopup(tk.Toplevel):
 
     def saveData(self):
         try:
-            _contributorsMatrix = self.customKsTable.data
+            ksConstants = self.customKsTable.data[0, :-1]
+            kVarsNames = self.customKsTable.rowTitles[1:]
+            ksMatrix = self.customKsTable.data[1:, :-1]
+            knownKs = self.customKsTable.data[1:, -1]
         except Exception as e:
             mb.showerror(title="Could not save data", message=e, parent=self)
             return
 
-        self.titration._contributorsMatrix = _contributorsMatrix
-        self.titration._contributorNames = self.customKsTable.rowTitles
-
+        self.titration.ksConstants = ksConstants
+        self.titration.kVarsNames = kVarsNames
+        self.titration.ksMatrix = ksMatrix
+        self.titration.knownKs = knownKs
+        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
         self.destroy()
 
 
 class GetKsCustom(moduleFrame.Strategy):
     popup = CustomKsPopup
 
-    popupAttributes = ("ksMatrix", "knownKs")
+    popupAttributes = ("ksConstants", "kVarsNames", "ksMatrix", "knownKs")
 
     def __init__(self, titration):
         self.titration = titration
-        if not (
-            hasattr(titration, "knownKs")
-            and len(titration.knownKs) == titration.boundCount
-        ):
-            titration.knownKs = np.full(titration.boundCount, np.nan)
-        if not (
-            hasattr(titration, "knownAlphas")
-            and len(titration.knownAlphas) == titration.boundCount
-        ):
-            titration.knownAlphas = np.full(titration.boundCount, np.nan)
         titration.kVarsCount = self.kVarsCount
         titration.alphaVarsCount = self.alphaVarsCount
 
     def __call__(self, kVars, alphaVars):
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = kVars
-        alphas = self.titration.knownAlphas[self.titration.polymerIndices].copy()
-        alphas[np.isnan(alphas)] = alphaVars
-        return (ks, alphas)
+        # microKs as a column vector, with the unknown values filled in
+        microKs = self.titration.knownKs.copy()
+        microKs[np.isnan(microKs)] = kVars
+        microKs = np.atleast_2d(microKs).T
+
+        # perform the calculation as previewed in the popup
+        globalKs = self.titration.ksConstants * np.prod(
+            microKs ** self.titration.ksMatrix, 0
+        )
+        return (globalKs, alphaVars)
 
     def kVarsCount(self):
         return np.count_nonzero(np.isnan(self.titration.knownKs))
 
     def alphaVarsCount(self):
-        return np.count_nonzero(
-            np.isnan(self.titration.knownAlphas[self.titration.polymerIndices])
-        )
+        return 0
 
 
 class KnownKsTable(Table):
@@ -265,6 +274,8 @@ class GetKsKnown(moduleFrame.Strategy):
         titration.alphaVarsCount = self.alphaVarsCount
 
     def __call__(self, kVars, alphaVars):
+        # TODO: move to a better place
+        self.titration.kVarsNames = self.titration.boundNames
         ks = self.titration.knownKs.copy()
         ks[np.isnan(ks)] = kVars
         alphas = self.titration.knownAlphas[self.titration.polymerIndices].copy()
@@ -287,6 +298,8 @@ class GetKsNonspecific(moduleFrame.Strategy):
         titration.alphaVarsCount = self.alphaVarsCount
 
     def __call__(self, kVars, alphaVars):
+        # TODO: move to a better place
+        self.titration.kVarsNames = self.titration.boundNames
         # TODO: consider replacing fixed value with percentage of 2:1 K
         arbitrarilySmallK = 0.001
         self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
@@ -320,6 +333,8 @@ class GetKsAll(moduleFrame.Strategy):
         return self.titration.boundCount
 
     def __call__(self, kVars, alphaVars):
+        # TODO: move to a better place
+        self.titration.kVarsNames = self.titration.boundNames
         # TODO: move this to a more sensible place
         self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
         self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
