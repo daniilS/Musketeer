@@ -505,6 +505,7 @@ class FittedFrame(ttk.Frame):
             command=self.toggleSmooth,
             style="Outline.Toolbutton",
         )
+        self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
         self.rowconfigure(0, weight=1)
@@ -674,6 +675,7 @@ class SpeciationFrame(ttk.Frame):
             command=self.toggleSmooth,
             style="Outline.Toolbutton",
         )
+        self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
         self.rowconfigure(0, weight=1)
