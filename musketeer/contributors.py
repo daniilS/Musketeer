@@ -56,22 +56,22 @@ class ContributorsPopup(tk.Toplevel):
         self.title("Enter the contributing states")
 
         height = int(self.master.winfo_height() * 0.4)
-        frame = ScrolledFrame(self, height=height, max_width=1500)
-        frame.pack(expand=True, fill="both")
+        self.frame = ttk.Frame(self, height=height)
+        self.frame.pack(expand=True, fill="both")
+        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame.pack(expand=True, fill="both")
 
-        self.innerFrame = frame.display_widget(ttk.Frame, stretch=True)
+        self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 
         self.contributorsTable = ContributorsTable(self.innerFrame, titration)
         self.contributorsTable.pack(expand=True, fill="both")
 
-        buttonFrame = ButtonFrame(
-            self.innerFrame, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
         self.update()
         self.contributorsLabel = ttk.Label(
-            self.innerFrame,
+            self.frame,
             wraplength=self.innerFrame.winfo_reqwidth(),
             padding=padding * 2,
             text=(
@@ -80,13 +80,11 @@ class ContributorsPopup(tk.Toplevel):
                 " species contains."
             ),
         )
-        self.contributorsLabel.pack(
-            before=self.contributorsTable, expand=True, fill="both"
-        )
+        self.contributorsLabel.pack(before=scrolledFrame, fill="both")
 
     def reset(self):
         self.contributorsTable.destroy()
-        self.contributorsTable = ContributorsTable(self.innerFrame, self.titration)
+        self.contributorsTable = ContributorsTable(self.frame, self.titration)
         self.contributorsTable.pack(expand=True, fill="both")
 
     def saveData(self):

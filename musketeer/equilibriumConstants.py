@@ -27,9 +27,7 @@ class CustomKsTable(Table):
             knownKs = np.where(np.isnan(titration.knownKs), "", titration.knownKs)
         else:
             knownKs = np.full(ksMatrix.shape[0], "")
-        columnTitles = np.append(
-            [f"Global K for {name}" for name in titration.boundNames], "Value"
-        )
+        columnTitles = np.append(titration.boundNames, "Value")
         self.width = max([len(title) for title in columnTitles]) + 1
 
         super().__init__(
@@ -42,6 +40,9 @@ class CustomKsTable(Table):
             columnOptions=("readonlyTitles",),
             boldTitles=True,
             callback=self.createLabels,
+        )
+        self.readonlyEntry(
+            self.headerCells - 1, 1, "Global K for:", font=self.titleFont
         )
         self.addConstantsRow()
         for name, contributions, value in zip(kVarsNames, ksMatrix, knownKs):
@@ -78,7 +79,7 @@ class CustomKsTable(Table):
                 self.data[0, :-1],
                 self.data[1:, :-1].T.astype(int),
             ):
-                label = f"{globalK} = {statFactor:g}"
+                label = f"Global K for {globalK} = {statFactor:g}"
                 for variable, factor in zip(variables, variableFactors):
                     if factor == 0 or factor == "":
                         continue
@@ -108,10 +109,12 @@ class CustomKsPopup(tk.Toplevel):
         self.title("Enter relationships between Ks")
 
         height = int(self.master.winfo_height() * 0.4)
-        frame = ScrolledFrame(self, height=height, max_width=1500)
-        frame.pack(expand=True, fill="both")
+        self.frame = ttk.Frame(self, height=height)
+        self.frame.pack(expand=True, fill="both")
+        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame.pack(expand=True, fill="both")
 
-        self.innerFrame = frame.display_widget(ttk.Frame, stretch=True)
+        self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 
         self.customKsTable = CustomKsTable(self.innerFrame, titration)
         self.customKsTable.pack(expand=True, fill="both")
@@ -120,21 +123,19 @@ class CustomKsPopup(tk.Toplevel):
         self.labelFont["size"] = int(1.3 * self.labelFont["size"])
 
         self.equationsLabel = ttk.Label(
-            self.innerFrame, anchor="center", font=self.labelFont, padding=5
+            self.frame, anchor="center", font=self.labelFont, padding=5
         )
-        self.equationsLabel.pack(expand=True, fill="both")
+        self.equationsLabel.pack(fill="both")
         self.customKsTable.label = self.equationsLabel
         self.customKsTable.createLabels()
 
-        buttonFrame = ButtonFrame(
-            self.innerFrame, self.reset, self.saveData, self.destroy
-        )
+        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
     def reset(self):
         self.customKsTable.destroy()
         self.customKsTable = CustomKsTable(self.innerFrame, self.titration)
-        self.customKsTable.pack(before=self.equationsLabel, expand=True, fill="both")
+        self.customKsTable.pack(expand=True, fill="both")
         self.customKsTable.label = self.equationsLabel
         self.customKsTable.createLabels()
 
