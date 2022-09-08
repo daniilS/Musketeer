@@ -45,10 +45,8 @@ class ContributorsTable(Table):
         self.addRow("New state", defaultEntries)
 
     def convertData(self, number):
-        if number.isdigit():
-            return int(number)
-        else:
-            return float(number)
+        # if all entries happen to be integers, this is handled by saveData()
+        return float(number)
 
 
 class ContributorsPopup(tk.Toplevel):
@@ -94,6 +92,8 @@ class ContributorsPopup(tk.Toplevel):
     def saveData(self):
         try:
             _contributorsMatrix = self.contributorsTable.data
+            if np.all(_contributorsMatrix % 1 == 0):
+                _contributorsMatrix = _contributorsMatrix.astype(int)
         except Exception as e:
             mb.showerror(title="Could not save data", message=e, parent=self)
             return
