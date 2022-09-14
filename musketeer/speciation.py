@@ -1,5 +1,4 @@
 import numpy as np
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 
@@ -91,7 +90,7 @@ class SpeciationTable(Table):
         return int(number)
 
 
-class SpeciationPopup(tk.Toplevel):
+class SpeciationPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -127,6 +126,7 @@ class SpeciationPopup(tk.Toplevel):
         self.titration.freeNames = self.speciationTable.columnTitles
         self.titration.boundNames = self.speciationTable.rowTitles
 
+        self.saved = True
         self.destroy()
 
 
@@ -183,7 +183,7 @@ class SpeciationHG2(SpeciationCOGS):
 
 
 class SpeciationCustom(SpeciationCOGS):
-    popup = SpeciationPopup
+    Popup = SpeciationPopup
     popupAttributes = ("stoichiometries", "freeNames", "boundNames")
 
 

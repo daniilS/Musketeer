@@ -1,5 +1,4 @@
 import numpy as np
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 from tkinter import font
@@ -102,7 +101,7 @@ class CustomKsTable(Table):
             return float(number)
 
 
-class CustomKsPopup(tk.Toplevel):
+class CustomKsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -154,11 +153,12 @@ class CustomKsPopup(tk.Toplevel):
         self.titration.ksMatrix = ksMatrix
         self.titration.knownKs = knownKs
         self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
+        self.saved = True
         self.destroy()
 
 
 class GetKsCustom(moduleFrame.Strategy):
-    popup = CustomKsPopup
+    Popup = CustomKsPopup
 
     popupAttributes = ("ksConstants", "kVarsNames", "ksMatrix", "knownKs")
 
@@ -215,7 +215,7 @@ class KnownKsTable(Table):
             )
 
 
-class KnownKsPopup(tk.Toplevel):
+class KnownKsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -252,11 +252,12 @@ class KnownKsPopup(tk.Toplevel):
 
         self.titration.knownKs = knownKs
         self.titration.knownAlphas = knownAlphas
+        self.saved = True
         self.destroy()
 
 
 class GetKsKnown(moduleFrame.Strategy):
-    popup = KnownKsPopup
+    Popup = KnownKsPopup
     popupAttributes = ("knownKs", "knownAlphas")
 
     def __init__(self, titration):

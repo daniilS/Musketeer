@@ -93,6 +93,8 @@ class SaveLoadFrame(ttk.Frame):
                 if dropdownValue not in moduleFrame.dropdownOptions:
                     continue
                 moduleFrame.stringVar.set(dropdownValue)
+                moduleFrame.lastValue = dropdownValue
+
                 attributeName = moduleFrame.attributeName
                 Strategy = moduleFrame.dropdownOptions[dropdownValue]
                 strategy = Strategy(self.titration)

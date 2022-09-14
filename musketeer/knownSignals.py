@@ -1,5 +1,4 @@
 import numpy as np
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 
@@ -10,7 +9,7 @@ from .table import ButtonFrame
 from .style import padding
 
 
-class KnownSpectraPopup(tk.Toplevel):
+class KnownSpectraPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -59,6 +58,7 @@ class KnownSpectraPopup(tk.Toplevel):
             return
 
         self.titration.knownSpectra = data
+        self.saved = True
         self.destroy()
 
     def loadCSV(self):
@@ -66,7 +66,7 @@ class KnownSpectraPopup(tk.Toplevel):
 
 
 class GetKnownSpectra(moduleFrame.Strategy):
-    popup = KnownSpectraPopup
+    Popup = KnownSpectraPopup
     popupAttributes = ("knownSpectra",)
 
     def __init__(self, titration):

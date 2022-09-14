@@ -173,7 +173,7 @@ class VolumesTable(Table):
         return f"{convertedVolume:g}"  # strip trailing zeroes
 
 
-class VolumesPopup(tk.Toplevel):
+class VolumesPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -264,6 +264,7 @@ class VolumesPopup(tk.Toplevel):
             # present
             del self.titration.totalConcs
 
+        self.saved = True
         self.destroy()
 
 
@@ -357,7 +358,7 @@ class ConcsTable(Table):
         return f"{convertedConc:g}"  # strip trailing zeroes
 
 
-class ConcsPopup(tk.Toplevel):
+class ConcsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -394,11 +395,12 @@ class ConcsPopup(tk.Toplevel):
             self.titration.additionTitles, self.concsTable.rowTitles
         )
 
+        self.saved = True
         self.destroy()
 
 
 class GetTotalConcsFromVolumes(moduleFrame.Strategy):
-    popup = VolumesPopup
+    Popup = VolumesPopup
     popupAttributes = (
         "stockTitles",
         "unknownTotalConcsLinked",
@@ -444,7 +446,7 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
 
 
 class GetTotalConcs(moduleFrame.Strategy):
-    popup = ConcsPopup
+    Popup = ConcsPopup
     popupAttributes = (
         "concsUnit",
         "totalConcs",

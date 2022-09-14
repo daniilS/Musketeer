@@ -1,5 +1,4 @@
 import numpy as np
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 
@@ -49,7 +48,7 @@ class ContributorsTable(Table):
         return float(number)
 
 
-class ContributorsPopup(tk.Toplevel):
+class ContributorsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -99,11 +98,12 @@ class ContributorsPopup(tk.Toplevel):
         self.titration._contributorsMatrix = _contributorsMatrix
         self.titration._contributorNames = self.contributorsTable.rowTitles
 
+        self.saved = True
         self.destroy()
 
 
 class GetSignalVarsCustom(GetSignalVarsFromMatrix):
-    popup = ContributorsPopup
+    Popup = ContributorsPopup
     popupAttributes = ("_contributorsMatrix", "_contributorNames")
 
     def __init__(self, titration, *args, **kwargs):

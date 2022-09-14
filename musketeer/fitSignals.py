@@ -1,4 +1,3 @@
-import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 
@@ -78,7 +77,7 @@ class SignalConstraintsTable(Table):
         self.addRow(data=signalConstraints)
 
 
-class SignalConstraintsPopup(tk.Toplevel):
+class SignalConstraintsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -112,6 +111,7 @@ class SignalConstraintsPopup(tk.Toplevel):
             np.isnan(constraints), (-np.inf, np.inf), constraints
         )
 
+        self.saved = True
         self.destroy()
 
 
@@ -164,7 +164,7 @@ class FitSignalsNonnegative(FitSignalsConstrained):
 
 
 class FitSignalsCustom(FitSignalsConstrained):
-    popup = SignalConstraintsPopup
+    Popup = SignalConstraintsPopup
     popupAttributes = ("signalConstraints",)
 
 
