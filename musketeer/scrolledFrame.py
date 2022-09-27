@@ -328,6 +328,11 @@ class ScrolledFrame(ttk.Frame):
                     requested_width = min(self._max_width, requested_width)
                 self._canvas.config(width=requested_width)
 
+            canvas_height = self._canvas.winfo_height()
+            requested_height = self._interior.winfo_reqheight()
+            if requested_height < canvas_height:
+                self._canvas.config(height=requested_height)
+
     def _update_scroll_region(self, event):
         """Update the scroll region when the interior widget is resized."""
 

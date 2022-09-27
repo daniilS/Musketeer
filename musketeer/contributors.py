@@ -3,7 +3,7 @@ import tkinter.ttk as ttk
 import tkinter.messagebox as mb
 
 from . import moduleFrame
-from .table import Table, ButtonFrame
+from .table import Table, ButtonFrame, WrappedLabel
 from .scrolledFrame import ScrolledFrame
 from .style import padding
 
@@ -57,21 +57,9 @@ class ContributorsPopup(moduleFrame.Popup):
         height = int(self.master.winfo_height() * 0.4)
         self.frame = ttk.Frame(self, height=height)
         self.frame.pack(expand=True, fill="both")
-        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
-        scrolledFrame.pack(expand=True, fill="both")
 
-        self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
-
-        self.contributorsTable = ContributorsTable(self.innerFrame, titration)
-        self.contributorsTable.pack(expand=True, fill="both")
-
-        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
-        buttonFrame.pack(expand=False, fill="both", side="bottom")
-
-        self.update()
-        self.contributorsLabel = ttk.Label(
+        contributorsLabel = WrappedLabel(
             self.frame,
-            wraplength=self.innerFrame.winfo_reqwidth(),
             padding=padding * 2,
             text=(
                 "On each row, enter a state that contributes to the observed"
@@ -79,7 +67,16 @@ class ContributorsPopup(moduleFrame.Popup):
                 " species contains."
             ),
         )
-        self.contributorsLabel.pack(before=scrolledFrame, fill="both")
+        contributorsLabel.pack(expand=False, fill="both")
+
+        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
+        buttonFrame.pack(expand=False, fill="both", side="bottom")
+
+        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame.pack(expand=True, fill="both")
+        self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
+        self.contributorsTable = ContributorsTable(self.innerFrame, titration)
+        self.contributorsTable.pack(expand=True, fill="both")
 
     def reset(self):
         self.contributorsTable.destroy()

@@ -385,3 +385,18 @@ class ButtonFrame(ttk.Frame):
             self, text="Cancel", command=cancel, style="secondary.TButton"
         )
         self.cancelButton.pack(side="right", padx=padding)
+
+
+class WrappedLabel(ttk.Frame):
+    # A label that automatically wraps text to its allocated width, and only propagates
+    # its height.
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master)
+        self.pack_propagate(False)
+        self.label = ttk.Label(self, *args, **kwargs)
+        self.label.pack(expand=True, fill="both")
+        self.label.bind("<Configure>", self.callback)
+
+    def callback(self, event):
+        self.label.configure(wraplength=event.width - 4)
+        self.configure(height=self.label.winfo_reqheight())
