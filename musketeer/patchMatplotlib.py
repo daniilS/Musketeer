@@ -2,12 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import matplotlib
-from matplotlib.backends._backend_tk import (
-    NavigationToolbar2Tk,
-    FigureCanvasTk,
-    ToolTip,
-    cursord,
-)
+from matplotlib.backends._backend_tk import NavigationToolbar2Tk
 from matplotlib.backend_bases import _Mode
 
 matplotlib.use("TkAgg")
@@ -54,46 +49,7 @@ def _update_buttons_checked(self):
                 self._buttons[text].var.set(0)
 
 
-# make the tooltips appear further to the right to prevent them from
-# overlapping the buttons
-def showtip(self, text):
-    """Display text in tooltip window."""
-    self.text = text
-    if self.tipwindow or not self.text:
-        return
-    x, y, _, _ = self.widget.bbox("insert")
-    x = x + self.widget.winfo_rootx() + self.widget.winfo_width()
-    y = y + self.widget.winfo_rooty()
-    self.tipwindow = tw = tk.Toplevel(self.widget)
-    tw.wm_overrideredirect(1)
-    tw.wm_geometry("+%d+%d" % (x, y))
-    try:
-        # For Mac OS
-        tw.tk.call(
-            "::tk::unsupported::MacWindowStyle", "style", tw._w, "help", "noActivates"
-        )
-    except tk.TclError:
-        pass
-    label = tk.Label(
-        tw, text=self.text, justify=tk.LEFT, relief=tk.SOLID, borderwidth=1
-    )
-    label.pack(ipadx=1)
-
-
-def set_cursor(self, cursor):
-    try:
-        self._tkcanvas.configure(cursor=cursord[cursor])
-    except tk.TclError:
-        pass
-
-
 def applyPatch():
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
-
-    # implements mpl GH PR #22294
-    FigureCanvasTk.set_cursor = set_cursor
-
-    # implements mpl GH PR #22078
-    ToolTip.showtip = showtip

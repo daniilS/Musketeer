@@ -49,7 +49,7 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "scipy",
-        "matplotlib",
+        "matplotlib >= 3.5.2",
         "ttkbootstrap >=0.5.2, <1.0",
         "ttkwidgets",
         "tksheet",
