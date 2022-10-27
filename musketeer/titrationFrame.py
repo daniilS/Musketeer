@@ -794,6 +794,30 @@ class ResultsFrame(ttk.Frame):
             kTable.addRow(kVarName, [np.rint(k), alpha if not np.isnan(alpha) else ""])
         kTable.pack(side="top", pady=15)
 
+        concVarsCount = titration.getConcVarsCount()
+        if concVarsCount > 0:
+            concsTable = Table(
+                self,
+                0,
+                0,
+                [f"c ({titration.concsUnit})"],
+                rowOptions=["readonlyTitles"],
+                columnOptions=["readonlyTitles"],
+            )
+            concNames = self.titration.getConcVarsNames()
+            concs = (
+                10
+                ** titration.lastKs[
+                    titration.kVarsCount() : -titration.alphaVarsCount() or None
+                ]
+            )
+            for concName, conc in zip(concNames, concs):
+                concsTable.addRow(
+                    concName,
+                    [totalConcentrations.convertConc(conc, "M", titration.concsUnit)],
+                )
+            concsTable.pack(side="top", pady=15)
+
         sheet = tksheet.Sheet(
             self,
             data=list(np.around(titration.lastFitResult, 2)),

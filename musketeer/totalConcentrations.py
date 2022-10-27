@@ -21,6 +21,16 @@ prefixesDecimal = {
 prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 
+def convertConc(conc, fromUnit, toUnit):
+    if np.isnan(conc):
+        return ""
+    conc = Decimal(conc)
+    convertedConc = float(
+        conc * prefixesDecimal[fromUnit.strip("M")] / prefixesDecimal[toUnit.strip("M")]
+    )
+    return f"{convertedConc:g}"  # strip trailing zeroes
+
+
 class StockTable(Table):
     def __init__(self, master, titration):
         if hasattr(titration, "stockTitles"):
@@ -59,24 +69,11 @@ class StockTable(Table):
 
     def populate(self, stockConcs):
         for name, row in zip(self.titration.freeNames, stockConcs):
-            self.addRow(
-                name, [self.convertConc(conc, "M", self.unit.get()) for conc in row]
-            )
+            self.addRow(name, [convertConc(conc, "M", self.unit.get()) for conc in row])
 
     def populateDefault(self):
         for name in self.titration.freeNames:
             self.addRow(name)
-
-    def convertConc(self, conc, fromUnit, toUnit):
-        if np.isnan(conc):
-            return ""
-        conc = Decimal(conc)
-        convertedConc = float(
-            conc
-            * prefixesDecimal[fromUnit.strip("M")]
-            / prefixesDecimal[toUnit.strip("M")]
-        )
-        return f"{convertedConc:g}"  # strip trailing zeroes
 
 
 class VolumesTable(Table):
@@ -300,9 +297,7 @@ class ConcsTable(Table):
 
     def populate(self, concs):
         for name, row in zip(self.titration.processedAdditionTitles, concs):
-            self.addRow(
-                name, [self.convertConc(conc, "M", self.unit.get()) for conc in row]
-            )
+            self.addRow(name, [convertConc(conc, "M", self.unit.get()) for conc in row])
 
     def populateDefault(self):
         for name in self.titration.additionTitles:
@@ -346,16 +341,7 @@ class ConcsTable(Table):
         if not searchResult:
             return None
         conc, prefix = searchResult.group(1, 2)
-        return self.convertConc(conc, prefix, toUnit)
-
-    def convertConc(self, conc, fromUnit, toUnit):
-        conc = Decimal(conc)
-        convertedConc = float(
-            conc
-            * prefixesDecimal[fromUnit.strip("M")]
-            / prefixesDecimal[toUnit.strip("M")]
-        )
-        return f"{convertedConc:g}"  # strip trailing zeroes
+        return convertConc(conc, prefix, toUnit)
 
 
 class ConcsPopup(moduleFrame.Popup):
@@ -413,6 +399,7 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
     def __init__(self, titration):
         self.titration = titration
         titration.getConcVarsCount = self.getConcVarsCount
+        titration.getConcVarsNames = self.getConcVarsNames
 
     def __call__(self, totalConcVars):
         titration = self.titration
@@ -436,6 +423,24 @@ class GetTotalConcsFromVolumes(moduleFrame.Strategy):
     @property
     def rowsWithBlanks(self):
         return np.isnan(np.sum(self.titration.stockConcs, 1))
+
+    def getConcVarsNames(self):
+        if self.titration.unknownTotalConcsLinked:
+            # return the number of rows (= species) with blank cells
+            concVarsNames = self.titration.freeNames[self.rowsWithBlanks]
+            return np.array([f"[{name}]" for name in concVarsNames])
+        else:
+            concVarsNames = []
+            for freeName, concs in zip(
+                self.titration.freeNames, self.titration.stockConcs
+            ):
+                concVarsNames.extend(
+                    [
+                        f"[{freeName}] in {stock}"
+                        for stock in self.titration.stockTitles[np.isnan(concs)]
+                    ]
+                )
+            return np.array(concVarsNames)
 
     def getConcVarsCount(self):
         if self.titration.unknownTotalConcsLinked:
