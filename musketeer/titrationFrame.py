@@ -244,7 +244,10 @@ class SaveLoadFrame(ttk.Frame):
         rowTitles = np.atleast_2d(self.titration.processedAdditionTitles).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        np.savetxt(fileName, output, fmt="%s", delimiter=",")
+        try:
+            np.savetxt(fileName, output, fmt="%s", delimiter=",")
+        except Exception as e:
+            mb.showerror(title="Could not save file", message=e, parent=self)
 
 
 class TitrationFrame(ttk.Frame):
@@ -510,6 +513,17 @@ class FittedFrame(ttk.Frame):
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
+        separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
+        separator.pack(pady=padding, fill="x")
+
+        self.saveCurvesButton = ttk.Button(
+            self.toggleButtonsFrame,
+            text="Save fitted curves",
+            command=self.saveCurves,
+            style="success.Outline.TButton",
+        )
+        self.saveCurvesButton.pack(pady=padding, fill="x")
+
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
@@ -530,6 +544,23 @@ class FittedFrame(ttk.Frame):
     def toggleSmooth(self):
         self.smooth = not self.smooth
         self.plot()
+
+    def saveCurves(self):
+        initialfile = os.path.splitext(self.titration.title)[0] + "_fitted_curves"
+        fileName = fd.asksaveasfilename(
+            title="Save fitted curves",
+            initialfile=initialfile,
+            filetypes=[("CSV file", "*.csv")],
+            defaultextension=".csv",
+        )
+        data = self.titration.lastFittedCurves
+        rowTitles = np.atleast_2d(self.titration.processedAdditionTitles).T
+        columnTitles = np.append("", self.titration.processedSignalTitles)
+        output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
+        try:
+            np.savetxt(fileName, output, fmt="%s", delimiter=",")
+        except Exception as e:
+            mb.showerror(title="Could not save file", message=e, parent=self)
 
     def plot(self):
         self.ax.clear()
@@ -845,4 +876,7 @@ class ResultsFrame(ttk.Frame):
         rowTitles = np.atleast_2d(self.titration.contributorNames()).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        np.savetxt(fileName, output, fmt="%s", delimiter=",")
+        try:
+            np.savetxt(fileName, output, fmt="%s", delimiter=",")
+        except Exception as e:
+            mb.showerror(title="Could not save file", message=e, parent=self)
