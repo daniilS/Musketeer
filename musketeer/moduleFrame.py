@@ -24,6 +24,7 @@ class Popup(tk.Toplevel):
             # the popup unresponsive to mouse events.
             # TODO: find better place for callback that avoids this issue
             self.grab_set()
+        self.transient(self.master)
         self.saved = False
         self.wait_window()
         return self.saved
@@ -66,7 +67,9 @@ class ModuleFrame(ttk.LabelFrame):
         SelectedStrategy = self.dropdownOptions[value]
         selectedStrategy = SelectedStrategy(self.titration)
         if selectedStrategy.Popup is not None:
-            popup = selectedStrategy.Popup(self.titration)
+            root = self.winfo_toplevel()
+            popup = selectedStrategy.Popup(self.titration, master=root)
+            popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
             if not popup.show():
                 # Returns False if the new options shouldn't be saved, so restore the
                 # previous value.
