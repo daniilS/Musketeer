@@ -5,6 +5,8 @@ import matplotlib
 from matplotlib.backends._backend_tk import NavigationToolbar2Tk
 from matplotlib.backend_bases import _Mode
 
+from tksheet import _tksheet, _tksheet_main_table, _tksheet_column_headers
+
 matplotlib.use("TkAgg")
 
 
@@ -49,7 +51,16 @@ def _update_buttons_checked(self):
                 self._buttons[text].var.set(0)
 
 
+def nop(self):
+    pass
+
+
 def applyPatch():
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
+
+    # remove calls to update() from tksheet
+    _tksheet.Sheet.update = nop
+    _tksheet_main_table.MainTable.update = nop
+    _tksheet_column_headers.ColumnHeaders.update = nop
