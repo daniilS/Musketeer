@@ -96,7 +96,6 @@ class TitrationsNotebook(InteractiveNotebook):
     def createQuickStartMenu(self):
         self.quickStartFrame = ttk.Frame(self)
         self.quickStartFrame.pack(expand=True, fill="none")
-        print(font.nametofont("TkTextFont")["size"])
 
         self.quickStartFont = font.nametofont("TkTextFont").copy()
         self.quickStartFont["size"] = round(self.quickStartFont["size"] * 1.33)
