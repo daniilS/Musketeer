@@ -2,8 +2,8 @@ import os
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog as fd
-import packaging.version
 from copy import deepcopy
+from pathlib import Path, PurePath
 
 import numpy as np
 import tksheet
@@ -15,6 +15,7 @@ from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvas
 from matplotlib.figure import Figure
 
 from . import __version__
+from . import editData
 from . import speciation
 from . import equilibriumConstants
 from . import totalConcentrations
@@ -76,7 +77,7 @@ class SaveLoadFrame(ttk.Frame):
     def loadOptions(self):
         fileName = fd.askopenfilename(
             title="Load options from file",
-            filetypes=[("NumPy archive", "*.npz"), ("all files", "*.*")],
+            filetypes=[("NumPy archive", "*.npz"), ("All files", "*.*")],
         )
         if fileName == "":
             return
@@ -263,6 +264,14 @@ class TitrationFrame(ttk.Frame):
             ttk.Frame, stretch=True, padding=(0, 0, padding, 0)
         )
 
+        editDataButton = ttk.Button(
+            self.options,
+            text="Edit data",
+            command=self.editData,
+            style="Outline.TButton",
+        )
+        editDataButton.grid(sticky="nesw", pady=padding)
+
         self.moduleFrames = {}
         for mod in titrationModules:
             moduleFrame = mod.ModuleFrame(
@@ -306,6 +315,12 @@ class TitrationFrame(ttk.Frame):
             mb.showerror(title="Failed to fit data", message=e, parent=self)
             return
 
+    def editData(self):
+        root = self.winfo_toplevel()
+        popup = editData.EditDataPopup(self.titration, master=root)
+        popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
+        popup.show()
+
     def fitData(self):
         self.titration.fitData()
         self.numFits += 1
@@ -314,6 +329,7 @@ class TitrationFrame(ttk.Frame):
 
         # TODO: link titrationCopy to options frame as well
         titrationCopy = deepcopy(self.titration)
+        nb.titration = titrationCopy
 
         if self.titration.continuous:
             continuousFittedFrame = ContinuousFittedFrame(nb, titrationCopy)
@@ -332,6 +348,56 @@ class TitrationFrame(ttk.Frame):
 
         self.notebook.select(str(nb))
         nb.select(str(discreteFittedFrame))
+
+    def saveFile(self, saveAs=False):
+        options = {}
+        options["version"] = __version__
+
+        fits = np.array([])
+
+        for tkpath in self.notebook.tabs():
+            tab = self.notebook.nametowidget(tkpath)
+            if not isinstance(tab, ttk.Notebook):
+                continue
+            name = self.notebook.tab(tkpath)["text"]
+            fits = np.append(fits, name)
+
+            moduleNames = np.array([])
+            dropdownValues = np.array([])
+
+            for name, moduleFrame in tab.moduleFrames.items():
+                dropdownValue = moduleFrame.stringVar.get()
+                if dropdownValue == "":
+                    continue
+                moduleNames = np.append(moduleNames, name)
+                dropdownValues = np.append(dropdownValues, dropdownValue)
+
+                Strategy = moduleFrame.dropdownOptions[dropdownValue]
+                for attr in Strategy.popupAttributes:
+                    options[f"{name}.{attr}"] = getattr(self.titration, attr)
+
+            options[f"{name}.dropdownValues"] = dropdownValues
+            options[f"{name}.lastKs"] = tab.titration.lastKs
+
+        if self.titration.filePath is None:
+            filePath = fd.asksaveasfilename(
+                title="Save as",
+                initialfile=f"{PurePath(self.titration.title).stem}.fit",
+                filetypes=[("Musketeer file", "*.fit")],
+                defaultextension=".fit",
+            )
+        elif saveAs:
+            filePath = fd.asksaveasfilename(
+                title="Save as",
+                initialdir=PurePath(self.titration.filePath).parent,
+                initialfile=PurePath(self.titration.filePath).name,
+                filetypes=[("Musketeer file", "*.fit")],
+                defaultextension=".fit",
+            )
+
+        if filePath != "":
+            self.titration.filePath = filePath
+            np.savez(self.titration.filePath, **options)
 
 
 class InputSpectraFrame(ttk.Frame):

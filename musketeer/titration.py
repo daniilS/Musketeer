@@ -4,11 +4,16 @@ from scipy.signal import find_peaks
 
 
 class Titration:
-    def __init__(self):
-        self.title = "Titration"
+    def __init__(self, title="Titration", filePath=None):
+        self.title = title
+        self.filePath = filePath
         # identical to [True, True, True, ..., True]
         self.rowFilter = slice(None)
         self.columnFilter = slice(None)
+
+        self.hasSignalTitles = False
+        self.hasAdditionTitles = False
+        self.transposeData = False
 
     @property
     def freeCount(self):
@@ -40,14 +45,26 @@ class Titration:
 
     @property
     def processedSignalTitles(self):
-        return self.signalTitles[self.columnFilter]
+        if self.hasSignalTitles:
+            return self.signalTitles[self.columnFilter]
+        else:
+            return np.array(
+                ["Signal " + str(i + 1) for i in range(self.processedData.shape[1])]
+            )
 
     @property
     def signalTitles(self):
-        return self._signalTitles
+        if self.hasSignalTitles:
+            return self._signalTitles
+        else:
+            return np.array(
+                ["Signal " + str(i + 1) for i in range(self.rawData.shape[1])]
+            )
 
     @signalTitles.setter
     def signalTitles(self, titles):
+        # TODO: replace flag with just setting titles to None
+        self.hasSignalTitles = True
         try:
             _signalTitles = np.array(titles, dtype=float)
         except ValueError:
@@ -78,6 +95,18 @@ class Titration:
         self._signalTitles = np.round(_signalTitles, self.signalTitlesDecimals)
 
     @property
+    def signalTitlesStrings(self):
+        if self.signalTitles.dtype == float:
+            return np.array(
+                [
+                    f"{title:.{self.signalTitlesDecimals}f}"
+                    for title in self.signalTitles
+                ]
+            )
+        else:
+            return self.signalTitles.astype(str)
+
+    @property
     def processedSignalTitlesStrings(self):
         if self.processedSignalTitles.dtype == float:
             return np.array(
@@ -91,7 +120,26 @@ class Titration:
 
     @property
     def processedAdditionTitles(self):
-        return self.additionTitles[self.rowFilter]
+        if self.hasAdditionTitles:
+            return self.additionTitles[self.rowFilter]
+        else:
+            return np.array(
+                ["Addition " + str(i + 1) for i in range(self.processedData.shape[0])]
+            )
+
+    @property
+    def additionTitles(self):
+        if self.hasAdditionTitles:
+            return self._additionTitles
+        else:
+            return np.array(
+                ["Addition " + str(i + 1) for i in range(self.rawData.shape[0])]
+            )
+
+    @additionTitles.setter
+    def additionTitles(self, additionTitles):
+        self.hasAdditionTitles = True
+        self._additionTitles = additionTitles
 
     def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
         # get the total movement for each signal

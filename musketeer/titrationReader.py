@@ -1,13 +1,10 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import tkinter.filedialog as fd
-from collections import namedtuple
 
 import csv
 import numpy as np
 from numpy import ma
 import os
-import re
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
 from matplotlib.backend_bases import _Mode
 import matplotlib as mpl
@@ -15,17 +12,7 @@ from matplotlib.figure import Figure
 
 from .titration import Titration
 from .style import padding
-
-Params = namedtuple(
-    "Params",
-    ("yQuantity", "yUnit", "xQuantity", "xUnit"),
-    defaults=[""] * 4,
-)
-
-predefinedParams = {
-    "UV-Vis": Params("Abs", "AU", "λ", "nm"),
-    "NMR": Params("δ", "ppm"),
-}
+from .editData import predefinedParams
 
 
 def fillPredefinedParams(titration, params):
@@ -37,72 +24,6 @@ def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
-
-
-def getFileReader():
-    fileType = askFileType()
-    if fileType == "":
-        return None
-    return fileReaders[fileType]
-
-
-def askFileType():
-    fileType = tk.StringVar()
-    askFileTypeDialog(fileType)
-    return fileType.get()
-
-
-def askFileTypeDialog(stringVar):
-    popup = tk.Toplevel()
-    popup.title("Select input file type")
-    popup.grab_set()
-
-    frame = ttk.Frame(popup, padding=padding)
-    frame.pack(expand=True, fill="both")
-
-    label = ttk.Label(frame, text="Select input file type:")
-    label.pack()
-
-    fileTypes = fileReaders.keys()
-    optionMenu = ttk.OptionMenu(
-        frame, stringVar, None, *fileTypes, style="Outline.TMenubutton"
-    )
-    optionMenu.configure(width=max([len(s) for s in fileTypes]) + 1)
-    optionMenu.pack(fill="x", pady=padding)
-
-    button = ttk.Button(frame, text="Select", command=popup.destroy)
-    button.pack()
-    popup.wait_window(popup)
-
-
-def getFilePath():
-    # On Windows, askopenfilename can hang for a while after the file is
-    # selected. This seems to only happen if the script has been run before,
-    # and disabling all internet connections seems to fix it. ???
-    filePath = fd.askopenfilename(
-        title="Select input file",
-        filetypes=[("csv files", "*.csv"), ("all files", "*.*")],
-    )
-    return filePath
-
-
-# gets the volume in litres from string
-def getVolumeFromString(string):
-    searchResult = re.search(r"([0-9.]+) ?([nuμm]?)[lL]", string)
-    if not searchResult:
-        return None
-    volume, prefix = searchResult.group(1, 2)
-    volume = float(volume)
-    if not prefix:
-        return volume
-    elif prefix == "m":
-        return volume / 1e3
-    elif prefix == "u" or prefix == "μ":
-        return volume / 1e6
-    elif prefix == "n":
-        return volume / 1e9
-    else:
-        return None
 
 
 def readUV(filePath):
@@ -136,133 +57,6 @@ def readUV(filePath):
     # transpose data so that the column is the wavelength
     titration.rawData = np.array(absorbances, dtype=float).T
 
-    return [titration]
-
-
-class CSVPopup(tk.Toplevel):
-    def __init__(self, *args, **kwargs):
-        self.aborted = True
-        super().__init__(*args, **kwargs)
-        frame = ttk.Frame(self, padding=15)
-        frame.pack(expand=True, fill="both")
-
-        self.additionTitlesCheckbutton = ttk.Checkbutton(frame, text="Addition titles")
-        self.signalTitlesCheckbutton = ttk.Checkbutton(frame, text="Signal titles")
-        self.additionsRowsRadiobutton = ttk.Radiobutton(
-            frame, value=0, text="Rows are additions, columns are signals"
-        )
-        self.additionsColumnsRadiobutton = ttk.Radiobutton(
-            frame, value=1, text="Rows are signals, columns are additions"
-        )
-        self.continueButton = ttk.Button(
-            frame, text="Continue", command=self.continueCommand
-        )
-
-        self.additionTitlesCheckbutton.pack(pady=2.5)
-        self.signalTitlesCheckbutton.pack(pady=2.5)
-        self.additionsRowsRadiobutton.pack(pady=2.5)
-        self.additionsColumnsRadiobutton.pack(pady=2.5)
-        self.continueButton.pack(pady=2.5, side="bottom")
-
-        self.additionTitlesCheckbutton.invoke()
-        self.signalTitlesCheckbutton.invoke()
-        self.additionsRowsRadiobutton.invoke()
-
-        optionMenuVar = tk.StringVar(self)
-        optionMenu = ttk.OptionMenu(
-            frame,
-            optionMenuVar,
-            None,
-            *predefinedParams.keys(),
-            style="Outline.TMenubutton",
-            command=self.setParams
-        )
-        optionMenu.configure(width=max([len(s) for s in predefinedParams]) + 1)
-        optionMenu.pack(pady=2.5)
-
-        paramsFrame = ttk.Frame(frame)
-        paramsFrame.pack(expand=True, fill="both", pady=2.5)
-
-        self.yQuantityLabel = ttk.Label(paramsFrame, text="Measured quantity:")
-        self.yQuantityLabel.grid(row=0, column=0, sticky="w")
-        self.yUnitLabel = ttk.Label(paramsFrame, text="Unit:")
-        self.yUnitLabel.grid(row=0, column=1, sticky="w")
-        self.yQuantity = tk.StringVar(self)
-        self.yUnit = tk.StringVar(self)
-        self.yQuantityWidget = ttk.Entry(paramsFrame, textvariable=self.yQuantity)
-        self.yQuantityWidget.grid(row=1, column=0, sticky="w")
-        self.yUnitWidget = ttk.Entry(paramsFrame, width=10, textvariable=self.yUnit)
-        self.yUnitWidget.grid(row=1, column=1, sticky="w")
-
-        self.xQuantityLabel = ttk.Label(
-            paramsFrame, text="Continuous signals x-axis quantity:"
-        )
-        self.xQuantityLabel.grid(row=2, column=0, sticky="w")
-        self.xUnitLabel = ttk.Label(paramsFrame, text="Unit:")
-        self.xUnitLabel.grid(row=2, column=1, sticky="w")
-        self.xQuantity = tk.StringVar(self)
-        self.xUnit = tk.StringVar(self)
-        self.xQuantityWidget = ttk.Entry(paramsFrame, textvariable=self.xQuantity)
-        self.xQuantityWidget.grid(row=3, column=0, sticky="w")
-        self.xUnitWidget = ttk.Entry(paramsFrame, width=10, textvariable=self.xUnit)
-        self.xUnitWidget.grid(row=3, column=1, sticky="w")
-
-    def setParams(self, selection):
-        params = predefinedParams[selection]
-        for k, v in params._asdict().items():
-            if v is not None:
-                getattr(self, k).set(v)
-
-    def continueCommand(self):
-        self.aborted = False
-        self.hasSignalTitles = self.signalTitlesCheckbutton.instate(["selected"])
-        self.hasAdditionTitles = self.additionTitlesCheckbutton.instate(["selected"])
-        self.needTranspose = self.additionsColumnsRadiobutton.instate(["selected"])
-        self.destroy()
-
-
-def readCSV(filePath):
-    popup = CSVPopup()
-    popup.wait_window(popup)
-    if popup.aborted:
-        return []
-
-    titration = Titration()
-    titration.title = os.path.basename(filePath)
-    for param in Params._fields:
-        setattr(titration, param, getattr(popup, param).get())
-
-    with open(filePath, "r", newline="") as inFile:
-        data = np.loadtxt(inFile, dtype=str, delimiter=",", ndmin=2)
-        if popup.needTranspose:
-            data = data.T
-        if popup.hasAdditionTitles and popup.hasSignalTitles:
-            titration.additionTitles = data[1:, 0]
-            titration.signalTitles = data[0, 1:]
-            rawData = data[1:, 1:]
-        elif popup.hasAdditionTitles:
-            titration.additionTitles = data[:, 0]
-            titration.signalTitles = np.array(
-                ["Signal " + str(i + 1) for i in range(data.shape[1] - 1)]
-            )
-            rawData = data[:, 1:]
-        elif popup.hasSignalTitles:
-            titration.additionTitles = np.array(
-                ["Addition " + str(i + 1) for i in range(data.shape[0] - 1)]
-            )
-            titration.signalTitles = data[0, :]
-            rawData = data[1:, :]
-        else:
-            titration.additionTitles = np.array(
-                ["Addition " + str(i + 1) for i in range(data.shape[0])]
-            )
-            titration.signalTitles = np.array(
-                ["Signal " + str(i + 1) for i in range(data.shape[1])]
-            )
-            rawData = data
-
-    rawData[rawData == ""] = "nan"
-    titration.rawData = ma.masked_invalid(rawData.astype(float))
     return [titration]
 
 
@@ -472,8 +266,14 @@ def readNMR(filePath):
         return [titration]
 
 
-fileReaders = {
-    "UV-Vis csv file": readUV,
-    "NMR peak list": readNMR,
-    "Universal csv file": readCSV,
-}
+def readMusketeer(filePath):
+    pass
+
+
+fileReaders = np.array(
+    [
+        ["Musketeer file", "*.fit", readMusketeer],
+        ["UV-Vis csv file", "*.csv", readUV],
+        ["NMR peak list", "*.csv", readNMR],
+    ]
+)
