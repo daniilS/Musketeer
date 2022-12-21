@@ -25,14 +25,14 @@ class Table(ttk.Frame):
         rowOptions=[],
         columnOptions=[],
         boldTitles=False,
-        callback="",
+        callback=None,
         **kwargs,
     ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
         self.allowBlanks = allowBlanks
         super().__init__(master, padding=padding, **kwargs)
-        if callback != "":
+        if callback is not None:
             callback = self.register(callback)
         self.callback = callback
 
@@ -85,7 +85,7 @@ class Table(ttk.Frame):
 
         entry.stringVar = tk.StringVar(entry)
         entry.configure(textvariable=entry.stringVar)
-        if self.callback != "":
+        if self.callback is not None:
             # Callback is registered once for the entire table, but StringVar.trace_add
             # only supports python functions.
             self.tk.eval(
