@@ -582,11 +582,15 @@ class FittedFrame(ttk.Frame):
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, fittedCurve, label=name)
                 continue
-            spl = make_interp_spline(
-                xConcs[filter], fittedCurve[filter], bc_type="natural"
-            )
-            smoothY = spl(smoothX)
-            self.ax.plot(smoothX, smoothY, label=name)
+            try:
+                spl = make_interp_spline(
+                    xConcs[filter], fittedCurve[filter], bc_type="natural"
+                )
+                smoothY = spl(smoothX)
+                self.ax.plot(smoothX, smoothY, label=name)
+            except ValueError:
+                # spline interpolation failed
+                self.ax.plot(xConcs, fittedCurve, label=name)
 
         if self.logScale:
             self.ax.set_xscale("log")
@@ -746,9 +750,15 @@ class SpeciationFrame(ttk.Frame):
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, curve, label=name)
                 continue
-            spl = make_interp_spline(xConcs[filter], curve[filter], bc_type="natural")
-            smoothY = spl(smoothX)
-            self.ax.plot(smoothX, smoothY, label=name)
+            try:
+                spl = make_interp_spline(
+                    xConcs[filter], curve[filter], bc_type="natural"
+                )
+                smoothY = spl(smoothX)
+                self.ax.plot(smoothX, smoothY, label=name)
+            except ValueError:
+                # spline interpolation failed
+                self.ax.plot(xConcs, curve, label=name)
 
         if self.logScale:
             self.ax.set_xscale("log")
