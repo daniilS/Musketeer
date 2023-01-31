@@ -174,6 +174,7 @@ class Titration:
         self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
 
         signalVars = self.contributors.run(freeConcs, boundConcs)
+        self.lastSignalVars = signalVars
 
         proportionalSignalVars = self.proportionality.run(signalVars, totalConcs)
 

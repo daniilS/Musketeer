@@ -344,25 +344,12 @@ class ContinuousFittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.populate()
         self.plot()
 
-    def plot(self):
-        titration = self.titration
+    def populate(self):
         self.fig = Figure()
         self.ax = self.fig.add_subplot()
-
-        spectra = titration.lastFittedSpectra
-        names = titration.contributors.contributorNames
-        wavelengths = titration.processedSignalTitles
-        for spectrum, name in zip(spectra, names):
-            self.ax.plot(wavelengths, spectrum, label=name)
-
-        self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
-        self.ax.set_ylabel(f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹")
-        self.ax.legend()
-
-        self.fig.tight_layout()
-
         canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().grid(row=1, column=0, sticky="")
@@ -371,10 +358,80 @@ class ContinuousFittedFrame(ttk.Frame):
         toolbar.update()
         toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
 
+        self.optionsFrame = ttk.Frame(self)
+        self.optionsFrame.grid(row=1, column=1, sticky="")
+        self.speciesLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="Show:"
+        )
+        self.speciesLabel.pack(pady=padding, fill="x")
+
+        self.deconvolutionVar = tk.StringVar()
+        deconvolutionOptions = (
+            "Normalised contributions",
+            "Deconvolution at start",
+            "Deconvolution at endpoint",
+        )
+        self.deconvolutionDropdown = ttk.OptionMenu(
+            self.optionsFrame,
+            self.deconvolutionVar,
+            deconvolutionOptions[0],
+            command=lambda *args: self.plot(),
+            *deconvolutionOptions,
+            style="primary.Outline.TMenubutton",
+        )
+        self.deconvolutionDropdown.pack()
+
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
         self.grid_anchor("center")
+
+    def plot(self):
+        self.ax.clear()
+
+        titration = self.titration
+        spectra = titration.lastFittedSpectra
+        names = titration.contributors.contributorNames
+        wavelengths = titration.processedSignalTitles
+
+        deconvolution = self.deconvolutionVar.get()
+        if deconvolution == "Normalised contributions":
+            for spectrum, name in zip(spectra, names):
+                self.ax.plot(wavelengths, spectrum, label=name)
+            self.ax.set_ylabel(f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹")
+        else:
+            if deconvolution == "Deconvolution at start":
+                deconvolutionPoint = 0
+            elif deconvolution == "Deconvolution at endpoint":
+                deconvolutionPoint = -1
+
+            self.ax.plot(
+                wavelengths,
+                titration.processedData[deconvolutionPoint],
+                color="0.5",
+                label="Observed",
+            )
+            self.ax.plot(
+                wavelengths,
+                titration.lastFittedCurves[deconvolutionPoint],
+                color="0",
+                linestyle="--",
+                label="Fitted",
+            )
+            for spectrum, name in zip(
+                spectra * titration.lastSignalVars[[deconvolutionPoint], :].T, names
+            ):
+                self.ax.plot(
+                    wavelengths,
+                    spectrum,
+                    label=name,
+                )
+            self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
+
+        self.ax.legend()
+        self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+
+        self.fig.tight_layout()
 
 
 class FittedFrame(ttk.Frame):
