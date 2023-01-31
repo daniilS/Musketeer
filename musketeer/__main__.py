@@ -1,19 +1,19 @@
+import ctypes
+import importlib.resources as res
 import tkinter as tk
-import tkinter.ttk as ttk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
+import tkinter.ttk as ttk
 from tkinter import font
-import ctypes
 
+import numpy as np
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook
-import importlib.resources as res
-import numpy as np
 
-from . import titrationReader, patchMatplotlib, windowsHighDpiPatch
+from . import patchMatplotlib, titrationReader, windowsHighDpiPatch
+from .style import padding
 from .titration import Titration
 from .titrationFrame import TitrationFrame
-from .style import padding
 
 patchMatplotlib.applyPatch()
 try:

@@ -60,10 +60,9 @@ class ModuleFrame(ttk.LabelFrame):
     attributeName = ""
     setDefault = True
 
-    def __init__(self, parent, titration, updatePlots, *args, **kwargs):
+    def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, text=self.frameLabel, borderwidth=5, *args, **kwargs)
         self.titration = titration
-        self.updatePlots = updatePlots
 
         self.stringVar = tk.StringVar()
 
@@ -85,6 +84,19 @@ class ModuleFrame(ttk.LabelFrame):
         if self.setDefault:
             self.callback(self.lastValue)
         optionMenu.pack(fill="x", pady=(5, 0))
+
+    def update(self, titration):
+        self.titration = titration
+        if not hasattr(self.titration, self.attributeName):
+            self.stringVar.set("")
+            return
+        self.stringVar.set(
+            list(self.dropdownOptions.keys())[
+                list(self.dropdownOptions.values()).index(
+                    type(getattr(self.titration, self.attributeName))
+                )
+            ]
+        )
 
     def callback(self, value):
         SelectedStrategy = self.dropdownOptions[value]
@@ -109,5 +121,4 @@ class ModuleFrame(ttk.LabelFrame):
                     f" implementing the required attribute {attr}"
                 )
         setattr(self.titration, self.attributeName, selectedStrategy)
-        self.updatePlots()
         self.lastValue = value

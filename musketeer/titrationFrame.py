@@ -29,6 +29,7 @@ from . import (
 from .scrolledFrame import ScrolledFrame
 from .style import padding
 from .table import Table
+from .titration import titrationAttributes
 
 warningIcon = "::tk::icons::warning"
 
@@ -44,220 +45,11 @@ titrationModules = [
 ]
 
 
-class SaveLoadFrame(ttk.Frame):
-    def __init__(self, parent, titration, moduleFrames, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.titration = titration
-        self.moduleFrames = moduleFrames
-
-        loadOptionsButton = ttk.Button(
-            self,
-            text="Load Options",
-            style="primary.Outline.TButton",
-            command=self.loadOptions,
-        )
-        loadOptionsButton.grid(sticky="nesw", pady=(padding, padding / 2))
-
-        saveOptionsButton = ttk.Button(
-            self,
-            text="Save Options",
-            style="success.Outline.TButton",
-            command=self.saveOptions,
-        )
-        saveOptionsButton.grid(sticky="nesw", pady=padding / 2)
-
-        saveDataButton = ttk.Button(
-            self,
-            text="Save Processed Data",
-            style="success.Outline.TButton",
-            command=self.saveData,
-        )
-        saveDataButton.grid(sticky="nesw", pady=padding / 2)
-
-        self.columnconfigure(0, weight=1)
-
-    def loadOptions(self):
-        fileName = fd.askopenfilename(
-            title="Load options from file",
-            filetypes=[("NumPy archive", "*.npz"), ("All files", "*.*")],
-        )
-        if fileName == "":
-            return
-
-        with np.load(fileName) as options:
-            # TODO: check file version against current
-            # TODO: show popup to choose which modules should be loaded
-            for moduleName, dropdownValue in zip(
-                options["moduleNames"], options["dropdownValues"]
-            ):
-                if moduleName not in self.moduleFrames:
-                    continue
-                moduleFrame = self.moduleFrames[moduleName]
-                if dropdownValue not in moduleFrame.dropdownOptions:
-                    continue
-                moduleFrame.stringVar.set(dropdownValue)
-                moduleFrame.lastValue = dropdownValue
-
-                attributeName = moduleFrame.attributeName
-                Strategy = moduleFrame.dropdownOptions[dropdownValue]
-                strategy = Strategy(self.titration)
-                setattr(self.titration, attributeName, strategy)
-                for attr in strategy.popupAttributes:
-                    if attr not in options:
-                        continue
-                    attrValue = options[attr]
-                    if attrValue.shape == ():
-                        attrValue = attrValue.item()
-                    setattr(self.titration, attr, attrValue)
-
-    def saveOptions(self):
-        # TODO: handle errors
-        popup = tk.Toplevel()
-        popup.title("Choose which options to save")
-        popupFrame = ttk.Frame(popup, padding=15)
-        popupFrame.pack(expand=True, fill="both")
-
-        label = ttk.Label(popupFrame, text="Choose which options to save:")
-        label.pack(pady=(5, 15))
-
-        popup.checkbuttons = {}
-        popup.saved = False
-
-        for name, moduleFrame in self.moduleFrames.items():
-            checkbutton = ttk.Checkbutton(popupFrame, text=moduleFrame.frameLabel)
-            if moduleFrame.stringVar.get() == "":
-                checkbutton.state(["disabled"])
-            else:
-                checkbutton.state(["selected"])
-            checkbutton.pack(anchor="w", pady=2.5)
-            popup.checkbuttons[name] = checkbutton
-
-        buttonsFrame = ttk.Frame(popupFrame)
-        buttonsFrame.pack(expand=True, fill="x")
-
-        cancelButton = ttk.Button(
-            buttonsFrame,
-            text="Cancel",
-            style="secondary.TButton",
-            command=popup.destroy,
-        )
-        cancelButton.grid(row=0, column=0, pady=5)
-
-        saveButton = ttk.Button(
-            buttonsFrame,
-            text="Save",
-            style="success.TButton",
-            command=lambda: self.getSelectedOptions(popup),
-        )
-        saveButton.grid(row=0, column=1, pady=5)
-
-        for col in range(2):
-            buttonsFrame.columnconfigure(col, weight=1)
-
-        # Only create the warning label now, so that we know what width to make it
-        if (
-            (
-                isinstance(self.titration.rowFilter, slice)
-                and self.titration.rowFilter != slice(None)
-            )
-            or (
-                isinstance(self.titration.rowFilter, np.ndarray)
-                and not self.titration.rowFilter.all()
-            )
-            or (
-                type(self.titration.columnFilter) == slice
-                and self.titration.columnFilter != slice(None)
-            )
-            or (
-                isinstance(self.titration.columnFilter, np.ndarray)
-                and not self.titration.columnFilter.all()
-            )
-        ):
-            # row or column filter is active
-            warningLabel = ttk.Label(
-                popupFrame,
-                text=(
-                    "The input data has been modified, so it may need to be saved as a"
-                    " universal CSV file for some options to be applied to it."
-                ),
-            )
-            if warningIcon in popup.image_names():
-                warningLabel.configure(
-                    image=warningIcon,
-                    compound="left",
-                    wraplength=popup.winfo_reqwidth()
-                    - popup.tk.call("image", "width", warningIcon),
-                )
-            else:
-                warningLabel.configure(wraplength=popup.winfo_reqwidth())
-            warningLabel.pack(before=label)
-
-        popup.resizable(False, False)
-        popup.wait_window()
-        if not popup.saved:
-            return
-
-        options = {}
-        moduleNames = np.array(popup.selectedOptions)
-
-        dropdownValues = np.array([])
-
-        for name in moduleNames:
-            moduleFrame = self.moduleFrames[name]
-            dropdownValue = moduleFrame.stringVar.get()
-            dropdownValues = np.append(dropdownValues, dropdownValue)
-
-            Strategy = moduleFrame.dropdownOptions[dropdownValue]
-            for attr in Strategy.popupAttributes:
-                options[attr] = getattr(self.titration, attr)
-
-        options["version"] = __version__
-        options["moduleNames"] = moduleNames
-        options["dropdownValues"] = dropdownValues
-
-        initialfile = os.path.splitext(self.titration.title)[0] + "_options"
-        fileName = fd.asksaveasfilename(
-            title="Save options to file",
-            filetypes=[("NumPy archive", "*.npz")],
-            initialfile=initialfile,
-            defaultextension=".npz",
-        )
-        if fileName == "":
-            return
-
-        np.savez(fileName, **options)
-
-    def getSelectedOptions(self, popup):
-        popup.selectedOptions = []
-        for name, checkbutton in popup.checkbuttons.items():
-            if checkbutton.instate(["selected"]):
-                popup.selectedOptions.append(name)
-        popup.saved = True
-        popup.destroy()
-
-    def saveData(self):
-        initialfile = os.path.splitext(self.titration.title)[0] + "_processed_input"
-        fileName = fd.asksaveasfilename(
-            title="Save processed input data as a universal CSV file",
-            initialfile=initialfile,
-            filetypes=[("CSV file", "*.csv")],
-            defaultextension=".csv",
-        )
-        data = self.titration.processedData
-        rowTitles = np.atleast_2d(self.titration.additionTitles).T
-        columnTitles = np.append("", self.titration.processedSignalTitles)
-        output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",")
-        except Exception as e:
-            mb.showerror(title="Could not save file", message=e, parent=self)
-
-
 class TitrationFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.titration = titration
-        self.numFits = 0
+        self.originalTitration = titration
+        self.filePath = None
 
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
@@ -276,80 +68,119 @@ class TitrationFrame(ttk.Frame):
 
         self.moduleFrames = {}
         for mod in titrationModules:
-            moduleFrame = mod.ModuleFrame(
-                self.options, self.titration, self.updatePlots
-            )
+            moduleFrame = mod.ModuleFrame(self.options, titration)
             self.moduleFrames[mod.__name__] = moduleFrame
             moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
 
-        fitDataButton = ttk.Button(self.options, text="Fit", command=self.tryFitData)
+        fitDataButton = ttk.Button(
+            self.options, style="success.TButton", text="Fit", command=self.fitData
+        )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         separator = ttk.Separator(self.options, orient="horizontal")
         separator.grid(sticky="nesw", pady=padding)
 
-        saveLoadFrame = SaveLoadFrame(self.options, self.titration, self.moduleFrames)
-        saveLoadFrame.grid(sticky="nesw")
+        copyFitButton = ttk.Button(self.options, text="Copy fit", command=self.copyFit)
+        copyFitButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         self.options.columnconfigure(0, weight=1)
 
         # tabs with different fits
         self.notebook = InteractiveNotebook(
-            self, padding=padding, style="Flat.Interactive.TNotebook"
+            self,
+            padding=padding,
+            newtab=self.newFit,
+            style="Flat.Interactive.TNotebook",
         )
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
-        if self.titration.continuous:
-            self.inputSpectraFrame = InputSpectraFrame(self.notebook, self.titration)
-            self.notebook.add(self.inputSpectraFrame, text="Input Spectra")
+        self.numFits = 0
+        self.newFit()
+
+        self.notebook.bind("<<NotebookTabChanged>>", self.switchFit, add=True)
 
         self.rowconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
-    def updatePlots(self):
-        if hasattr(self, "inputSpectraFrame"):
-            self.inputSpectraFrame.plot()
+    def editData(self):
+        root = self.winfo_toplevel()
+        popup = editData.EditDataPopup(self.currentTab.titration, master=root)
+        popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
+        popup.show()
+        if hasattr(self.currentTab, "inputSpectraFrame"):
+            self.currentTab.inputSpectraFrame.plot()
 
-    def tryFitData(self, *args, **kwargs):
+    @property
+    def currentTab(self):
+        return self.notebook.nametowidget(self.notebook.select())
+
+    # TODO: make inner notebooks into separate class
+    def newFit(self, titration=None):
+        if titration is None:
+            titration = deepcopy(self.originalTitration)
+        self.numFits += 1
+        nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
+        nb.titration = titration
+        nb.fitted = False
+        self.notebook.add(nb, text=f"Fit {self.numFits}")
+
+        if titration.continuous:
+            nb.inputSpectraFrame = InputSpectraFrame(nb, nb.titration)
+            nb.add(nb.inputSpectraFrame, text="Input Spectra")
+
+        self.notebook.select(str(nb))
+
+    def copyFit(self):
+        self.newFit(deepcopy(self.currentTab.titration))
+
+    def switchFit(self, event):
+        nb = self.currentTab
+        for moduleFrame in self.moduleFrames.values():
+            moduleFrame.update(nb.titration)
+
+    def fitData(self):
+        nb = self.currentTab
         try:
-            self.fitData(*args, **kwargs)
+            nb.titration.fitData()
         except Exception as e:
             mb.showerror(title="Failed to fit data", message=e, parent=self)
             return
 
-    def editData(self):
-        root = self.winfo_toplevel()
-        popup = editData.EditDataPopup(self.titration, master=root)
-        popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
-        popup.show()
+        if nb.fitted:
+            lastTabClass = type(nb.nametowidget(nb.select()))
+            for tab in nb.tabs():
+                widget = nb.nametowidget(tab)
+                if isinstance(widget, InputSpectraFrame):
+                    continue
+                nb.forget(widget)
+                widget.destroy()
 
-    def fitData(self):
-        self.titration.fitData()
-        self.numFits += 1
-        nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
-        self.notebook.add(nb, text=f"Fit {self.numFits}")
-
-        # TODO: link titrationCopy to options frame as well
-        titrationCopy = deepcopy(self.titration)
-        nb.titration = titrationCopy
-
-        if self.titration.continuous:
-            continuousFittedFrame = ContinuousFittedFrame(nb, titrationCopy)
-            nb.add(continuousFittedFrame, text="Fitted Spectra")
-            discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, titrationCopy)
-            nb.add(discreteFittedFrame, text=f"Fit at select {titrationCopy.xQuantity}")
+        if nb.titration.continuous:
+            nb.continuousFittedFrame = ContinuousFittedFrame(nb, nb.titration)
+            nb.add(nb.continuousFittedFrame, text="Fitted Spectra")
+            nb.discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, nb.titration)
+            nb.add(
+                nb.discreteFittedFrame, text=f"Fit at select {nb.titration.xQuantity}"
+            )
         else:
-            discreteFittedFrame = DiscreteFittedFrame(nb, titrationCopy)
-            nb.add(discreteFittedFrame, text="Fitted signals")
+            nb.discreteFittedFrame = DiscreteFittedFrame(nb, nb.titration)
+            nb.add(nb.discreteFittedFrame, text="Fitted signals")
 
-        speciationFrame = SpeciationFrame(nb, titrationCopy)
-        nb.add(speciationFrame, text="Speciation")
+        nb.speciationFrame = SpeciationFrame(nb, nb.titration)
+        nb.add(nb.speciationFrame, text="Speciation")
 
-        resultsFrame = ResultsFrame(nb, titrationCopy)
-        nb.add(resultsFrame, text="Results")
+        nb.resultsFrame = ResultsFrame(nb, nb.titration)
+        nb.add(nb.resultsFrame, text="Results")
 
-        self.notebook.select(str(nb))
-        nb.select(str(discreteFittedFrame))
+        if nb.fitted:
+            for tab in nb.tabs():
+                widget = nb.nametowidget(tab)
+                if isinstance(widget, lastTabClass):
+                    nb.select(str(widget))
+                    break
+        else:
+            nb.fitted = True
+            nb.select(str(nb.discreteFittedFrame))
 
     def saveFile(self, saveAs=False):
         options = {}
@@ -361,45 +192,69 @@ class TitrationFrame(ttk.Frame):
             tab = self.notebook.nametowidget(tkpath)
             if not isinstance(tab, ttk.Notebook):
                 continue
-            name = self.notebook.tab(tkpath)["text"]
-            fits = np.append(fits, name)
+            fit = self.notebook.tab(tkpath)["text"][: -self.notebook._padding_spaces]
+            fits = np.append(fits, fit)
 
-            moduleNames = np.array([])
+            titration = tab.titration
+            for titrationAttribute in titrationAttributes:
+                if not hasattr(titration, titrationAttribute):
+                    continue
+                options[f"{fit}.{titrationAttribute}"] = getattr(
+                    titration, titrationAttribute
+                )
+
+            attributeNames = np.array([])
             dropdownValues = np.array([])
 
-            for name, moduleFrame in tab.moduleFrames.items():
-                dropdownValue = moduleFrame.stringVar.get()
-                if dropdownValue == "":
+            for module in titrationModules:
+                moduleFrame = module.ModuleFrame
+                if not hasattr(titration, moduleFrame.attributeName):
                     continue
-                moduleNames = np.append(moduleNames, name)
-                dropdownValues = np.append(dropdownValues, dropdownValue)
+                strategy = getattr(titration, moduleFrame.attributeName)
+                attributeNames = np.append(attributeNames, moduleFrame.attributeName)
+                dropdownValues = np.append(
+                    dropdownValues,
+                    list(moduleFrame.dropdownOptions.keys())[
+                        list(moduleFrame.dropdownOptions.values()).index(
+                            type(getattr(titration, moduleFrame.attributeName))
+                        )
+                    ],
+                )
+                for popupAttributeName in strategy.popupAttributes:
+                    options[
+                        f"{fit}.{moduleFrame.attributeName}.{popupAttributeName}"
+                    ] = getattr(strategy, popupAttributeName)
 
-                Strategy = moduleFrame.dropdownOptions[dropdownValue]
-                for attr in Strategy.popupAttributes:
-                    options[f"{name}.{attr}"] = getattr(self.titration, attr)
+            options[f"{fit}.attributeNames"] = dropdownValues
+            options[f"{fit}.dropdownValues"] = dropdownValues
 
-            options[f"{name}.dropdownValues"] = dropdownValues
-            options[f"{name}.fitResult"] = tab.titration.fitResult
+            if tab.fitted:
+                options[f"{fit}.fitResult"] = titration.fitResult
 
-        if self.titration.filePath is None:
+        options["fits"] = fits
+
+        if self.filePath is None:
             filePath = fd.asksaveasfilename(
                 title="Save as",
-                initialfile=f"{PurePath(self.titration.title).stem}.fit",
+                initialfile=f"{PurePath(titration.title).stem}.fit",
                 filetypes=[("Musketeer file", "*.fit")],
                 defaultextension=".fit",
             )
         elif saveAs:
             filePath = fd.asksaveasfilename(
                 title="Save as",
-                initialdir=PurePath(self.titration.filePath).parent,
-                initialfile=PurePath(self.titration.filePath).name,
+                initialdir=PurePath(self.filePath).parent,
+                initialfile=PurePath(self.filePath).name,
                 filetypes=[("Musketeer file", "*.fit")],
                 defaultextension=".fit",
             )
+        else:
+            filePath = self.filePath
 
         if filePath != "":
-            self.titration.filePath = filePath
-            np.savez(self.titration.filePath, **options)
+            self.filePath = filePath
+            with open(self.filePath, "wb") as f:
+                np.savez(f, **options)
 
 
 class InputSpectraFrame(ttk.Frame):

@@ -1,7 +1,6 @@
 import csv
 import tkinter as tk
 import tkinter.filedialog as fd
-import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 from collections import namedtuple
 

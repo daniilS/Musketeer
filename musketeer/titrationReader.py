@@ -1,18 +1,18 @@
+import csv
+import os
 import tkinter as tk
 import tkinter.ttk as ttk
 
-import csv
-import numpy as np
-from numpy import ma
-import os
-from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
-from matplotlib.backend_bases import _Mode
 import matplotlib as mpl
+import numpy as np
+from matplotlib.backend_bases import _Mode
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
+from numpy import ma
 
-from .titration import Titration
-from .style import padding
 from .editData import predefinedParams
+from .style import padding
+from .titration import Titration
 
 
 def fillPredefinedParams(titration, params):

@@ -2,13 +2,27 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import find_peaks
 
+titrationAttributes = (
+    "title",
+    "filePath",
+    "rawData",
+    "columnFilter",
+    "hasSignalTitles",
+    "hasAdditionTitles",
+    "additionTitles",
+    "signalTitles",
+    "transposeData",
+    "yQuantity",
+    "yUnit",
+    "xQuantity",
+    "xUnit",
+)
+
 
 class Titration:
-    def __init__(self, title="Titration", filePath=None):
+    def __init__(self, title="Titration"):
         self.title = title
-        self.filePath = filePath
         # identical to [True, True, True, ..., True]
-        self.rowFilter = slice(None)
         self.columnFilter = slice(None)
 
         self.hasSignalTitles = False
@@ -21,7 +35,7 @@ class Titration:
 
     @property
     def processedData(self):
-        return self.rawData[self.rowFilter, :][:, self.columnFilter]
+        return self.rawData[:, self.columnFilter]
 
     @property
     def processedSignalTitles(self):
