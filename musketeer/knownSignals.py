@@ -1,12 +1,22 @@
-import numpy as np
-import tkinter.ttk as ttk
 import tkinter.messagebox as mb
+import tkinter.ttk as ttk
+from abc import abstractmethod
 
+import numpy as np
+from numpy import ma
 from tksheet import Sheet
 
 from . import moduleFrame
-from .table import ButtonFrame
 from .style import padding
+from .table import ButtonFrame
+
+
+class KnownSignals(moduleFrame.Strategy):
+    requiredAttributes = ()
+
+    @abstractmethod
+    def run(self):
+        pass
 
 
 class KnownSpectraPopup(moduleFrame.Popup):
@@ -41,13 +51,9 @@ class KnownSpectraPopup(moduleFrame.Popup):
         self.sheet.set_sheet_data(self.formatData(self.titration.knownSpectra))
 
     def saveData(self):
-        try:
-            data = np.array(self.sheet.get_sheet_data(), dtype=object)
-            data[np.where(data == "")] = None
-            data = data.astype(float)
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        data = np.array(self.sheet.get_sheet_data(), dtype=object)
+        data[np.where(data == "")] = None
+        data = data.astype(float)
 
         if not np.all(np.any(np.isnan(data), 1) == np.all(np.isnan(data), 1)):
             mb.showerror(
@@ -65,7 +71,8 @@ class KnownSpectraPopup(moduleFrame.Popup):
         return
 
 
-class GetKnownSpectra(moduleFrame.Strategy):
+# TODO: make this work with the new format
+class GetKnownSpectra(KnownSignals):
     Popup = KnownSpectraPopup
     popupAttributes = ("knownSpectra",)
 
@@ -88,14 +95,16 @@ class GetKnownSpectra(moduleFrame.Strategy):
         return self.titration.knownSpectra
 
 
-class GetAllSpectra(moduleFrame.Strategy):
-    def __call__(self):
-        return np.full(
-            (
-                len(self.titration.contributorNames()),
-                len(self.titration.processedSignalTitles),
+class GetAllSpectra(KnownSignals):
+    def run(self):
+        return ma.array(
+            np.empty(
+                (
+                    len(self.titration.contributors.contributorNames),
+                    len(self.titration.processedSignalTitles),
+                )
             ),
-            np.nan,
+            mask=True,
         )
 
 
@@ -104,6 +113,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Which spectra to optimise?"
     dropdownOptions = {
         "Optimise all spectra": GetAllSpectra,
-        "Specify some known spectra": GetKnownSpectra,
+        # "Specify some known spectra": GetKnownSpectra,
     }
-    attributeName = "getKnownSpectra"
+    attributeName = "knownSignals"

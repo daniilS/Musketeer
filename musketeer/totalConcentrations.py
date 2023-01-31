@@ -1,14 +1,16 @@
+import re
 import tkinter as tk
 import tkinter.ttk as ttk
-import tkinter.messagebox as mb
+from abc import abstractmethod
 from decimal import Decimal
 
-import re
 import numpy as np
 
 from . import moduleFrame
-from .table import Table, ButtonFrame
 from .scrolledFrame import ScrolledFrame
+from .table import ButtonFrame, Table
+
+DEFAULT_INITIAL_CONC = 1e-4
 
 prefixesDecimal = {
     "": Decimal(1),
@@ -31,18 +33,35 @@ def convertConc(conc, fromUnit, toUnit):
     return f"{convertedConc:g}"  # strip trailing zeroes
 
 
+class totalConcentrations(moduleFrame.Strategy):
+    requiredAttributes = (
+        "concsUnit",
+        "totalConcs",
+        "variableNames",
+    )
+
+    # TODO: support entering initial guesses
+    @property
+    def variableInitialGuesses(self):
+        return np.full(len(self.variableNames), DEFAULT_INITIAL_CONC)
+
+    @abstractmethod
+    def run(self, totalConcVars):
+        pass
+
+
 class StockTable(Table):
     def __init__(self, master, titration):
-        if hasattr(titration, "stockTitles"):
-            stockTitles = titration.stockTitles
-        else:
+        try:
+            stockTitles = titration.totalConcentrations.stockTitles
+        except AttributeError:
             stockTitles = ("Stock 1", "Stock 2")
         super().__init__(
             master,
             2,
             0,
             stockTitles,
-            allowBlanks=True,
+            maskBlanks=True,
             rowOptions=("readonlyTitles", "delete"),
             columnOptions=("titles", "new", "delete"),
         )
@@ -51,14 +70,23 @@ class StockTable(Table):
 
         self.label(0 - self.headerGridRows, 0, "Stock concentrations:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
-        _, self.unit = self.dropdown(
+        _, self.concsUnit = self.dropdown(
             1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
         )
-        if hasattr(titration, "concsUnit"):
-            self.unit.set(titration.concsUnit)
+        try:
+            self.concsUnit.set(titration.totalConcentrations.concsUnit)
+        except AttributeError:
+            pass
 
-        if hasattr(titration, "stockConcs"):
-            self.populate(titration.stockConcs)
+        if (
+            hasattr(titration, "totalConcentrations")
+            and hasattr(titration.totalConcentrations, "stockConcs")
+            and (
+                self.titration.totalConcentrations.stockConcs.shape[0]
+                == len(self.titration.speciation.freeNames)
+            )
+        ):
+            self.populate(titration.totalConcentrations.stockConcs)
         else:
             self.populateDefault()
 
@@ -68,26 +96,27 @@ class StockTable(Table):
         return button
 
     def populate(self, stockConcs):
-        for name, row in zip(self.titration.freeNames, stockConcs):
-            self.addRow(name, [convertConc(conc, "M", self.unit.get()) for conc in row])
+        for name, row in zip(self.titration.speciation.freeNames, stockConcs):
+            self.addRow(
+                name, [convertConc(conc, "M", self.concsUnit.get()) for conc in row]
+            )
 
     def populateDefault(self):
-        for name in self.titration.freeNames:
+        for name in self.titration.speciation.freeNames:
             self.addRow(name)
 
 
 class VolumesTable(Table):
     def __init__(self, master, titration):
-        if hasattr(titration, "stockTitles"):
-            stockTitles = titration.stockTitles
-        else:
+        try:
+            stockTitles = titration.totalConcentrations.stockTitles
+        except AttributeError:
             stockTitles = ("Stock 1", "Stock 2")
         super().__init__(
             master,
             2,
             2,
             stockTitles,
-            allowBlanks=False,
             rowOptions=("delete", "readonlyTitles"),
             columnOptions=(),
         )
@@ -96,24 +125,36 @@ class VolumesTable(Table):
 
         self.label(0 - self.headerGridRows, 0, "Cumulative addition volumes:", 4)
         self.label(1 - self.headerGridRows, 2, "Unit:")
-        _, self.unit = self.dropdown(
+        _, self.volumesUnit = self.dropdown(
             1 - self.headerGridRows, 3, ("nL", "μL", "mL", "L"), "μL"
         )
-        if hasattr(titration, "volumesUnit"):
-            self.unit.set(titration.volumesUnit)
+        try:
+            self.volumesUnit.set(titration.totalConcentrations.volumesUnit)
+        except AttributeError:
+            pass
 
         self.label(1, 1, "Addition title:")
 
-        if hasattr(titration, "volumes"):
-            self.populate(titration.volumes)
+        if (
+            hasattr(titration, "totalConcentrations")
+            and hasattr(titration.totalConcentrations, "volumes")
+            and (
+                self.titration.totalConcentrations.volumes.shape[0]
+                == len(self.titration.additionTitles)
+            )
+        ):
+            self.populate(titration.totalConcentrations.volumes)
         else:
             self.populateDefault()
 
     def populate(self, volumes):
-        for name, row in zip(self.titration.processedAdditionTitles, volumes):
+        for name, row in zip(self.titration.additionTitles, volumes):
             self.addRow(
                 name,
-                [self.convertVolume(volume, "L", self.unit.get()) for volume in row],
+                [
+                    self.convertVolume(volume, "L", self.volumesUnit.get())
+                    for volume in row
+                ],
             )
 
     def populateDefault(self):
@@ -149,7 +190,7 @@ class VolumesTable(Table):
         cells = self.cells[self.headerCells :]
         for row in cells:
             title = row[1].get()
-            volume = self.getVolumeFromString(title, self.unit.get())
+            volume = self.getVolumeFromString(title, self.volumesUnit.get())
             if volume is not None:
                 row[column].set(volume)
 
@@ -189,9 +230,11 @@ class VolumesPopup(moduleFrame.Popup):
         )
         unknownConcsLabel.pack()
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
-        if hasattr(titration, "unknownTotalConcsLinked"):
-            self.unknownTotalConcsLinkedVar.set(self.titration.unknownTotalConcsLinked)
-        else:
+        try:
+            self.unknownTotalConcsLinkedVar.set(
+                self.titration.totalConcentrations.unknownTotalConcsLinked
+            )
+        except AttributeError:
             self.unknownTotalConcsLinkedVar.set(True)
         unknownTotalConcsCheckbutton = ttk.Checkbutton(
             unknownConcsFrame,
@@ -227,42 +270,82 @@ class VolumesPopup(moduleFrame.Popup):
             table.populateDefault()
 
     def saveData(self):
-        try:
-            stockTitles = self.stockTable.columnTitles
-            stockConcs = self.stockTable.data
-            volumes = self.volumesTable.data
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        stockTitles = self.stockTable.columnTitles
+        stockConcs = self.stockTable.data
+        volumes = self.volumesTable.data
 
-        self.titration.stockTitles = stockTitles
-        self.titration.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
+        self.stockTitles = stockTitles
+        self.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
 
-        concsUnit = self.stockTable.unit.get()
-        self.titration.concsUnit = concsUnit
-        self.titration.stockConcs = stockConcs * prefixes[concsUnit.strip("M")]
+        self.concsUnit = self.stockTable.concsUnit.get()
+        self.stockConcs = stockConcs * prefixes[self.concsUnit.strip("M")]
 
-        volumesUnit = self.volumesTable.unit.get()
-        self.titration.volumesUnit = volumesUnit
-        self.titration.volumes = volumes * prefixes[volumesUnit.strip("L")]
-
-        self.titration.rowFilter = np.in1d(
-            self.titration.additionTitles, self.volumesTable.rowTitles
-        )
-
-        # Calculate and save total concentrations if no stock concentrations
-        # are unknown, to transfer them to the ConcsPopup.
-        if np.count_nonzero(np.isnan(self.titration.stockConcs)) == 0:
-            moles = self.titration.volumes @ self.titration.stockConcs.T
-            totalVolumes = np.atleast_2d(np.sum(self.titration.volumes, 1)).T
-            self.titration.totalConcs = moles / totalVolumes
-        elif hasattr(self.titration, "totalConcs"):
-            # TODO: Find a way to store totalConcs in the options file, only if they're
-            # present
-            del self.titration.totalConcs
+        self.volumesUnit = self.volumesTable.volumesUnit.get()
+        self.volumes = volumes * prefixes[self.volumesUnit.strip("L")]
 
         self.saved = True
         self.destroy()
+
+
+class GetTotalConcsFromVolumes(totalConcentrations):
+    Popup = VolumesPopup
+    popupAttributes = (
+        "stockTitles",
+        "unknownTotalConcsLinked",
+        "concsUnit",
+        "stockConcs",
+        "volumesUnit",
+        "volumes",
+    )
+
+    def run(self, totalConcVars):
+        stockConcs = np.copy(self.stockConcs)
+        if self.unknownTotalConcsLinked:
+            # For each row (= species), all blank cells are assigned to a
+            # single unknown variable.
+            for rowIndex, totalConcVar in zip(
+                np.where(self.rowsWithBlanks)[0], totalConcVars
+            ):
+                stockConcs[rowIndex, np.isnan(stockConcs[rowIndex])] = totalConcVar
+        else:
+            stockConcs[np.isnan(stockConcs)] = totalConcVars
+
+        moles = self.volumes @ stockConcs.T
+        totalVolumes = np.atleast_2d(np.sum(self.volumes, 1)).T
+        totalConcs = moles / totalVolumes
+
+        return totalConcs
+
+    @property
+    def totalConcs(self):
+        # If all total concentrations are known, they can be used by other strategies.
+        if len(self.variableNames != 0):
+            return np.empty((0, 0))
+        else:
+            return self.run(np.empty((0,)))
+
+    @property
+    def rowsWithBlanks(self):
+        return np.isnan(np.sum(self.stockConcs, 1))
+
+    @property
+    def variableNames(self):
+        if self.unknownTotalConcsLinked:
+            # return the number of rows (= species) with blank cells
+            concVarsNames = self.titration.speciation.freeNames[self.rowsWithBlanks]
+            return np.array([f"[{name}]" for name in concVarsNames])
+        else:
+            concVarsNames = []
+            for freeName, concs in zip(
+                self.titration.speciation.freeNames, self.stockConcs
+            ):
+                concVarsNames.extend(
+                    [
+                        f"[{freeName}] in {stock}"
+                        for stock in self.stockTitles[np.isnan(concs)]
+                    ]
+                )
+            return np.array(concVarsNames)
 
 
 class ConcsTable(Table):
@@ -274,34 +357,38 @@ class ConcsTable(Table):
             master,
             2,
             2,
-            titration.freeNames,
-            allowBlanks=False,
-            rowOptions=("delete", "readonlyTitles"),
+            titration.speciation.freeNames,
+            rowOptions=("readonlyTitles",),
             columnOptions=("readonlyTitles",),
         )
 
-        self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
-        self.label(1 - self.headerGridRows, 2, "Unit:")
-        _, self.unit = self.dropdown(
-            1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
-        )
-        if hasattr(titration, "concsUnit"):
-            self.unit.set(titration.concsUnit)
-
-        self.label(self.headerCells - 1, 1, "Addition title:")
-
-        if hasattr(titration, "totalConcs"):
-            self.populate(titration.totalConcs)
-        else:
-            self.populateDefault()
-
-    def populate(self, concs):
-        for name, row in zip(self.titration.processedAdditionTitles, concs):
-            self.addRow(name, [convertConc(conc, "M", self.unit.get()) for conc in row])
+        self.populateDefault()
 
     def populateDefault(self):
-        for name in self.titration.additionTitles:
-            self.addRow(name)
+        self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
+        self.label(1 - self.headerGridRows, 2, "Unit:")
+        _, self.concsUnit = self.dropdown(
+            1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
+        )
+
+        self.label(self.headerCells - 1, 1, "Addition title:")
+        if hasattr(
+            self.titration, "totalConcentrations"
+        ) and self.titration.totalConcentrations.totalConcs.shape == (
+            len(self.titration.additionTitles),
+            len(self.titration.speciation.freeNames),
+        ):
+            self.concsUnit.set(self.titration.totalConcentrations.concsUnit)
+            for name, row in zip(
+                self.titration.additionTitles,
+                self.titration.totalConcentrations.totalConcs,
+            ):
+                self.addRow(
+                    name, [convertConc(conc, "M", self.concsUnit.get()) for conc in row]
+                )
+        else:
+            for name in self.titration.additionTitles:
+                self.addRow(name)
 
     def addColumn(self, firstEntry="", data=None):
         super().addColumn(firstEntry, data)
@@ -332,7 +419,7 @@ class ConcsTable(Table):
         cells = self.cells[self.headerCells :]
         for row in cells:
             title = row[1].get()
-            conc = self.getConcFromString(title, self.unit.get())
+            conc = self.getConcFromString(title, self.concsUnit.get())
             if conc is not None:
                 row[column].set(conc)
 
@@ -364,108 +451,28 @@ class ConcsPopup(moduleFrame.Popup):
 
     def reset(self):
         self.concsTable.resetData()
+        self.concsTable.columnTitles = self.titration.speciation.freeNames
         self.concsTable.populateDefault()
 
     def saveData(self):
-        try:
-            totalConcs = self.concsTable.data
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
-
-        concsUnit = self.concsTable.unit.get()
-        self.titration.concsUnit = concsUnit
-        self.titration.totalConcs = totalConcs * prefixes[concsUnit.strip("M")]
-
-        self.titration.rowFilter = np.in1d(
-            self.titration.additionTitles, self.concsTable.rowTitles
-        )
+        self.concsUnit = self.concsTable.concsUnit.get()
+        self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
 
         self.saved = True
         self.destroy()
 
 
-class GetTotalConcsFromVolumes(moduleFrame.Strategy):
-    Popup = VolumesPopup
-    popupAttributes = (
-        "stockTitles",
-        "unknownTotalConcsLinked",
-        "concsUnit",
-        "stockConcs",
-        "volumesUnit",
-        "volumes",
-    )
-
-    def __init__(self, titration):
-        self.titration = titration
-        titration.getConcVarsCount = self.getConcVarsCount
-        titration.getConcVarsNames = self.getConcVarsNames
-
-    def __call__(self, totalConcVars):
-        titration = self.titration
-        stockConcs = np.copy(titration.stockConcs)
-        if titration.unknownTotalConcsLinked:
-            # For each row (= species), all blank cells are assigned to a
-            # single unknown variable.
-            for rowIndex, totalConcVar in zip(
-                np.where(self.rowsWithBlanks)[0], totalConcVars
-            ):
-                stockConcs[rowIndex, np.isnan(stockConcs[rowIndex])] = totalConcVar
-        else:
-            stockConcs[np.isnan(stockConcs)] = totalConcVars
-
-        moles = titration.volumes @ stockConcs.T
-        totalVolumes = np.atleast_2d(np.sum(titration.volumes, 1)).T
-        totalConcs = moles / totalVolumes
-
-        return totalConcs
-
-    @property
-    def rowsWithBlanks(self):
-        return np.isnan(np.sum(self.titration.stockConcs, 1))
-
-    def getConcVarsNames(self):
-        if self.titration.unknownTotalConcsLinked:
-            # return the number of rows (= species) with blank cells
-            concVarsNames = self.titration.freeNames[self.rowsWithBlanks]
-            return np.array([f"[{name}]" for name in concVarsNames])
-        else:
-            concVarsNames = []
-            for freeName, concs in zip(
-                self.titration.freeNames, self.titration.stockConcs
-            ):
-                concVarsNames.extend(
-                    [
-                        f"[{freeName}] in {stock}"
-                        for stock in self.titration.stockTitles[np.isnan(concs)]
-                    ]
-                )
-            return np.array(concVarsNames)
-
-    def getConcVarsCount(self):
-        if self.titration.unknownTotalConcsLinked:
-            # return the number of rows (= species) with blank cells
-            return np.count_nonzero(self.rowsWithBlanks)
-        else:
-            return np.count_nonzero(np.isnan(self.titration.stockConcs))
-
-
-class GetTotalConcs(moduleFrame.Strategy):
+class GetTotalConcs(totalConcentrations):
     Popup = ConcsPopup
     popupAttributes = (
         "concsUnit",
         "totalConcs",
     )
 
-    def __init__(self, titration):
-        self.titration = titration
-        titration.getConcVarsCount = self.getConcVarsCount
+    def run(self, totalConcVars):
+        return self.totalConcs
 
-    def __call__(self, totalConcVars):
-        return self.titration.totalConcs
-
-    def getConcVarsCount(self):
-        return 0
+    variableNames = np.array([])
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
@@ -475,5 +482,5 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "Volumes": GetTotalConcsFromVolumes,
         "Concentrations": GetTotalConcs,
     }
-    attributeName = "getTotalConcs"
+    attributeName = "totalConcentrations"
     setDefault = False

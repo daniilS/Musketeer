@@ -16,26 +16,6 @@ class Titration:
         self.transposeData = False
 
     @property
-    def freeCount(self):
-        return self.stoichiometries.shape[1]
-
-    @property
-    def boundCount(self):
-        return self.stoichiometries.shape[0]
-
-    @property
-    def totalCount(self):
-        return self.freeCount + self.boundCount
-
-    @property
-    def polymerIndices(self):
-        return np.any(self.stoichiometries < 0, 1)
-
-    @property
-    def polymerCount(self):
-        return np.count_nonzero(self.stoichiometries < 0)
-
-    @property
     def numAdditions(self):
         return self.processedData.shape[0]
 
@@ -119,15 +99,6 @@ class Titration:
             return self.processedSignalTitles.astype(str)
 
     @property
-    def processedAdditionTitles(self):
-        if self.hasAdditionTitles:
-            return self.additionTitles[self.rowFilter]
-        else:
-            return np.array(
-                ["Addition " + str(i + 1) for i in range(self.processedData.shape[0])]
-            )
-
-    @property
     def additionTitles(self):
         if self.hasAdditionTitles:
             return self._additionTitles
@@ -176,53 +147,49 @@ class Titration:
 
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
-        kVars = ksAndTotalConcs[: self.kVarsCount()]
-        totalConcVars = ksAndTotalConcs[
-            self.kVarsCount() : -self.alphaVarsCount() or None
-        ]
-        alphaVars = ksAndTotalConcs[self.kVarsCount() + self.getConcVarsCount() :]
+        kVars = ksAndTotalConcs[: self.equilibriumConstants.variableCount]
+        totalConcVars = ksAndTotalConcs[self.equilibriumConstants.variableCount :]
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
-        ks, alphas = self.getKs(kVars, alphaVars)
-        totalConcs = self.getTotalConcs(totalConcVars)
+        speciationVars = self.equilibriumConstants.run(kVars)
+        totalConcs = self.totalConcentrations.run(totalConcVars)
         self.lastTotalConcs = totalConcs
 
-        freeConcs, boundConcs = self.speciation(ks, totalConcs, alphas)
+        freeConcs, boundConcs = self.speciation.run(speciationVars, totalConcs)
         self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
 
-        signalVars = self.getSignalVars(freeConcs, boundConcs)
+        signalVars = self.contributors.run(freeConcs, boundConcs)
 
-        proportionalSignalVars = self.getProportionalSignals(signalVars, totalConcs)
+        proportionalSignalVars = self.proportionality.run(signalVars, totalConcs)
 
-        knownSpectra = self.getKnownSpectra()
+        knownSpectra = self.knownSignals.run()
 
-        self.lastFitResult, residuals, self.lastFittedCurves = self.fitSignals(
+        self.lastFittedSpectra, residuals, self.lastFittedCurves = self.fitSignals.run(
             proportionalSignalVars, knownSpectra
         )
 
-        combinedResiduals = self.combineResiduals(residuals)
+        combinedResiduals = self.combineResiduals.run(residuals)
 
         return combinedResiduals
 
     def optimisationFuncLog(self, logKsAndTotalConcs):
-        ksAndTotalConcs = 10 ** logKsAndTotalConcs
+        ksAndTotalConcs = 10**logKsAndTotalConcs
         return self.optimisationFunc(ksAndTotalConcs)
 
     def optimise(self):
-        initialGuessKs = np.full(self.kVarsCount(), 3)
-        initialGuessConcs = np.full(self.getConcVarsCount(), -4)
-        initialGuessAlphas = np.full(self.alphaVarsCount(), 0)
-        initialGuess = np.concatenate(
-            (initialGuessKs, initialGuessConcs, initialGuessAlphas)
-        )
+        initialGuessKs = np.log10(self.equilibriumConstants.variableInitialGuesses)
+        initialGuessConcs = np.log10(self.totalConcentrations.variableInitialGuesses)
+        initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
 
         result = minimize(
-            self.optimisationFuncLog, x0=initialGuess, method="Nelder-Mead"
+            self.optimisationFuncLog,
+            x0=initialGuess,
+            method="nelder-mead",
         )
         # to make sure the last fit is the optimal one
         self.optimisationFuncLog(result.x)
         return result.x
 
     def fitData(self):
-        self.lastKs = self.optimise()
+        self.fitResult = self.optimise()

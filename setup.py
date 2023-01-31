@@ -1,6 +1,7 @@
-import setuptools
 import warnings
 from pathlib import Path
+
+import setuptools
 
 with open("README.md") as readmeFile:
     long_description = readmeFile.read()

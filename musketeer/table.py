@@ -1,17 +1,19 @@
 import tkinter as tk
-import tkinter.ttk as ttk
 import tkinter.messagebox as mb
+import tkinter.ttk as ttk
 from tkinter import font
 
 import numpy as np
+from numpy import ma
 
-from .style import padding, cellWidth
+from .style import cellWidth, padding
 
 
 class Table(ttk.Frame):
     width = cellWidth
 
     titleFont = None
+    italicFont = None
     fitToText = "New column"
 
     def __init__(
@@ -21,16 +23,18 @@ class Table(ttk.Frame):
         headerCells,
         columnTitles=[],
         *,
-        allowBlanks=False,
+        maskBlanks=False,
         rowOptions=[],
         columnOptions=[],
         boldTitles=False,
         callback=None,
+        allowGuesses=False,
         **kwargs,
     ):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
-        self.allowBlanks = allowBlanks
+        self.maskBlanks = maskBlanks
+        self.allowGuesses = allowGuesses
         super().__init__(master, padding=padding, **kwargs)
         if callback is not None:
             callback = self.register(callback)
@@ -41,6 +45,9 @@ class Table(ttk.Frame):
             Table.titleFont["weight"] = "bold"
         if not boldTitles:
             self.titleFont = "TkTextFont"
+        if Table.italicFont is None:
+            Table.italicFont = font.nametofont("TkTextFont").copy()
+            Table.italicFont["slant"] = "italic"
 
         # Grid rows at the top that will be left empty for a subclass to fill
         # in with other widgets.
@@ -91,6 +98,10 @@ class Table(ttk.Frame):
             self.tk.eval(
                 f"trace add variable {entry.stringVar._name} write {self.callback}"
             )
+        if self.allowGuesses:
+            entry.stringVar.trace_add("write", lambda *args: self.checkIfGuess(entry))
+
+        entry.get = entry.stringVar.get
         entry.set = entry.stringVar.set
 
         entry.set(text)
@@ -105,7 +116,26 @@ class Table(ttk.Frame):
         entry.bind("<Tab>", lambda *args: self.tab(entry))
         entry.bind("<Shift-Tab>", lambda *args: self.shiftTab(entry))
 
+        # Left and Right move the cursor inside the entry
+        directions = {"Up": (-1, 0), "Down": (1, 0)}
+        for key, value in directions.items():
+            entry.bind(
+                f"<{key}>",
+                (lambda direction: lambda *args: self.arrowKey(entry, direction))(
+                    value
+                ),
+            )
+
         return entry
+
+    def checkIfGuess(self, entry):
+        if entry.get().startswith("~"):
+            entry.configure(style="info.TEntry")
+            entry.configure(font=self.italicFont)
+        elif entry.configure("style")[-1] == "info.TEntry":
+            # Only reset the style if it was set to info.TEntry
+            entry.configure(style="primary.TEntry")
+            entry.configure(font="TkTextFont")
 
     def readonlyEntry(self, *args, **kwargs):
         entry = self.entry(*args, style="TLabel", **kwargs)
@@ -176,7 +206,12 @@ class Table(ttk.Frame):
         )
         optionMenu.configure(takefocus=0)
         optionMenu.grid(
-            row=self.headerGridRows + row, column=column, sticky="nesw", padx=1, pady=1
+            row=self.headerGridRows + row,
+            column=column,
+            sticky="nesw",
+            columnspan=columnspan,
+            padx=1,
+            pady=1,
         )
         return optionMenu, stringVar
 
@@ -259,7 +294,7 @@ class Table(ttk.Frame):
         self.initEmptyCells()
 
     def convertData(self, number):
-        if self.allowBlanks and number == "":
+        if self.maskBlanks and number == "":
             return np.nan
         return float(number)
 
@@ -298,6 +333,26 @@ class Table(ttk.Frame):
                 self.setFocus(prevCell)
                 return "break"
 
+    def arrowKey(self, entry, direction):
+        info = entry.grid_info()
+        row, column = info["row"] - self.headerGridRows, info["column"]
+        rows, columns = self.cells.shape
+        targetRow, targetColumn = row + direction[0], column + direction[1]
+        if (
+            targetRow < 0
+            or targetColumn < 0
+            or targetRow >= rows
+            or targetColumn >= columns
+        ):
+            return
+
+        targetCell = self.cells[targetRow, targetColumn]
+        if isinstance(targetCell, tk.Widget) and targetCell.tk.call(
+            "::tk::FocusOK", targetCell
+        ):
+            self.setFocus(targetCell)
+            return "break"
+
     def paste(self, entry):
         info = entry.grid_info()
         row, column = info["row"] - self.headerGridRows, info["column"]
@@ -327,9 +382,14 @@ class Table(ttk.Frame):
 
     @property
     def data(self):
-        data = np.full(self.dataCells.shape, self.convertData("0"))
+        dtype = type(self.convertData("0"))
+        if dtype is str:
+            dtype = object
+        data = np.empty(self.dataCells.shape, dtype=dtype)
         for (row, column), cell in np.ndenumerate(self.dataCells):
             data[row, column] = self.convertData(cell.get())
+        if self.maskBlanks:
+            data = ma.masked_invalid(data)
         return data
 
     @data.setter
@@ -373,18 +433,29 @@ class Table(ttk.Frame):
 class ButtonFrame(ttk.Frame):
     def __init__(self, master, reset, save, cancel, *args, **kwargs):
         super().__init__(master, borderwidth=padding, *args, **kwargs)
+
+        self.save = save
+
         self.resetButton = ttk.Button(
             self, text="Reset", command=reset, style="danger.TButton"
         )
         self.resetButton.pack(side="left", padx=padding)
+
         self.saveButton = ttk.Button(
-            self, text="OK", command=save, style="success.TButton"
+            self, text="OK", command=self.trySave, style="success.TButton"
         )
         self.saveButton.pack(side="right", padx=padding)
+
         self.cancelButton = ttk.Button(
             self, text="Cancel", command=cancel, style="secondary.TButton"
         )
         self.cancelButton.pack(side="right", padx=padding)
+
+    def trySave(self):
+        try:
+            self.save()
+        except Exception as e:
+            mb.showerror(title="Could not save data", message=e, parent=self)
 
 
 class WrappedLabel(ttk.Frame):

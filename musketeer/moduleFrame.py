@@ -1,19 +1,42 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+from abc import ABC
 
 
 # all module strategies should be a subclass
-class Strategy:
+class Strategy(ABC):
     Popup = None
-    # List of titration attributes that are set through the popup window, and
-    # can be loaded from / saved to a file.
+
+    # List of attributes that are set through the popup window, and can be
+    # loaded from / saved to a file.
     popupAttributes = ()
+
+    # List of attributes that each base Strategy class should define, for all concrete
+    # strategies to set either in __init__ or from the popup. Compliance by the concrete
+    # strategies is checked in ModuleFrame.callback().
+    requiredAttributes = NotImplemented
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls.requiredAttributes is NotImplemented:
+            raise NotImplementedError(
+                f"Can't define class {cls.__name__} without implementing the abstract"
+                " class attribute requiredAttributes"
+            )
 
     def __init__(self, titration):
         self.titration = titration
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError()
+
+    @property
+    def outputCount(self):
+        return len(self.outputNames)
+
+    @property
+    def variableCount(self):
+        return len(self.variableNames)
 
 
 class Popup(tk.Toplevel):
@@ -75,6 +98,16 @@ class ModuleFrame(ttk.LabelFrame):
                 # previous value.
                 self.stringVar.set(self.lastValue)
                 return
+
+            for attr in selectedStrategy.popupAttributes:
+                setattr(selectedStrategy, attr, getattr(popup, attr))
+
+        for attr in selectedStrategy.requiredAttributes:
+            if not hasattr(selectedStrategy, attr):
+                raise NotImplementedError(
+                    f"Can't set strategy {SelectedStrategy.__name__} without"
+                    f" implementing the required attribute {attr}"
+                )
         setattr(self.titration, self.attributeName, selectedStrategy)
         self.updatePlots()
         self.lastValue = value

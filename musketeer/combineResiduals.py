@@ -1,28 +1,41 @@
+from abc import abstractmethod
+
 import numpy as np
 
 from . import moduleFrame
 
 
-class ResidualsSum(moduleFrame.Strategy):
-    def __call__(self, residuals):
+class combineResiduals(moduleFrame.Strategy):
+    requiredAttributes = ()
+
+    @abstractmethod
+    def run(self, residuals):
+        pass
+
+
+class ResidualsSum(combineResiduals):
+    def run(self, residuals):
         return np.sum(residuals)
 
 
-class ResidualsSumScaled(moduleFrame.Strategy):
-    # TODO: test & use
+class ResidualsSumScaled(combineResiduals):
+    # TODO: test
     # sum of the residuals, scaled by the number of data points for each signal
-    def __call__(self, residuals):
-        numPoints = np.sum(self.titration.processedData != None, axis=0)
+    def run(self, residuals):
+        numPoints = self.titration.processedData.count(axis=0)
         return np.sum(residuals / numPoints)
 
 
-class ResidualsSumNormalised(moduleFrame.Strategy):
-    def __call__(self, residuals):
+class ResidualsSumNormalised(combineResiduals):
+    def run(self, residuals):
         raise NotImplementedError
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Combine residuals"
-    dropdownLabelText = "Method for combining residuals"
-    dropdownOptions = {"Sum": ResidualsSum, "Normalised sum": ResidualsSumNormalised}
+    frameLabel = "Normalise residuals"
+    dropdownLabelText = "Normalise residuals?"
+    dropdownOptions = {
+        "No": ResidualsSum,
+        "By number of points": ResidualsSumScaled,
+    }
     attributeName = "combineResiduals"

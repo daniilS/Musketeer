@@ -1,31 +1,33 @@
 import os
 import tkinter as tk
-import tkinter.ttk as ttk
 import tkinter.filedialog as fd
+import tkinter.messagebox as mb
+import tkinter.ttk as ttk
 from copy import deepcopy
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 import numpy as np
 import tksheet
-from scipy.interpolate import make_interp_spline
 from cycler import cycler
-from ttkbootstrap.widgets import InteractiveNotebook
-import tkinter.messagebox as mb
-from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
+from scipy.interpolate import make_interp_spline
+from ttkbootstrap.widgets import InteractiveNotebook
 
-from . import __version__
-from . import editData
-from . import speciation
-from . import equilibriumConstants
-from . import totalConcentrations
-from . import contributors
-from . import proportionality
-from . import knownSignals
-from . import fitSignals
-from . import combineResiduals
-from .style import padding
+from . import (
+    __version__,
+    combineResiduals,
+    contributors,
+    editData,
+    equilibriumConstants,
+    fitSignals,
+    knownSignals,
+    proportionality,
+    speciation,
+    totalConcentrations,
+)
 from .scrolledFrame import ScrolledFrame
+from .style import padding
 from .table import Table
 
 warningIcon = "::tk::icons::warning"
@@ -242,7 +244,7 @@ class SaveLoadFrame(ttk.Frame):
             defaultextension=".csv",
         )
         data = self.titration.processedData
-        rowTitles = np.atleast_2d(self.titration.processedAdditionTitles).T
+        rowTitles = np.atleast_2d(self.titration.additionTitles).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:
@@ -377,7 +379,7 @@ class TitrationFrame(ttk.Frame):
                     options[f"{name}.{attr}"] = getattr(self.titration, attr)
 
             options[f"{name}.dropdownValues"] = dropdownValues
-            options[f"{name}.lastKs"] = tab.titration.lastKs
+            options[f"{name}.fitResult"] = tab.titration.fitResult
 
         if self.titration.filePath is None:
             filePath = fd.asksaveasfilename(
@@ -415,7 +417,7 @@ class InputSpectraFrame(ttk.Frame):
         minWL = self.titration.signalTitles.min()
         maxWL = self.titration.signalTitles.max()
         decimals = self.titration.signalTitlesDecimals
-        step = 1 / (10 ** decimals)
+        step = 1 / (10**decimals)
 
         self.fromSpinbox = ttk.Spinbox(
             rangeSelection, from_=minWL, to=maxWL, width=5, increment=step
@@ -491,20 +493,15 @@ class ContinuousFittedFrame(ttk.Frame):
 
     def plot(self):
         titration = self.titration
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
         self.fig = Figure()
         self.ax = self.fig.add_subplot()
 
-        spectra = titration.lastFitResult
-        names = titration.contributorNames()
+        spectra = titration.lastFittedSpectra
+        names = titration.contributors.contributorNames
         wavelengths = titration.processedSignalTitles
         for spectrum, name in zip(spectra, names):
             self.ax.plot(wavelengths, spectrum, label=name)
 
-        ttk.Label(self, text=f"Fitted spectra (K = {ks[0]:.0f})", font="-size 15").grid(
-            row=0, column=0, sticky=""
-        )
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         self.ax.set_ylabel(f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹")
         self.ax.legend()
@@ -529,14 +526,13 @@ class FittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.freeNames[-1]
+        self.xQuantity = titration.speciation.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.normalisation = False
         self.smooth = True
         self.logScale = False
 
     def populate(self):
-        titration = self.titration
         self.fig = Figure()
         self.ax = self.fig.add_subplot()
 
@@ -547,12 +543,6 @@ class FittedFrame(ttk.Frame):
         self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
         self.toolbar.update()
         self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
-
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
-        ttk.Label(self, text=f"Fitted curves (K = {ks[0]:.0f})", font="-size 15").grid(
-            row=0, column=0, sticky=""
-        )
 
         self.toggleButtonsFrame = ttk.Frame(self)
         self.toggleButtonsFrame.grid(row=1, column=1, sticky="")
@@ -620,7 +610,7 @@ class FittedFrame(ttk.Frame):
             defaultextension=".csv",
         )
         data = self.titration.lastFittedCurves
-        rowTitles = np.atleast_2d(self.titration.processedAdditionTitles).T
+        rowTitles = np.atleast_2d(self.titration.additionTitles).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:
@@ -637,7 +627,7 @@ class FittedFrame(ttk.Frame):
         # and xUnit in the titration object, which are used for the input
         # spectra.
         xQuantity = self.xQuantity
-        xUnit = titration.concsUnit
+        xUnit = titration.totalConcentrations.concsUnit
         xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
         if self.normalisation:
@@ -681,11 +671,16 @@ class FittedFrame(ttk.Frame):
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, fittedCurve, label=name)
                 continue
-            spl = make_interp_spline(
-                xConcs[filter], fittedCurve[filter], bc_type="natural"
-            )
-            smoothY = spl(smoothX)
-            self.ax.plot(smoothX, smoothY, label=name)
+            try:
+                spl = make_interp_spline(
+                    xConcs[filter], fittedCurve[filter], bc_type="natural"
+                )
+                smoothY = spl(smoothX)
+                self.ax.plot(smoothX, smoothY, label=name)
+            except ValueError:
+                # spline interpolation failed
+                self.ax.plot(xConcs, fittedCurve, label=name)
+                continue
 
         if self.logScale:
             self.ax.set_xscale("log")
@@ -724,7 +719,7 @@ class SpeciationFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.freeNames[-1]
+        self.xQuantity = titration.speciation.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.speciesVar = tk.StringVar(self)
         self.logScale = False
@@ -755,9 +750,9 @@ class SpeciationFrame(ttk.Frame):
         self.speciesDropdown = ttk.OptionMenu(
             self.optionsFrame,
             self.speciesVar,
-            titration.freeNames[0],
+            titration.speciation.freeNames[0],
             command=lambda *args: self.plot(),
-            *titration.freeNames,
+            *titration.speciation.freeNames,
             style="primary.Outline.TMenubutton",
         )
         self.speciesDropdown.pack()
@@ -796,7 +791,9 @@ class SpeciationFrame(ttk.Frame):
 
     @property
     def freeIndex(self):
-        return np.where(self.titration.freeNames == self.speciesVar.get())[0][0]
+        return np.where(self.titration.speciation.freeNames == self.speciesVar.get())[
+            0
+        ][0]
 
     def plot(self):
         self.ax.clear()
@@ -811,7 +808,7 @@ class SpeciationFrame(ttk.Frame):
         totalConcs = totalConcs[additionsFilter]
 
         xQuantity = self.xQuantity
-        xUnit = titration.concsUnit
+        xUnit = titration.totalConcentrations.concsUnit
         xConcs = (
             self.xConcs[additionsFilter]
             / totalConcentrations.prefixes[xUnit.strip("M")]
@@ -820,12 +817,13 @@ class SpeciationFrame(ttk.Frame):
         freeConcs = titration.lastFreeConcs[additionsFilter, :][:, self.freeIndex]
         freeName = self.speciesVar.get()
 
-        factor = abs(titration.stoichiometries[:, self.freeIndex])
+        factor = abs(titration.speciation.stoichiometries[:, self.freeIndex])
         boundFilter = factor.astype(bool)
 
         boundConcs = titration.lastBoundConcs * factor
         boundConcs = boundConcs[additionsFilter, :][:, boundFilter]
-        boundNames = titration.boundNames[boundFilter]
+        # TODO: make this work with polymers
+        boundNames = titration.speciation.boundNames[boundFilter]
 
         curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
         names = np.append(freeName, boundNames)
@@ -845,9 +843,16 @@ class SpeciationFrame(ttk.Frame):
                 # cannot do spline interpolation with fewer than 3 unique x-values
                 self.ax.plot(xConcs, curve, label=name)
                 continue
-            spl = make_interp_spline(xConcs[filter], curve[filter], bc_type="natural")
-            smoothY = spl(smoothX)
-            self.ax.plot(smoothX, smoothY, label=name)
+            try:
+                spl = make_interp_spline(
+                    xConcs[filter], curve[filter], bc_type="natural"
+                )
+                smoothY = spl(smoothX)
+                self.ax.plot(smoothX, smoothY, label=name)
+            except ValueError:
+                # spline interpolation failed
+                self.ax.plot(xConcs, curve, label=name)
+                continue
 
         if self.logScale:
             self.ax.set_xscale("log")
@@ -872,54 +877,53 @@ class ResultsFrame(ttk.Frame):
             self,
             0,
             0,
-            ["K (M⁻ⁿ)", "α"],
+            ["K (M⁻ⁿ)"],
             rowOptions=("readonlyTitles",),
             columnOptions=("readonlyTitles",),
         )
 
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = 10 ** titration.lastKs[: titration.kVarsCount()]
-
-        alphas = titration.knownAlphas.copy()
-        polymerAlphas = alphas[np.any(titration.stoichiometries < 0, 1)]
-        polymerAlphas[np.isnan(polymerAlphas)] = (
-            10
-            ** titration.lastKs[titration.kVarsCount() + titration.getConcVarsCount() :]
+        ks = titration.equilibriumConstants.run(
+            titration.fitResult[: titration.equilibriumConstants.variableCount]
         )
 
-        for kVarName, k, alpha in zip(self.titration.kVarsNames, ks, alphas):
-            kTable.addRow(kVarName, [np.rint(k), alpha if not np.isnan(alpha) else ""])
+        for (
+            name,
+            value,
+        ) in zip(titration.equilibriumConstants.outputNames, ks):
+            kTable.addRow(name, [np.rint(value)])
         kTable.pack(side="top", pady=15)
 
-        concVarsCount = titration.getConcVarsCount()
+        concVarsCount = titration.totalConcentrations.variableCount
         if concVarsCount > 0:
             concsTable = Table(
                 self,
                 0,
                 0,
-                [f"c ({titration.concsUnit})"],
+                [f"c ({titration.totalConcentrations.concsUnit})"],
                 rowOptions=["readonlyTitles"],
                 columnOptions=["readonlyTitles"],
             )
-            concNames = self.titration.getConcVarsNames()
+            concNames = self.titration.totalConcentrations.variableNames
             concs = (
                 10
-                ** titration.lastKs[
-                    titration.kVarsCount() : -titration.alphaVarsCount() or None
-                ]
+                ** titration.fitResult[titration.equilibriumConstants.variableCount :]
             )
             for concName, conc in zip(concNames, concs):
                 concsTable.addRow(
                     concName,
-                    [totalConcentrations.convertConc(conc, "M", titration.concsUnit)],
+                    [
+                        totalConcentrations.convertConc(
+                            conc, "M", titration.totalConcentrations.concsUnit
+                        )
+                    ],
                 )
             concsTable.pack(side="top", pady=15)
 
         sheet = tksheet.Sheet(
             self,
-            data=list(np.around(titration.lastFitResult, 2)),
+            data=list(np.around(titration.lastFittedSpectra, 2)),
             headers=list(titration.processedSignalTitlesStrings),
-            row_index=list(titration.contributorNames()),
+            row_index=list(titration.contributors.contributorNames),
             set_all_heights_and_widths=True,
         )
         sheet.enable_bindings()
@@ -938,8 +942,8 @@ class ResultsFrame(ttk.Frame):
             filetypes=[("CSV file", "*.csv")],
             defaultextension=".csv",
         )
-        data = self.titration.lastFitResult
-        rowTitles = np.atleast_2d(self.titration.contributorNames()).T
+        data = self.titration.lastFittedSpectra
+        rowTitles = np.atleast_2d(self.titration.contributors.contributorNames).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:

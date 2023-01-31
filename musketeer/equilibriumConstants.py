@@ -1,11 +1,71 @@
-import numpy as np
 import tkinter.ttk as ttk
-import tkinter.messagebox as mb
 from tkinter import font
 
+import numpy as np
+from numpy import ma
+
 from . import moduleFrame
-from .table import Table, ButtonFrame
 from .scrolledFrame import ScrolledFrame
+from .table import ButtonFrame, Table, WrappedLabel
+
+DEFAULT_INITIAL_GUESS = 1000
+
+
+class EquilibriumConstants(moduleFrame.Strategy):
+    requiredAttributes = (
+        "kNames",
+        "knownKs",
+        "initialKs",
+    )
+
+    @property
+    def outputNames(self):
+        return self.titration.speciation.variableNames
+
+    @property
+    def variableNames(self):
+        return self.kNames[self.knownKs.mask]
+
+    @property
+    def variableInitialGuesses(self):
+        return self.initialKs[self.knownKs.mask].filled(DEFAULT_INITIAL_GUESS)
+
+    def run(self, kVars):
+        ks = self.knownKs.copy()
+        ks[ks.mask] = kVars
+        return ks
+
+
+class GetKsAll(EquilibriumConstants):
+    # when every equilibrium constant is unknown and independent
+    @property
+    def kNames(self):
+        return self.titration.speciation.variableNames
+
+    @property
+    def knownKs(self):
+        return ma.array(np.empty(self.outputCount), mask=True)
+
+    @property
+    def initialKs(self):
+        return ma.array(np.empty(self.outputCount), mask=True)
+
+
+class GetKsNonspecific(EquilibriumConstants):
+    @property
+    def kNames(self):
+        return self.titration.speciation.variableNames
+
+    @property
+    def knownKs(self):
+        knownKs = ma.masked_array(np.empty(self.outputCount))
+        knownKs[self.trimerIndices] = 0.001
+        knownKs[~self.trimerIndices] = ma.masked
+        return knownKs
+
+    @property
+    def initialKs(self):
+        return ma.array(np.empty(self.outputCount), mask=True)
 
 
 class CustomKsTable(Table):
@@ -34,7 +94,7 @@ class CustomKsTable(Table):
             0,
             0,
             columnTitles,
-            allowBlanks=True,
+            maskBlanks=True,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
             boldTitles=True,
@@ -71,7 +131,7 @@ class CustomKsTable(Table):
     def createLabels(self, *args, **kwargs):
         try:
             labels = []
-            superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+            trans = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
             variables = self.rowTitles[1:]
             for globalK, statFactor, variableFactors in zip(
                 self.columnTitles[:-1],
@@ -85,9 +145,7 @@ class CustomKsTable(Table):
                     label += f" × {variable}"
                     if factor == 1:
                         continue
-                    label += "".join(
-                        [superscripts[int(digit)] for digit in str(factor)]
-                    )
+                    label += str(factor).translate(trans)
                 labels.append(label)
             self.label.configure(text="\n".join(labels))
         except Exception:
@@ -110,6 +168,21 @@ class CustomKsPopup(moduleFrame.Popup):
         height = int(self.master.winfo_height() * 0.4)
         self.frame = ttk.Frame(self, height=height)
         self.frame.pack(expand=True, fill="both")
+
+        customKsLabel = WrappedLabel(
+            self.frame,
+            text=(
+                "Each row represents a variable that will be optimised. The global K"
+                " for each complex is the product of a statistical factor and all the"
+                " variables raised to the exponent specified in the cells.\n\nIn the"
+                " final column, specify a value to fix the variable, leave empty to"
+                " optimise the variable, or write ~number to provide an initial guess"
+                " for the optimisation."
+            ),
+            padding=5,
+        )
+        customKsLabel.pack(expand=False, fill="both")
+
         scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
         scrolledFrame.pack(expand=True, fill="both")
 
@@ -139,14 +212,10 @@ class CustomKsPopup(moduleFrame.Popup):
         self.customKsTable.createLabels()
 
     def saveData(self):
-        try:
-            ksConstants = self.customKsTable.data[0, :-1]
-            kVarsNames = self.customKsTable.rowTitles[1:]
-            ksMatrix = self.customKsTable.data[1:, :-1]
-            knownKs = self.customKsTable.data[1:, -1]
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        ksConstants = self.customKsTable.data[0, :-1]
+        kVarsNames = self.customKsTable.rowTitles[1:]
+        ksMatrix = self.customKsTable.data[1:, :-1]
+        knownKs = self.customKsTable.data[1:, -1]
 
         self.titration.ksConstants = ksConstants
         self.titration.kVarsNames = kVarsNames
@@ -157,7 +226,8 @@ class CustomKsPopup(moduleFrame.Popup):
         self.destroy()
 
 
-class GetKsCustom(moduleFrame.Strategy):
+# TODO: convert to new format
+class GetKsCustom(EquilibriumConstants):
     Popup = CustomKsPopup
 
     popupAttributes = ("ksConstants", "kVarsNames", "ksMatrix", "knownKs")
@@ -175,7 +245,7 @@ class GetKsCustom(moduleFrame.Strategy):
 
         # perform the calculation as previewed in the popup
         globalKs = self.titration.ksConstants * np.prod(
-            microKs ** self.titration.ksMatrix, 0
+            microKs**self.titration.ksMatrix, 0
         )
         return (globalKs, alphaVars)
 
@@ -193,26 +263,37 @@ class KnownKsTable(Table):
             master,
             0,
             0,
-            ["Value", "α"],
-            allowBlanks=True,
+            ["Value"],
             rowOptions=("readonlyTitles",),
             columnOptions=("readonlyTitles",),
+            allowGuesses=True,
         )
+        self.outputNames = self.titration.speciation.variableNames
         self.populateDefault()
 
     def populateDefault(self):
-        for boundName, knownK, knownAlpha in zip(
-            self.titration.boundNames,
-            self.titration.knownKs,
-            self.titration.knownAlphas,
+        # TODO: knownKs and initialKs should be dicts or structured arrays, in order to
+        # still work if the required number of outputs changes
+        if len(self.outputNames) != len(self.titration.equilibriumConstants.knownKs):
+            for name in self.outputNames:
+                self.addRow(name, [""])
+            return
+
+        for name, knownK, initialK in zip(
+            self.outputNames,
+            self.titration.equilibriumConstants.knownKs,
+            self.titration.equilibriumConstants.initialKs,
         ):
-            self.addRow(
-                boundName,
-                [
-                    knownK if not np.isnan(knownK) else "",
-                    knownAlpha if not np.isnan(knownAlpha) else "",
-                ],
-            )
+            if knownK is not ma.masked:
+                value = f"{knownK:g}"
+            elif initialK is not ma.masked:
+                value = f"~{initialK:g}"
+            else:
+                value = ""
+            self.addRow(name, [value])
+
+    def convertData(self, string):
+        return string
 
 
 class KnownKsPopup(moduleFrame.Popup):
@@ -226,10 +307,15 @@ class KnownKsPopup(moduleFrame.Popup):
         frame.pack(expand=True, fill="both")
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
-        knownKsLabel = ttk.Label(
-            innerFrame, text="Enter known K values. Leave blank for unknown values."
+        knownKsLabel = WrappedLabel(
+            innerFrame,
+            text=(
+                "Enter known K values, leave empty to optimise the value, or write"
+                " ~number to provide an initial guess for the optimisation."
+            ),
+            padding=5,
         )
-        knownKsLabel.pack()
+        knownKsLabel.pack(expand=False, fill="both")
 
         self.knownKsTable = KnownKsTable(innerFrame, titration)
         self.knownKsTable.pack(expand=True, fill="both")
@@ -239,108 +325,34 @@ class KnownKsPopup(moduleFrame.Popup):
 
     def reset(self):
         self.knownKsTable.resetData()
-        self.knownKsTable.columnTitles = ["Value", "α"]
+        self.knownKsTable.columnTitles = ["Value"]
         self.knownKsTable.populateDefault()
 
     def saveData(self):
-        try:
-            knownKs = self.knownKsTable.data[:, 0]
-            knownAlphas = self.knownKsTable.data[:, 1]
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        kCells = self.knownKsTable.data[:, 0]
 
-        self.titration.knownKs = knownKs
-        self.titration.knownAlphas = knownAlphas
+        knownKs = ma.array(
+            [
+                ma.masked if kCell == "" or kCell.startswith("~") else float(kCell)
+                for kCell in kCells
+            ]
+        )
+        initialKs = ma.array(
+            [
+                float(kCell[1:]) if kCell.startswith("~") else ma.masked
+                for kCell in kCells
+            ]
+        )
+
+        self.knownKs = knownKs
+        self.initialKs = initialKs
         self.saved = True
         self.destroy()
 
 
-class GetKsKnown(moduleFrame.Strategy):
+class GetKsKnown(EquilibriumConstants):
     Popup = KnownKsPopup
-    popupAttributes = ("knownKs", "knownAlphas")
-
-    def __init__(self, titration):
-        self.titration = titration
-        if not (
-            hasattr(titration, "knownKs")
-            and len(titration.knownKs) == titration.boundCount
-        ):
-            titration.knownKs = np.full(titration.boundCount, np.nan)
-        if not (
-            hasattr(titration, "knownAlphas")
-            and len(titration.knownAlphas) == titration.boundCount
-        ):
-            titration.knownAlphas = np.full(titration.boundCount, np.nan)
-        titration.kVarsCount = self.kVarsCount
-        titration.alphaVarsCount = self.alphaVarsCount
-
-    def __call__(self, kVars, alphaVars):
-        # TODO: move to a better place
-        self.titration.kVarsNames = self.titration.boundNames
-        ks = self.titration.knownKs.copy()
-        ks[np.isnan(ks)] = kVars
-        alphas = self.titration.knownAlphas[self.titration.polymerIndices].copy()
-        alphas[np.isnan(alphas)] = alphaVars
-        return (ks, alphas)
-
-    def kVarsCount(self):
-        return np.count_nonzero(np.isnan(self.titration.knownKs))
-
-    def alphaVarsCount(self):
-        return np.count_nonzero(
-            np.isnan(self.titration.knownAlphas[self.titration.polymerIndices])
-        )
-
-
-class GetKsNonspecific(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-        titration.kVarsCount = self.kVarsCount
-        titration.alphaVarsCount = self.alphaVarsCount
-
-    def __call__(self, kVars, alphaVars):
-        # TODO: move to a better place
-        self.titration.kVarsNames = self.titration.boundNames
-        # TODO: consider replacing fixed value with percentage of 2:1 K
-        arbitrarilySmallK = 0.001
-        self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
-        self.titration.knownKs[self.trimerIndices()] = arbitrarilySmallK
-        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
-        ks = np.full(self.titration.boundCount, arbitrarilySmallK)
-        ks[~self.trimerIndices()] = kVars
-        return (ks, alphaVars)
-
-    def trimerIndices(self):
-        return self.titration.stoichiometries.sum(axis=1) == 3
-
-    def kVarsCount(self):
-        return self.titration.boundCount - np.count_nonzero(self.trimerIndices())
-
-    def alphaVarsCount(self):
-        return self.titration.polymerCount
-
-
-class GetKsAll(moduleFrame.Strategy):
-    # when every equilibrium constant is unknown and independent
-    def __init__(self, titration):
-        self.titration = titration
-        titration.kVarsCount = self.kVarsCount
-        titration.alphaVarsCount = self.alphaVarsCount
-
-    def alphaVarsCount(self):
-        return self.titration.polymerCount
-
-    def kVarsCount(self):
-        return self.titration.boundCount
-
-    def __call__(self, kVars, alphaVars):
-        # TODO: move to a better place
-        self.titration.kVarsNames = self.titration.boundNames
-        # TODO: move this to a more sensible place
-        self.titration.knownKs = np.full(self.titration.boundCount, np.nan)
-        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
-        return (kVars, alphaVars)
+    popupAttributes = ("knownKs", "initialKs")
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
@@ -350,6 +362,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "No, optimise all Ks": GetKsAll,
         "Assume second binding weak": GetKsNonspecific,
         "Fix some known Ks": GetKsKnown,
-        "Custom": GetKsCustom,
+        # "Custom": GetKsCustom,
     }
-    attributeName = "getKs"
+    attributeName = "equilibriumConstants"

@@ -1,22 +1,29 @@
-import numpy as np
 import tkinter.ttk as ttk
-import tkinter.messagebox as mb
+from abc import abstractmethod
+
+import numpy as np
 
 from . import moduleFrame
-from .table import Table, ButtonFrame, WrappedLabel
 from .scrolledFrame import ScrolledFrame
 from .style import padding
+from .table import ButtonFrame, Table, WrappedLabel
 
 
-class GetSignalVarsFromMatrix(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-        self.titration.contributorsMatrix = self.contributorsMatrix
-        self.titration.contributorNames = self.contributorNames
+class Contributors(moduleFrame.Strategy):
+    requiredAttributes = (
+        "contributorsMatrix",
+        "contributorNames",
+    )
 
-    def __call__(self, freeConcs, boundConcs):
+    @abstractmethod
+    def run(self, freeConcs, boundConcs):
+        pass
+
+
+class GetSignalVarsFromMatrix(Contributors):
+    def run(self, freeConcs, boundConcs):
         allConcs = np.concatenate((freeConcs, boundConcs), 1)
-        variableConcs = allConcs @ self.titration.contributorsMatrix().T
+        variableConcs = allConcs @ self.contributorsMatrix.T
         return variableConcs
 
 
@@ -29,7 +36,6 @@ class ContributorsTable(Table):
             0,
             0,
             columnTitles,
-            allowBlanks=False,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
             boldTitles=True,
@@ -84,13 +90,9 @@ class ContributorsPopup(moduleFrame.Popup):
         self.contributorsTable.pack(expand=True, fill="both")
 
     def saveData(self):
-        try:
-            _contributorsMatrix = self.contributorsTable.data
-            if np.all(_contributorsMatrix % 1 == 0):
-                _contributorsMatrix = _contributorsMatrix.astype(int)
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        _contributorsMatrix = self.contributorsTable.data
+        if np.all(_contributorsMatrix % 1 == 0):
+            _contributorsMatrix = _contributorsMatrix.astype(int)
 
         self.titration._contributorsMatrix = _contributorsMatrix
         self.titration._contributorNames = self.contributorsTable.rowTitles
@@ -99,6 +101,7 @@ class ContributorsPopup(moduleFrame.Popup):
         self.destroy()
 
 
+# TODO: convert to new format
 class GetSignalVarsCustom(GetSignalVarsFromMatrix):
     Popup = ContributorsPopup
     popupAttributes = ("_contributorsMatrix", "_contributorNames")
@@ -115,40 +118,41 @@ class GetSignalVarsCustom(GetSignalVarsFromMatrix):
         return self.titration._contributorNames
 
 
-class GetSignalVarsAll(moduleFrame.Strategy):
-    def __init__(self, titration):
-        self.titration = titration
-        self.titration.contributorsMatrix = self.contributorsMatrix
-        self.titration.contributorNames = self.contributorNames
-
+class GetSignalVarsAll(Contributors):
+    @property
     def contributorNames(self):
-        return np.concatenate((self.titration.freeNames, self.titration.boundNames))
+        return self.titration.speciation.outputNames
 
+    @property
     def contributorsMatrix(self):
-        totalCount = self.titration.freeCount + self.titration.boundCount
-        return np.identity(totalCount, dtype=int)
+        return np.identity(self.titration.speciation.outputCount, dtype=int)
 
-    def __call__(self, freeConcs, boundConcs):
+    def run(self, freeConcs, boundConcs):
         allConcs = np.concatenate((freeConcs, boundConcs), 1)
         return allConcs
 
 
 class GetSignalVarsSingle(GetSignalVarsFromMatrix):
+    requiredAttributes = GetSignalVarsFromMatrix.requiredAttributes + (
+        "contributorIndex",
+    )
+
+    # TODO: make this work with polymers
     def filter(self):
-        hostFree = np.zeros(self.titration.freeCount, dtype=int)
+        hostFree = np.zeros(self.titration.speciation.freeCount, dtype=int)
         hostFree[self.contributorIndex] = 1
 
-        hostBound = abs(self.titration.stoichiometries[:, self.contributorIndex])
+        hostBound = abs(
+            self.titration.speciation.stoichiometries[:, self.contributorIndex]
+        )
 
         return np.concatenate((hostFree, hostBound))
 
-    def filter_binary(self):
-        return self.filter().astype(bool).astype(int)
-
+    @property
     def contributorNames(self):
-        allNames = np.concatenate((self.titration.freeNames, self.titration.boundNames))
-        return allNames[self.filter().astype(bool)]
+        return self.titration.speciation.outputNames[self.filter().astype(bool)]
 
+    @property
     def contributorsMatrix(self):
         matrix = np.diag(self.filter())
         emptyRows = np.all(matrix == 0, axis=1)
@@ -158,6 +162,9 @@ class GetSignalVarsSingle(GetSignalVarsFromMatrix):
 class GetSignalVarsHost(GetSignalVarsSingle):
     contributorIndex = 0
 
+    def __init__(self, titration):
+        super().__init__(titration)
+
 
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Contributors"
@@ -165,6 +172,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownOptions = {
         "Only Host": GetSignalVarsHost,
         "All": GetSignalVarsAll,
-        "Custom": GetSignalVarsCustom,
+        # "Custom": GetSignalVarsCustom,
     }
-    attributeName = "getSignalVars"
+    attributeName = "contributors"

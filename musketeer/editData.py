@@ -1,17 +1,17 @@
-import tkinter as tk
-import tkinter.ttk as ttk
-import tkinter.messagebox as mb
-import tkinter.filedialog as fd
-from collections import namedtuple
 import csv
+import tkinter as tk
+import tkinter.filedialog as fd
+import tkinter.messagebox as mb
+import tkinter.ttk as ttk
+from collections import namedtuple
 
 import numpy as np
 from numpy import ma
 from tksheet import Sheet
 
 from . import moduleFrame
-from .table import ButtonFrame
 from .style import padding
+from .table import ButtonFrame
 
 Params = namedtuple(
     "Params",
@@ -200,13 +200,9 @@ class EditDataPopup(moduleFrame.Popup):
         return ma.masked_invalid(rawData.astype(float))
 
     def saveData(self):
-        try:
-            self.titration.rawData = self.processData()
-            for param in Params._fields:
-                setattr(self.titration, param, getattr(self, param).get())
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        self.titration.rawData = self.processData()
+        for param in Params._fields:
+            setattr(self.titration, param, getattr(self, param).get())
 
         self.saved = True
         self.destroy()

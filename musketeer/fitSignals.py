@@ -1,5 +1,5 @@
 import tkinter.ttk as ttk
-import tkinter.messagebox as mb
+from abc import abstractmethod
 
 import numpy as np
 from numpy import ma
@@ -7,17 +7,26 @@ from numpy.linalg import lstsq
 from scipy.optimize import lsq_linear
 
 from . import moduleFrame
-from .table import Table, ButtonFrame
+from .table import ButtonFrame, Table
 
 
 class FitSignals(moduleFrame.Strategy):
-    def __call__(self, signalVars, knownSpectra):
+    requiredAttributes = ()
+
+    @abstractmethod
+    def run(self, signalVars, knownSpectra):
+        pass
+
+
+class FitSignalsOrdinary(FitSignals):
+    def run(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
-        knownMask = ~np.isnan(knownSpectra[:, 0])
+        knownMask = ~knownSpectra.mask[:, 0]
         knownSignals = signalVars[:, knownMask]
         unknownSignals = signalVars[:, ~knownMask]
 
-        knownSpectrum = knownSignals @ knownSpectra[knownMask, :]
+        # TODO: investigate why this doesn't work with @
+        knownSpectrum = np.dot(knownSignals, knownSpectra[knownMask, :])
         unknownSpectrum = self.titration.processedData - knownSpectrum
 
         if ma.is_masked(unknownSpectrum):
@@ -56,7 +65,9 @@ class SignalConstraintsTable(Table):
     def __init__(self, master, titration):
         if hasattr(titration, "signalConstraints"):
             signalConstraints = np.where(
-                np.isinf(titration.signalConstraints), "", titration.signalConstraints
+                np.isinf(titration.fitSignals.signalConstraints),
+                "",
+                titration.fitSignals.signalConstraints,
             )
         else:
             signalConstraints = None
@@ -69,7 +80,7 @@ class SignalConstraintsTable(Table):
                 "Lower",
                 "Upper",
             ),
-            allowBlanks=True,
+            maskBlanks=True,
             rowOptions=(),
             columnOptions="readonlyTitles",
             boldTitles=True,
@@ -101,13 +112,9 @@ class SignalConstraintsPopup(moduleFrame.Popup):
         self.constraintsTable.data = np.array([["", ""]])
 
     def saveData(self):
-        try:
-            constraints = self.constraintsTable.data[0]
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
-            return
+        constraints = self.constraintsTable.data[0]
 
-        self.titration.signalConstraints = np.where(
+        self.signalConstraints = np.where(
             np.isnan(constraints), (-np.inf, np.inf), constraints
         )
 
@@ -115,7 +122,9 @@ class SignalConstraintsPopup(moduleFrame.Popup):
         self.destroy()
 
 
-class FitSignalsConstrained(moduleFrame.Strategy):
+class FitSignalsConstrained(FitSignals):
+    requiredAttributes = FitSignals.requiredAttributes + ("signalConstraints",)
+
     def __call__(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
         knownMask = ~np.isnan(knownSpectra[:, 0])
@@ -135,7 +144,7 @@ class FitSignalsConstrained(moduleFrame.Strategy):
                 result = lsq_linear(
                     unknownSignals[~signal.mask, :],
                     signal.compressed(),
-                    self.titration.signalConstraints,
+                    self.signalConstraints,
                     method="bvls",
                 )
                 fittedSignals[:, index] = result.x
@@ -145,7 +154,7 @@ class FitSignalsConstrained(moduleFrame.Strategy):
                 result = lsq_linear(
                     unknownSignals,
                     signal,
-                    self.titration.signalConstraints,
+                    self.signalConstraints,
                     method="bvls",
                 )
                 fittedSignals[:, index] = result.x
@@ -160,7 +169,7 @@ class FitSignalsConstrained(moduleFrame.Strategy):
 class FitSignalsNonnegative(FitSignalsConstrained):
     def __init__(self, titration):
         self.titration = titration
-        titration.signalConstraints = np.array([0, np.inf])
+        self.signalConstraints = np.array([0, np.inf])
 
 
 class FitSignalsCustom(FitSignalsConstrained):
@@ -172,7 +181,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Fit signals"
     dropdownLabelText = "Fit signals to curve using:"
     dropdownOptions = {
-        "Ordinary least squares": FitSignals,
+        "Ordinary least squares": FitSignalsOrdinary,
         "Nonnegative least squares": FitSignalsNonnegative,
         "Constrained least squares": FitSignalsCustom,
     }

@@ -2,10 +2,9 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import matplotlib
-from matplotlib.backends._backend_tk import NavigationToolbar2Tk
 from matplotlib.backend_bases import _Mode
-
-from tksheet import _tksheet, _tksheet_main_table, _tksheet_column_headers
+from matplotlib.backends._backend_tk import NavigationToolbar2Tk
+from tksheet import _tksheet, _tksheet_column_headers, _tksheet_main_table
 
 matplotlib.use("TkAgg")
 
