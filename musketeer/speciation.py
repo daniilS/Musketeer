@@ -107,7 +107,7 @@ class Speciation(moduleFrame.Strategy):
         polymerKs = np.empty(self.boundCount)
 
         polymersCounted = 0
-        for i in self.boundCount:
+        for i in range(self.boundCount):
             ks[i] = variables[i + polymersCounted]
             if self.polymerIndices[i]:
                 polymerKs[i] = variables[i + polymersCounted + 1]
@@ -266,8 +266,10 @@ class SpeciationCOGS(Speciation):
 
         # For polymers, return separate entries for terminal and internal groups
         bound = []
+        paddedPolymerParents = ma.array(np.empty(len(ks)), mask=True)
+        paddedPolymerParents[polymers] = polymerParents
         for k, polymerK, stoichiometries, isPolymer, parent in zip(
-            ks, polymerKs, M, self.polymerIndices, polymerParents
+            ks, polymerKs, M, self.polymerIndices, paddedPolymerParents
         ):
             if not isPolymer:
                 bound.append(k * np.prod(free**stoichiometries))

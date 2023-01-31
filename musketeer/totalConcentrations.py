@@ -62,7 +62,7 @@ class StockTable(Table):
             0,
             stockTitles,
             maskBlanks=True,
-            rowOptions=("readonlyTitles", "delete"),
+            rowOptions=("readonlyTitles",),
             columnOptions=("titles", "new", "delete"),
         )
 
@@ -117,7 +117,7 @@ class VolumesTable(Table):
             2,
             2,
             stockTitles,
-            rowOptions=("delete", "readonlyTitles"),
+            rowOptions=("readonlyTitles",),
             columnOptions=(),
         )
 

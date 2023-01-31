@@ -206,4 +206,4 @@ class Titration:
         return result.x
 
     def fitData(self):
-        self.fitResult = self.optimise()
+        self.fitResult = 10 ** self.optimise()

@@ -486,8 +486,8 @@ class FittedFrame(ttk.Frame):
         xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
         if self.normalisation:
-            curves = self.curves.T.copy()
-            fittedCurves = self.fittedCurves.T.copy()
+            curves = self.curves.T
+            fittedCurves = self.fittedCurves.T
             # normalise so that all the fitted curves have the same amplitude
             fittedDiff = self.fittedCurves.T - self.fittedCurves.T[0]
             maxFittedDiff = np.max(abs(fittedDiff), axis=0)
@@ -551,8 +551,8 @@ class FittedFrame(ttk.Frame):
 class DiscreteFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.curves = self.titration.processedData.T
-        self.fittedCurves = self.titration.lastFittedCurves.T
+        self.curves = self.titration.processedData.T.copy()
+        self.fittedCurves = self.titration.lastFittedCurves.T.copy()
         self.names = self.titration.processedSignalTitlesStrings
         self.populate()
         self.plot()
@@ -562,8 +562,8 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         peakIndices = self.titration.getPeakIndices()
-        self.curves = self.titration.processedData.T[peakIndices]
-        self.fittedCurves = self.titration.lastFittedCurves.T[peakIndices]
+        self.curves = self.titration.processedData.T[peakIndices].copy()
+        self.fittedCurves = self.titration.lastFittedCurves.T[peakIndices].copy()
         peakTitles = self.titration.processedSignalTitlesStrings[peakIndices]
         self.names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
         self.populate()
@@ -759,10 +759,7 @@ class ResultsFrame(ttk.Frame):
                 columnOptions=["readonlyTitles"],
             )
             concNames = self.titration.totalConcentrations.variableNames
-            concs = (
-                10
-                ** titration.fitResult[titration.equilibriumConstants.variableCount :]
-            )
+            concs = titration.fitResult[titration.equilibriumConstants.variableCount :]
             for concName, conc in zip(concNames, concs):
                 concsTable.addRow(
                     concName,
