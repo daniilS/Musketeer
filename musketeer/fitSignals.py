@@ -21,7 +21,7 @@ class FitSignals(moduleFrame.Strategy):
 class FitSignalsOrdinary(FitSignals):
     def run(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
-        knownMask = ~knownSpectra.mask[:, 0]
+        knownMask = ~ma.getmaskarray(knownSpectra)[:, 0]
         knownSignals = signalVars[:, knownMask]
         unknownSignals = signalVars[:, ~knownMask]
 
@@ -36,17 +36,18 @@ class FitSignalsOrdinary(FitSignals):
             residuals = np.empty(signalsCount)
 
             for index, signal in enumerate(unknownSpectrum.T):
+                signalMask = ma.getmaskarray(signal)
                 try:
                     fittedSignals[:, index], residuals[index], _, _ = lstsq(
-                        unknownSignals[~signal.mask, :], signal.compressed(), rcond=None
+                        unknownSignals[~signalMask, :], signal.compressed(), rcond=None
                     )
                 except ValueError:
                     # Should only happen with incorrect constraints
                     fittedSignals[:, index], _, _, _ = lstsq(
-                        unknownSignals[~signal.mask, :], signal.compressed(), rcond=None
+                        unknownSignals[~signalMask, :], signal.compressed(), rcond=None
                     )
                     residuals[index] = np.linalg.norm(
-                        unknownSignals[~signal.mask, :] @ fittedSignals[:, index]
+                        unknownSignals[~signalMask, :] @ fittedSignals[:, index]
                         - signal.compressed(),
                         ord=2,
                     )
@@ -142,7 +143,7 @@ class FitSignalsConstrained(FitSignals):
         if ma.is_masked(unknownSpectrum):
             for index, signal in enumerate(unknownSpectrum.T):
                 result = lsq_linear(
-                    unknownSignals[~signal.mask, :],
+                    unknownSignals[~ma.getmaskarray(signal), :],
                     signal.compressed(),
                     self.signalConstraints,
                     method="bvls",

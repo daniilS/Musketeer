@@ -5,6 +5,7 @@ from abc import abstractmethod
 from decimal import Decimal
 
 import numpy as np
+from numpy import ma
 
 from . import moduleFrame
 from .scrolledFrame import ScrolledFrame
@@ -24,7 +25,7 @@ prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 
 def convertConc(conc, fromUnit, toUnit):
-    if np.isnan(conc):
+    if conc is ma.masked:
         return ""
     conc = Decimal(conc)
     convertedConc = float(
@@ -319,14 +320,14 @@ class GetTotalConcsFromVolumes(totalConcentrations):
     @property
     def totalConcs(self):
         # If all total concentrations are known, they can be used by other strategies.
-        if len(self.variableNames != 0):
+        if len(self.variableNames) != 0:
             return np.empty((0, 0))
         else:
             return self.run(np.empty((0,)))
 
     @property
     def rowsWithBlanks(self):
-        return np.isnan(np.sum(self.stockConcs, 1))
+        return np.any(ma.getmaskarray(self.stockConcs), axis=1)
 
     @property
     def variableNames(self):
@@ -342,7 +343,7 @@ class GetTotalConcsFromVolumes(totalConcentrations):
                 concVarsNames.extend(
                     [
                         f"[{freeName}] in {stock}"
-                        for stock in self.stockTitles[np.isnan(concs)]
+                        for stock in self.stockTitles[ma.getmaskarray(concs)]
                     ]
                 )
             return np.array(concVarsNames)

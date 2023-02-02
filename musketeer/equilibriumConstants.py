@@ -23,16 +23,20 @@ class EquilibriumConstants(moduleFrame.Strategy):
         return self.titration.speciation.variableNames
 
     @property
+    def knownMask(self):
+        return ma.getmaskarray(self.knownKs)
+
+    @property
     def variableNames(self):
-        return self.kNames[self.knownKs.mask]
+        return self.kNames[self.knownMask]
 
     @property
     def variableInitialGuesses(self):
-        return self.initialKs[self.knownKs.mask].filled(DEFAULT_INITIAL_GUESS)
+        return self.initialKs[self.knownMask].filled(DEFAULT_INITIAL_GUESS)
 
     def run(self, kVars):
         ks = self.knownKs.copy()
-        ks[ks.mask] = kVars
+        ks[self.knownMask] = kVars
         return ks
 
 
@@ -353,6 +357,10 @@ class KnownKsPopup(moduleFrame.Popup):
 class GetKsKnown(EquilibriumConstants):
     Popup = KnownKsPopup
     popupAttributes = ("knownKs", "initialKs")
+
+    @property
+    def kNames(self):
+        return self.titration.speciation.variableNames
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
