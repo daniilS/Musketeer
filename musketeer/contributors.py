@@ -162,9 +162,6 @@ class GetSignalVarsSingle(GetSignalVarsFromMatrix):
 class GetSignalVarsHost(GetSignalVarsSingle):
     contributorIndex = 0
 
-    def __init__(self, titration):
-        super().__init__(titration)
-
 
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Contributors"

@@ -28,7 +28,6 @@ def find_nearest(array, value):
 
 def readUV(filePath):
     titration = Titration()
-    titration.title = os.path.basename(filePath)
     # set default parameters for UV-Vis titrations
     fillPredefinedParams(titration, predefinedParams["UV-Vis"])
 
@@ -169,7 +168,6 @@ def readNMR(filePath):
         cycler = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
 
         titration = Titration()
-        titration.title = os.path.basename(filePath)
         titration.additionTitles = np.array(additionTitles)
         fillPredefinedParams(titration, predefinedParams["NMR"])
 
@@ -267,7 +265,8 @@ def readNMR(filePath):
 
 
 def readMusketeer(filePath):
-    pass
+    serialised = np.load(filePath, allow_pickle=False)
+    return [serialised]
 
 
 fileReaders = np.array(

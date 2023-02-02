@@ -167,9 +167,7 @@ class FitSignalsConstrained(FitSignals):
 
 
 class FitSignalsNonnegative(FitSignalsConstrained):
-    def __init__(self, titration):
-        self.titration = titration
-        self.signalConstraints = np.array([0, np.inf])
+    signalConstraints = np.array([0, np.inf])
 
 
 class FitSignalsCustom(FitSignalsConstrained):

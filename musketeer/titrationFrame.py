@@ -29,7 +29,7 @@ from . import (
 from .scrolledFrame import ScrolledFrame
 from .style import padding
 from .table import Table
-from .titration import titrationAttributes
+from .titration import Titration, titrationAttributes
 
 warningIcon = "::tk::icons::warning"
 
@@ -46,10 +46,9 @@ titrationModules = [
 
 
 class TitrationFrame(ttk.Frame):
-    def __init__(self, parent, titration, *args, **kwargs):
+    def __init__(self, parent, titration, filePath=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.originalTitration = titration
-        self.filePath = None
+        self.filePath = filePath
 
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
@@ -68,7 +67,7 @@ class TitrationFrame(ttk.Frame):
 
         self.moduleFrames = {}
         for mod in titrationModules:
-            moduleFrame = mod.ModuleFrame(self.options, titration)
+            moduleFrame = mod.ModuleFrame(self.options)
             self.moduleFrames[mod.__name__] = moduleFrame
             moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
 
@@ -94,8 +93,66 @@ class TitrationFrame(ttk.Frame):
         )
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
-        self.numFits = 0
-        self.newFit()
+        if type(titration) is Titration:
+            self.originalTitration = titration
+            self.numFits = 0
+            self.newFit()
+        elif type(titration) is np.lib.npyio.NpzFile:
+            self.originalTitration = Titration()
+            for attribute in titrationAttributes:
+                try:
+                    value = titration[f".original.{attribute}"].item()
+                except ValueError:
+                    value = titration[f".original.{attribute}"]
+                except KeyError:
+                    continue
+                setattr(self.originalTitration, attribute, value)
+
+            self.numFits = titration[".numFits"].item()
+
+            for name in titration[".fits"]:
+                fit = Titration()
+
+                for attribute in titrationAttributes:
+                    try:
+                        value = titration[f"{name}.{attribute}"].item()
+                    except ValueError:
+                        value = titration[f"{name}.{attribute}"]
+                    except KeyError:
+                        continue
+                    setattr(fit, attribute, value)
+
+                for module in titrationModules:
+                    moduleFrame = module.ModuleFrame
+
+                    try:
+                        SelectedStrategy = moduleFrame.dropdownOptions[
+                            titration[f"{name}.{moduleFrame.attributeName}"].item()
+                        ]
+                    except KeyError:
+                        # no stategy selected
+                        continue
+
+                    selectedStrategy = SelectedStrategy(fit)
+                    for popupAttributeName in selectedStrategy.popupAttributes:
+                        key = f"{name}.{moduleFrame.attributeName}.{popupAttributeName}"
+                        try:
+                            popupAttribute = titration[key].item()
+                        except ValueError:
+                            popupAttribute = titration[key]
+                        except KeyError:
+                            continue
+                        setattr(selectedStrategy, popupAttributeName, popupAttribute)
+
+                    try:
+                        selectedStrategy.checkAttributes()
+                    except NotImplementedError:
+                        # required attribute missing
+                        continue
+
+                    setattr(fit, moduleFrame.attributeName, selectedStrategy)
+
+                self.newFit(fit, name, setDefault=False)
 
         self.notebook.bind("<<NotebookTabChanged>>", self.switchFit, add=True)
 
@@ -115,14 +172,20 @@ class TitrationFrame(ttk.Frame):
         return self.notebook.nametowidget(self.notebook.select())
 
     # TODO: make inner notebooks into separate class
-    def newFit(self, titration=None):
+    def newFit(self, titration=None, name=None, setDefault=True):
         if titration is None:
             titration = deepcopy(self.originalTitration)
-        self.numFits += 1
+        for moduleFrame in self.moduleFrames.values():
+            moduleFrame.update(titration, setDefault)
+        if setDefault:
+            self.numFits += 1
         nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
         nb.titration = titration
         nb.fitted = False
-        self.notebook.add(nb, text=f"Fit {self.numFits}")
+        if name is None:
+            name = f"Fit {self.numFits}"
+            titration.title = name
+        self.notebook.add(nb, text=name)
 
         if titration.continuous:
             nb.inputSpectraFrame = InputSpectraFrame(nb, nb.titration)
@@ -131,7 +194,7 @@ class TitrationFrame(ttk.Frame):
         self.notebook.select(str(nb))
 
     def copyFit(self):
-        self.newFit(deepcopy(self.currentTab.titration))
+        self.newFit(deepcopy(self.currentTab.titration), setDefault=False)
 
     def switchFit(self, event):
         nb = self.currentTab
@@ -184,7 +247,15 @@ class TitrationFrame(ttk.Frame):
 
     def saveFile(self, saveAs=False):
         options = {}
-        options["version"] = __version__
+        options[".version"] = __version__
+        options[".numFits"] = self.numFits
+
+        for titrationAttribute in titrationAttributes:
+            if not hasattr(self.originalTitration, titrationAttribute):
+                continue
+            options[f".original.{titrationAttribute}"] = getattr(
+                self.originalTitration, titrationAttribute
+            )
 
         fits = np.array([])
 
@@ -203,48 +274,38 @@ class TitrationFrame(ttk.Frame):
                     titration, titrationAttribute
                 )
 
-            attributeNames = np.array([])
-            dropdownValues = np.array([])
-
             for module in titrationModules:
                 moduleFrame = module.ModuleFrame
                 if not hasattr(titration, moduleFrame.attributeName):
                     continue
                 strategy = getattr(titration, moduleFrame.attributeName)
-                attributeNames = np.append(attributeNames, moduleFrame.attributeName)
-                dropdownValues = np.append(
-                    dropdownValues,
-                    list(moduleFrame.dropdownOptions.keys())[
-                        list(moduleFrame.dropdownOptions.values()).index(
-                            type(getattr(titration, moduleFrame.attributeName))
-                        )
-                    ],
-                )
+                options[f"{fit}.{moduleFrame.attributeName}"] = list(
+                    moduleFrame.dropdownOptions.keys()
+                )[
+                    list(moduleFrame.dropdownOptions.values()).index(
+                        type(getattr(titration, moduleFrame.attributeName))
+                    )
+                ]
+
                 for popupAttributeName in strategy.popupAttributes:
                     options[
                         f"{fit}.{moduleFrame.attributeName}.{popupAttributeName}"
                     ] = getattr(strategy, popupAttributeName)
 
-            options[f"{fit}.attributeNames"] = dropdownValues
-            options[f"{fit}.dropdownValues"] = dropdownValues
-
-            if tab.fitted:
-                options[f"{fit}.fitResult"] = titration.fitResult
-
-        options["fits"] = fits
+        options[".fits"] = fits
 
         if self.filePath is None:
             filePath = fd.asksaveasfilename(
                 title="Save as",
-                initialfile=f"{PurePath(titration.title).stem}.fit",
+                initialfile="New fit.fit",
                 filetypes=[("Musketeer file", "*.fit")],
                 defaultextension=".fit",
             )
-        elif saveAs:
+        elif saveAs or PurePath(self.filePath).suffix != ".fit":
             filePath = fd.asksaveasfilename(
                 title="Save as",
                 initialdir=PurePath(self.filePath).parent,
-                initialfile=PurePath(self.filePath).name,
+                initialfile=PurePath(self.filePath).stem + ".fit",
                 filetypes=[("Musketeer file", "*.fit")],
                 defaultextension=".fit",
             )
@@ -252,9 +313,14 @@ class TitrationFrame(ttk.Frame):
             filePath = self.filePath
 
         if filePath != "":
-            self.filePath = filePath
-            with open(self.filePath, "wb") as f:
-                np.savez(f, **options)
+            if filePath != self.filePath:
+                self.filePath = filePath
+                self.master.tab(self, text=PurePath(self.filePath).name)
+            try:
+                with open(self.filePath, "wb") as f:
+                    np.savez_compressed(f, **options)
+            except Exception as e:
+                mb.showerror(title="Failed to save file", message=e, parent=self)
 
 
 class InputSpectraFrame(ttk.Frame):
@@ -334,9 +400,7 @@ class InputSpectraFrame(ttk.Frame):
     def updateWLRange(self):
         from_ = float(self.fromSpinbox.get())
         to = float(self.toSpinbox.get())
-        self.titration.columnFilter = (self.titration.signalTitles >= from_) & (
-            self.titration.signalTitles <= to
-        )
+        self.titration.continuousRange = np.array([from_, to])
         self.plot()
 
 

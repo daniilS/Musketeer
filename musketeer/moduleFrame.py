@@ -24,11 +24,16 @@ class Strategy(ABC):
                 " class attribute requiredAttributes"
             )
 
+    def checkAttributes(self):
+        for attr in self.requiredAttributes:
+            if not hasattr(self, attr):
+                raise NotImplementedError(
+                    f"Can't set strategy {type(self).__name__} without"
+                    f" implementing the required attribute {attr}"
+                )
+
     def __init__(self, titration):
         self.titration = titration
-
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError()
 
     @property
     def outputCount(self):
@@ -60,17 +65,15 @@ class ModuleFrame(ttk.LabelFrame):
     attributeName = ""
     setDefault = True
 
-    def __init__(self, parent, titration, *args, **kwargs):
+    def __init__(self, parent, *args, **kwargs):
         super().__init__(parent, text=self.frameLabel, borderwidth=5, *args, **kwargs)
-        self.titration = titration
-
         self.stringVar = tk.StringVar()
 
         self.dropdownLabel = ttk.Label(self, text=self.dropdownLabelText)
         self.dropdownLabel.pack()
 
         strategies = list(self.dropdownOptions.keys())
-        self.lastValue = strategies[0] if self.setDefault else ""
+        self.lastValue = ""
         optionMenu = ttk.OptionMenu(
             self,
             self.stringVar,
@@ -80,13 +83,17 @@ class ModuleFrame(ttk.LabelFrame):
             style="primary.Outline.TMenubutton",
         )
         optionMenu.configure(width=30)
-        # call the callback for the default value
-        if self.setDefault:
-            self.callback(self.lastValue)
+
         optionMenu.pack(fill="x", pady=(5, 0))
 
-    def update(self, titration):
+    def update(self, titration, setDefault=False):
         self.titration = titration
+        if setDefault and self.setDefault:
+            defaultValue = list(self.dropdownOptions.keys())[0]
+            self.stringVar.set(defaultValue)
+            self.callback(defaultValue)
+            return
+
         if not hasattr(self.titration, self.attributeName):
             self.stringVar.set("")
             return
@@ -114,11 +121,7 @@ class ModuleFrame(ttk.LabelFrame):
             for attr in selectedStrategy.popupAttributes:
                 setattr(selectedStrategy, attr, getattr(popup, attr))
 
-        for attr in selectedStrategy.requiredAttributes:
-            if not hasattr(selectedStrategy, attr):
-                raise NotImplementedError(
-                    f"Can't set strategy {SelectedStrategy.__name__} without"
-                    f" implementing the required attribute {attr}"
-                )
+        selectedStrategy.checkAttributes()
+
         setattr(self.titration, self.attributeName, selectedStrategy)
         self.lastValue = value

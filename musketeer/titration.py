@@ -4,9 +4,8 @@ from scipy.signal import find_peaks
 
 titrationAttributes = (
     "title",
-    "filePath",
     "rawData",
-    "columnFilter",
+    "continuousRange",
     "hasSignalTitles",
     "hasAdditionTitles",
     "additionTitles",
@@ -16,15 +15,14 @@ titrationAttributes = (
     "yUnit",
     "xQuantity",
     "xUnit",
+    "fitResult",
 )
 
 
 class Titration:
     def __init__(self, title="Titration"):
         self.title = title
-        # identical to [True, True, True, ..., True]
-        self.columnFilter = slice(None)
-
+        self.continuousRange = np.array([-np.inf, np.inf])
         self.hasSignalTitles = False
         self.hasAdditionTitles = False
         self.transposeData = False
@@ -32,6 +30,15 @@ class Titration:
     @property
     def numAdditions(self):
         return self.processedData.shape[0]
+
+    @property
+    def columnFilter(self):
+        if self.continuous:
+            from_, to = self.continuousRange
+            return (self.signalTitles >= from_) & (self.signalTitles <= to)
+
+        else:
+            return slice(None)
 
     @property
     def processedData(self):

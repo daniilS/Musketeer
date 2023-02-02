@@ -4,6 +4,7 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
+from pathlib import PurePath
 from tkinter import font
 
 import numpy as np
@@ -156,12 +157,12 @@ class TitrationsNotebook(InteractiveNotebook):
         self.winfo_toplevel().bind(f"<{key}-{'-'.join(keys)}>", command)
 
     def newFile(self, *args):
-        titration = Titration("New Titration")
+        titration = Titration("Fit 1")
         titration.rawData = np.empty((0, 0))
         titration.continuous = False
 
         titrationFrame = TitrationFrame(self, titration, padding=padding)
-        self.add(titrationFrame, text=titration.title, sticky="nesw")
+        self.add(titrationFrame, text="New Titration", sticky="nesw")
         self.select(str(titrationFrame))
 
     def saveFile(self, *args):
@@ -190,8 +191,8 @@ class TitrationsNotebook(InteractiveNotebook):
         # create a tab for each titration, and let the titration object handle
         # its own I/O
         for titration in titrations:
-            titrationFrame = TitrationFrame(self, titration, padding=padding)
-            self.add(titrationFrame, text=titration.title, sticky="nesw")
+            titrationFrame = TitrationFrame(self, titration, filePath, padding=padding)
+            self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
             self.select(str(titrationFrame))
 
 

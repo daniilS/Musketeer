@@ -390,6 +390,8 @@ class Table(ttk.Frame):
             data[row, column] = self.convertData(cell.get())
         if self.maskBlanks:
             data = ma.masked_invalid(data)
+        if dtype is object:
+            data = data.astype(str)
         return data
 
     @data.setter
