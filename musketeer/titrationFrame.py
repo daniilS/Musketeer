@@ -297,7 +297,7 @@ class TitrationFrame(ttk.Frame):
         if self.filePath is None:
             filePath = fd.asksaveasfilename(
                 title="Save as",
-                initialfile="New fit.fit",
+                initialfile="New Titration.fit",
                 filetypes=[("Musketeer file", "*.fit")],
                 defaultextension=".fit",
             )
