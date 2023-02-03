@@ -16,6 +16,13 @@ titrationAttributes = (
     "xQuantity",
     "xUnit",
     "fitResult",
+    "lastKs",
+    "lastTotalConcs",
+    "lastFreeConcs",
+    "lastBoundConcs",
+    "lastSignalVars",
+    "lastFittedSpectra",
+    "lastFittedCurves",
 )
 
 
@@ -174,6 +181,7 @@ class Titration:
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
         speciationVars = self.equilibriumConstants.run(kVars)
+        self.lastKs = speciationVars
         totalConcs = self.totalConcentrations.run(totalConcVars)
         self.lastTotalConcs = totalConcs
 

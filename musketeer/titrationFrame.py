@@ -49,6 +49,7 @@ class TitrationFrame(ttk.Frame):
     def __init__(self, parent, titration, filePath=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.filePath = filePath
+        self.numFits = 0
 
         # options bar on the left
         scrolledFrame = ScrolledFrame(self)
@@ -95,29 +96,23 @@ class TitrationFrame(ttk.Frame):
 
         if type(titration) is Titration:
             self.originalTitration = titration
-            self.numFits = 0
             self.newFit()
         elif type(titration) is np.lib.npyio.NpzFile:
             self.originalTitration = Titration()
             for attribute in titrationAttributes:
                 try:
-                    value = titration[f".original.{attribute}"].item()
-                except ValueError:
-                    value = titration[f".original.{attribute}"]
+                    # Use [()] to extract values from scalar arrays, but not 1d arrays.
+                    value = titration[f".original.{attribute}"][()]
                 except KeyError:
                     continue
                 setattr(self.originalTitration, attribute, value)
-
-            self.numFits = titration[".numFits"].item()
 
             for name in titration[".fits"]:
                 fit = Titration()
 
                 for attribute in titrationAttributes:
                     try:
-                        value = titration[f"{name}.{attribute}"].item()
-                    except ValueError:
-                        value = titration[f"{name}.{attribute}"]
+                        value = titration[f"{name}.{attribute}"][()]
                     except KeyError:
                         continue
                     setattr(fit, attribute, value)
@@ -127,7 +122,7 @@ class TitrationFrame(ttk.Frame):
 
                     try:
                         SelectedStrategy = moduleFrame.dropdownOptions[
-                            titration[f"{name}.{moduleFrame.attributeName}"].item()
+                            titration[f"{name}.{moduleFrame.attributeName}"][()]
                         ]
                     except KeyError:
                         # no stategy selected
@@ -137,9 +132,7 @@ class TitrationFrame(ttk.Frame):
                     for popupAttributeName in selectedStrategy.popupAttributes:
                         key = f"{name}.{moduleFrame.attributeName}.{popupAttributeName}"
                         try:
-                            popupAttribute = titration[key].item()
-                        except ValueError:
-                            popupAttribute = titration[key]
+                            popupAttribute = titration[key][()]
                         except KeyError:
                             continue
                         setattr(selectedStrategy, popupAttributeName, popupAttribute)
@@ -153,6 +146,8 @@ class TitrationFrame(ttk.Frame):
                     setattr(fit, moduleFrame.attributeName, selectedStrategy)
 
                 self.newFit(fit, name, setDefault=False)
+
+            self.numFits = titration[".numFits"][()]
 
         self.notebook.bind("<<NotebookTabChanged>>", self.switchFit, add=True)
 
@@ -177,11 +172,9 @@ class TitrationFrame(ttk.Frame):
             titration = deepcopy(self.originalTitration)
         for moduleFrame in self.moduleFrames.values():
             moduleFrame.update(titration, setDefault)
-        if setDefault:
-            self.numFits += 1
+        self.numFits += 1
         nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
         nb.titration = titration
-        nb.fitted = False
         if name is None:
             name = f"Fit {self.numFits}"
             titration.title = name
@@ -191,6 +184,8 @@ class TitrationFrame(ttk.Frame):
             nb.inputSpectraFrame = InputSpectraFrame(nb, nb.titration)
             nb.add(nb.inputSpectraFrame, text="Input Spectra")
 
+        if hasattr(titration, "fitResult"):
+            self.showFit(nb)
         self.notebook.select(str(nb))
 
     def copyFit(self):
@@ -208,8 +203,10 @@ class TitrationFrame(ttk.Frame):
         except Exception as e:
             mb.showerror(title="Failed to fit data", message=e, parent=self)
             return
+        self.showFit(nb)
 
-        if nb.fitted:
+    def showFit(self, nb):
+        if hasattr(nb.titration, "fitResult"):
             lastTabClass = type(nb.nametowidget(nb.select()))
             for tab in nb.tabs():
                 widget = nb.nametowidget(tab)
@@ -217,6 +214,8 @@ class TitrationFrame(ttk.Frame):
                     continue
                 nb.forget(widget)
                 widget.destroy()
+        else:
+            lastTabClass = None
 
         if nb.titration.continuous:
             nb.continuousFittedFrame = ContinuousFittedFrame(nb, nb.titration)
@@ -235,14 +234,13 @@ class TitrationFrame(ttk.Frame):
         nb.resultsFrame = ResultsFrame(nb, nb.titration)
         nb.add(nb.resultsFrame, text="Results")
 
-        if nb.fitted:
+        if lastTabClass is not None:
             for tab in nb.tabs():
                 widget = nb.nametowidget(tab)
                 if isinstance(widget, lastTabClass):
                     nb.select(str(widget))
                     break
         else:
-            nb.fitted = True
             nb.select(str(nb.discreteFittedFrame))
 
     def saveFile(self, saveAs=False):
@@ -251,11 +249,12 @@ class TitrationFrame(ttk.Frame):
         options[".numFits"] = self.numFits
 
         for titrationAttribute in titrationAttributes:
-            if not hasattr(self.originalTitration, titrationAttribute):
+            try:
+                options[f".original.{titrationAttribute}"] = getattr(
+                    self.originalTitration, titrationAttribute
+                )
+            except AttributeError:
                 continue
-            options[f".original.{titrationAttribute}"] = getattr(
-                self.originalTitration, titrationAttribute
-            )
 
         fits = np.array([])
 
@@ -268,17 +267,19 @@ class TitrationFrame(ttk.Frame):
 
             titration = tab.titration
             for titrationAttribute in titrationAttributes:
-                if not hasattr(titration, titrationAttribute):
+                try:
+                    options[f"{fit}.{titrationAttribute}"] = getattr(
+                        titration, titrationAttribute
+                    )
+                except AttributeError:
                     continue
-                options[f"{fit}.{titrationAttribute}"] = getattr(
-                    titration, titrationAttribute
-                )
 
             for module in titrationModules:
                 moduleFrame = module.ModuleFrame
-                if not hasattr(titration, moduleFrame.attributeName):
+                try:
+                    strategy = getattr(titration, moduleFrame.attributeName)
+                except AttributeError:
                     continue
-                strategy = getattr(titration, moduleFrame.attributeName)
                 options[f"{fit}.{moduleFrame.attributeName}"] = list(
                     moduleFrame.dropdownOptions.keys()
                 )[
@@ -858,9 +859,7 @@ class ResultsFrame(ttk.Frame):
             columnOptions=("readonlyTitles",),
         )
 
-        ks = titration.equilibriumConstants.run(
-            titration.fitResult[: titration.equilibriumConstants.variableCount]
-        )
+        ks = titration.lastKs
 
         for (
             name,
