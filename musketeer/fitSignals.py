@@ -126,13 +126,13 @@ class SignalConstraintsPopup(moduleFrame.Popup):
 class FitSignalsConstrained(FitSignals):
     requiredAttributes = FitSignals.requiredAttributes + ("signalConstraints",)
 
-    def __call__(self, signalVars, knownSpectra):
+    def run(self, signalVars, knownSpectra):
         # rows are additions, columns are contributors
-        knownMask = ~np.isnan(knownSpectra[:, 0])
+        knownMask = ~ma.getmaskarray(knownSpectra)[:, 0]
         knownSignals = signalVars[:, knownMask]
         unknownSignals = signalVars[:, ~knownMask]
 
-        knownSpectrum = knownSignals @ knownSpectra[knownMask, :]
+        knownSpectrum = np.dot(knownSignals, knownSpectra[knownMask, :])
         unknownSpectrum = self.titration.processedData - knownSpectrum
 
         signalsCount = unknownSpectrum.shape[1]
@@ -178,10 +178,10 @@ class FitSignalsCustom(FitSignalsConstrained):
 
 class ModuleFrame(moduleFrame.ModuleFrame):
     frameLabel = "Fit signals"
-    dropdownLabelText = "Fit signals to curve using:"
+    dropdownLabelText = "Apply constraints to fitted signals?"
     dropdownOptions = {
-        "Ordinary least squares": FitSignalsOrdinary,
-        "Nonnegative least squares": FitSignalsNonnegative,
-        "Constrained least squares": FitSignalsCustom,
+        "No": FitSignalsOrdinary,
+        "Nonnegative": FitSignalsNonnegative,
+        "Custom constraints": FitSignalsCustom,
     }
     attributeName = "fitSignals"
