@@ -349,7 +349,7 @@ class InputSpectraFrame(ttk.Frame):
         self.titration = titration
 
         rangeSelection = ttk.Frame(self)
-        rangeSelection.grid(row=0, column=0, columnspan=2, sticky="")
+        rangeSelection.grid(row=0, column=1, sticky="s", pady=padding)
 
         ttk.Label(rangeSelection, text=f"Range of {titration.xQuantity} to fit:").pack(
             side="left"
@@ -387,20 +387,24 @@ class InputSpectraFrame(ttk.Frame):
 
         toolbar = NavigationToolbarVertical(canvas, self, pack_toolbar=False)
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="ne", padx=padding)
+        toolbar.grid(row=1, column=0, sticky="ne")
 
         self.columnconfigure(
             0,
-            weight=1,
+            weight=1000,
+            uniform="column",
             minsize=max(w.winfo_reqwidth() for w in toolbar.children.values()),
         )
         self.columnconfigure(1, weight=1)
+        self.columnconfigure(2, weight=1000, uniform="column")
         self.rowconfigure(
             0,
-            weight=1,
+            weight=1000,
+            uniform="row",
             minsize=max(w.winfo_reqheight() for w in rangeSelection.children.values()),
         )
         self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
         self.plot()
@@ -448,7 +452,7 @@ class ContinuousFittedFrame(ttk.Frame):
 
         toolbar = NavigationToolbarVertical(canvas, self, pack_toolbar=False)
         toolbar.update()
-        toolbar.grid(row=1, column=0, sticky="ne", padx=padding)
+        toolbar.grid(row=1, column=0, sticky="ne")
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
@@ -476,19 +480,21 @@ class ContinuousFittedFrame(ttk.Frame):
         self.columnconfigure(
             0,
             weight=1000,
+            uniform="column",
             minsize=max(w.winfo_reqwidth() for w in toolbar.children.values()),
         )
         self.columnconfigure(1, weight=1, minsize=0)
         self.columnconfigure(
             2,
             weight=1000,
+            uniform="column",
             minsize=max(
                 w.winfo_reqwidth() for w in self.optionsFrame.children.values()
             ),
         )
-        self.rowconfigure(0, weight=1000)
+        self.rowconfigure(0, weight=1000, uniform="row")
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1000)
+        self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
     def plot(self):
@@ -598,19 +604,21 @@ class FittedFrame(ttk.Frame):
         self.columnconfigure(
             0,
             weight=1000,
+            uniform="column",
             minsize=max(w.winfo_reqwidth() for w in self.toolbar.children.values()),
         )
         self.columnconfigure(1, weight=1, minsize=0)
         self.columnconfigure(
             2,
             weight=1000,
+            uniform="column",
             minsize=max(
                 w.winfo_reqwidth() for w in self.toggleButtonsFrame.children.values()
             ),
         )
-        self.rowconfigure(0, weight=1000)
+        self.rowconfigure(0, weight=1000, uniform="row")
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1000)
+        self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
     def toggleNormalisation(self):
@@ -802,19 +810,21 @@ class SpeciationFrame(ttk.Frame):
         self.columnconfigure(
             0,
             weight=1000,
+            uniform="column",
             minsize=max(w.winfo_reqwidth() for w in self.toolbar.children.values()),
         )
         self.columnconfigure(1, weight=1, minsize=0)
         self.columnconfigure(
             2,
             weight=1000,
+            uniform="column",
             minsize=max(
                 w.winfo_reqwidth() for w in self.optionsFrame.children.values()
             ),
         )
-        self.rowconfigure(0, weight=1000)
+        self.rowconfigure(0, weight=1000, uniform="row")
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1000)
+        self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
     def toggleLogScale(self):
