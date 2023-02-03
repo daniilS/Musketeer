@@ -9,7 +9,7 @@ from pathlib import PurePath
 import numpy as np
 import tksheet
 from cycler import cycler
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from scipy.interpolate import make_interp_spline
 from ttkbootstrap.widgets import InteractiveNotebook
@@ -26,12 +26,15 @@ from . import (
     speciation,
     totalConcentrations,
 )
+from .patchMatplotlib import NavigationToolbarVertical
 from .scrolledFrame import ScrolledFrame
 from .style import padding
 from .table import Table
 from .titration import Titration, titrationAttributes
 
-warningIcon = "::tk::icons::warning"
+# Magic value indicating that the data in a .fit file should be copied from the original
+# titration
+COPY_ORIGINAL_ARRAY = "COPY_OGIRINAL_ARRAY"
 
 titrationModules = [
     speciation,
@@ -101,10 +104,11 @@ class TitrationFrame(ttk.Frame):
             self.originalTitration = Titration()
             for attribute in titrationAttributes:
                 try:
-                    # Use [()] to extract values from scalar arrays, but not 1d arrays.
-                    value = titration[f".original.{attribute}"][()]
+                    value = titration[f".original.{attribute}"]
                 except KeyError:
                     continue
+                if value.shape == ():
+                    value = value.item()
                 setattr(self.originalTitration, attribute, value)
 
             for name in titration[".fits"]:
@@ -112,9 +116,16 @@ class TitrationFrame(ttk.Frame):
 
                 for attribute in titrationAttributes:
                     try:
-                        value = titration[f"{name}.{attribute}"][()]
+                        value = titration[f"{name}.{attribute}"]
                     except KeyError:
                         continue
+
+                    if value.shape == ():
+                        value = value.item()
+                    if (type(value) == type(COPY_ORIGINAL_ARRAY)) and (
+                        value == COPY_ORIGINAL_ARRAY
+                    ):
+                        value = getattr(self.originalTitration, attribute).copy()
                     setattr(fit, attribute, value)
 
                 for module in titrationModules:
@@ -122,7 +133,7 @@ class TitrationFrame(ttk.Frame):
 
                     try:
                         SelectedStrategy = moduleFrame.dropdownOptions[
-                            titration[f"{name}.{moduleFrame.attributeName}"][()]
+                            titration[f"{name}.{moduleFrame.attributeName}"].item()
                         ]
                     except KeyError:
                         # no stategy selected
@@ -132,9 +143,11 @@ class TitrationFrame(ttk.Frame):
                     for popupAttributeName in selectedStrategy.popupAttributes:
                         key = f"{name}.{moduleFrame.attributeName}.{popupAttributeName}"
                         try:
-                            popupAttribute = titration[key][()]
+                            popupAttribute = titration[key]
                         except KeyError:
                             continue
+                        if popupAttribute.shape == ():
+                            popupAttribute = popupAttribute.item()
                         setattr(selectedStrategy, popupAttributeName, popupAttribute)
 
                     try:
@@ -147,7 +160,7 @@ class TitrationFrame(ttk.Frame):
 
                 self.newFit(fit, name, setDefault=False)
 
-            self.numFits = titration[".numFits"][()]
+            self.numFits = titration[".numFits"].item()
 
         self.notebook.bind("<<NotebookTabChanged>>", self.switchFit, add=True)
 
@@ -267,6 +280,12 @@ class TitrationFrame(ttk.Frame):
 
             titration = tab.titration
             for titrationAttribute in titrationAttributes:
+                if (titrationAttribute == "rawData") and np.array_equal(
+                    titration.rawData, self.originalTitration.rawData
+                ):
+                    options[f"{fit}.{titrationAttribute}"] = COPY_ORIGINAL_ARRAY
+                    continue
+
                 try:
                     options[f"{fit}.{titrationAttribute}"] = getattr(
                         titration, titrationAttribute
@@ -330,7 +349,7 @@ class InputSpectraFrame(ttk.Frame):
         self.titration = titration
 
         rangeSelection = ttk.Frame(self)
-        rangeSelection.grid(row=0, column=0, sticky="")
+        rangeSelection.grid(row=0, column=0, columnspan=2, sticky="")
 
         ttk.Label(rangeSelection, text=f"Range of {titration.xQuantity} to fit:").pack(
             side="left"
@@ -355,7 +374,7 @@ class InputSpectraFrame(ttk.Frame):
         self.toSpinbox.set(f"{maxWL:.{decimals}f}")
         self.toSpinbox.pack(padx=padding, side="left")
 
-        self.fig = Figure()
+        self.fig = Figure(layout="constrained")
         self.ax = self.fig.add_subplot()
 
         ttk.Button(rangeSelection, text="Update", command=self.updateWLRange).pack(
@@ -364,15 +383,24 @@ class InputSpectraFrame(ttk.Frame):
 
         canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
-        toolbar = NavigationToolbar2Tk(canvas, self, pack_toolbar=False)
+        toolbar = NavigationToolbarVertical(canvas, self, pack_toolbar=False)
         toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
+        toolbar.grid(row=1, column=0, sticky="ne", padx=padding)
 
-        self.rowconfigure(0, weight=1)
+        self.columnconfigure(
+            0,
+            weight=1,
+            minsize=max(w.winfo_reqwidth() for w in toolbar.children.values()),
+        )
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(
+            0,
+            weight=1,
+            minsize=max(w.winfo_reqheight() for w in rangeSelection.children.values()),
+        )
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
         self.grid_anchor("center")
 
         self.plot()
@@ -395,7 +423,6 @@ class InputSpectraFrame(ttk.Frame):
         ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
 
-        fig.tight_layout()
         fig.canvas.draw_idle()
 
     def updateWLRange(self):
@@ -413,18 +440,18 @@ class ContinuousFittedFrame(ttk.Frame):
         self.plot()
 
     def populate(self):
-        self.fig = Figure()
+        self.fig = Figure(layout="constrained")
         self.ax = self.fig.add_subplot()
         canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+        canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
-        toolbar = NavigationToolbar2Tk(canvas, self, pack_toolbar=False)
+        toolbar = NavigationToolbarVertical(canvas, self, pack_toolbar=False)
         toolbar.update()
-        toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
+        toolbar.grid(row=1, column=0, sticky="ne", padx=padding)
 
         self.optionsFrame = ttk.Frame(self)
-        self.optionsFrame.grid(row=1, column=1, sticky="")
+        self.optionsFrame.grid(row=1, column=2, sticky="w")
         self.speciesLabel = ttk.Label(
             self.optionsFrame, anchor="center", justify="center", text="Show:"
         )
@@ -446,9 +473,22 @@ class ContinuousFittedFrame(ttk.Frame):
         )
         self.deconvolutionDropdown.pack()
 
-        self.rowconfigure(0, weight=1)
+        self.columnconfigure(
+            0,
+            weight=1000,
+            minsize=max(w.winfo_reqwidth() for w in toolbar.children.values()),
+        )
+        self.columnconfigure(1, weight=1, minsize=0)
+        self.columnconfigure(
+            2,
+            weight=1000,
+            minsize=max(
+                w.winfo_reqwidth() for w in self.optionsFrame.children.values()
+            ),
+        )
+        self.rowconfigure(0, weight=1000)
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(2, weight=1000)
         self.grid_anchor("center")
 
     def plot(self):
@@ -496,8 +536,6 @@ class ContinuousFittedFrame(ttk.Frame):
         self.ax.legend()
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
 
-        self.fig.tight_layout()
-
 
 class FittedFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
@@ -510,19 +548,19 @@ class FittedFrame(ttk.Frame):
         self.logScale = False
 
     def populate(self):
-        self.fig = Figure()
+        self.fig = Figure(layout="constrained")
         self.ax = self.fig.add_subplot()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.draw()
-        self.canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+        self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
-        self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
+        self.toolbar = NavigationToolbarVertical(self.canvas, self, pack_toolbar=False)
         self.toolbar.update()
-        self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
+        self.toolbar.grid(row=1, column=0, sticky="ne")
 
         self.toggleButtonsFrame = ttk.Frame(self)
-        self.toggleButtonsFrame.grid(row=1, column=1, sticky="")
+        self.toggleButtonsFrame.grid(row=1, column=2, sticky="w")
         self.normalisationButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
             text="Normalise movement",
@@ -557,9 +595,22 @@ class FittedFrame(ttk.Frame):
         )
         self.saveCurvesButton.pack(pady=padding, fill="x")
 
-        self.rowconfigure(0, weight=1)
+        self.columnconfigure(
+            0,
+            weight=1000,
+            minsize=max(w.winfo_reqwidth() for w in self.toolbar.children.values()),
+        )
+        self.columnconfigure(1, weight=1, minsize=0)
+        self.columnconfigure(
+            2,
+            weight=1000,
+            minsize=max(
+                w.winfo_reqwidth() for w in self.toggleButtonsFrame.children.values()
+            ),
+        )
+        self.rowconfigure(0, weight=1000)
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(2, weight=1000)
         self.grid_anchor("center")
 
     def toggleNormalisation(self):
@@ -665,7 +716,6 @@ class FittedFrame(ttk.Frame):
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
         self.ax.legend()
-        self.fig.tight_layout()
 
         self.canvas.draw()
 
@@ -706,19 +756,19 @@ class SpeciationFrame(ttk.Frame):
 
     def populate(self):
         titration = self.titration
-        self.fig = Figure()
+        self.fig = Figure(layout="constrained")
         self.ax = self.fig.add_subplot()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.draw()
-        self.canvas.get_tk_widget().grid(row=1, column=0, sticky="")
+        self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
-        self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
+        self.toolbar = NavigationToolbarVertical(self.canvas, self, pack_toolbar=False)
         self.toolbar.update()
-        self.toolbar.grid(row=2, column=0, sticky="w", padx=10 * padding)
+        self.toolbar.grid(row=1, column=0, sticky="ne")
 
         self.optionsFrame = ttk.Frame(self)
-        self.optionsFrame.grid(row=1, column=1, sticky="")
+        self.optionsFrame.grid(row=1, column=2, sticky="w")
         self.speciesLabel = ttk.Label(
             self.optionsFrame, anchor="center", justify="center", text="Select species:"
         )
@@ -749,9 +799,22 @@ class SpeciationFrame(ttk.Frame):
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
-        self.rowconfigure(0, weight=1)
+        self.columnconfigure(
+            0,
+            weight=1000,
+            minsize=max(w.winfo_reqwidth() for w in self.toolbar.children.values()),
+        )
+        self.columnconfigure(1, weight=1, minsize=0)
+        self.columnconfigure(
+            2,
+            weight=1000,
+            minsize=max(
+                w.winfo_reqwidth() for w in self.optionsFrame.children.values()
+            ),
+        )
+        self.rowconfigure(0, weight=1000)
         self.rowconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(2, weight=1000)
         self.grid_anchor("center")
 
     def toggleLogScale(self):
@@ -837,7 +900,6 @@ class SpeciationFrame(ttk.Frame):
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
         self.ax.legend()
-        self.fig.tight_layout()
 
         self.canvas.draw()
 
@@ -846,7 +908,12 @@ class ResultsFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.sigfigs = 3
         self.showResults()
+
+    # TODO: add spinbox for sigfigs
+    def formatK(self, k):
+        return f"{float(f'{k:.{self.sigfigs}g}'):.{max(self.sigfigs, 6)}g}"
 
     def showResults(self):
         titration = self.titration
@@ -865,7 +932,7 @@ class ResultsFrame(ttk.Frame):
             name,
             value,
         ) in zip(titration.equilibriumConstants.outputNames, ks):
-            kTable.addRow(name, [np.rint(value)])
+            kTable.addRow(name, [self.formatK(value)])
         kTable.pack(side="top", pady=15)
 
         concVarsCount = titration.totalConcentrations.variableCount

@@ -97,13 +97,12 @@ class ModuleFrame(ttk.LabelFrame):
         if not hasattr(self.titration, self.attributeName):
             self.stringVar.set("")
             return
-        self.stringVar.set(
-            list(self.dropdownOptions.keys())[
-                list(self.dropdownOptions.values()).index(
-                    type(getattr(self.titration, self.attributeName))
-                )
-            ]
-        )
+        self.lastValue = list(self.dropdownOptions.keys())[
+            list(self.dropdownOptions.values()).index(
+                type(getattr(self.titration, self.attributeName))
+            )
+        ]
+        self.stringVar.set(self.lastValue)
 
     def callback(self, value):
         SelectedStrategy = self.dropdownOptions[value]
