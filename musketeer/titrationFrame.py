@@ -656,7 +656,7 @@ class FittedFrame(ttk.Frame):
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",")
+            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
         except Exception as e:
             mb.showerror(title="Could not save file", message=e, parent=self)
 
@@ -1028,6 +1028,6 @@ class ResultsFrame(ttk.Frame):
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",")
+            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
         except Exception as e:
             mb.showerror(title="Could not save file", message=e, parent=self)
