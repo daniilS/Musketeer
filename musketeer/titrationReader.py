@@ -51,7 +51,7 @@ def readUV(filePath):
             absorbances.append(row[1::2])
 
     titration.additionTitles = np.array(titleRow)
-    titration.signalTitles = wavelengths
+    titration.signalTitles = np.array(wavelengths)
 
     # transpose data so that the column is the wavelength
     titration.rawData = np.array(absorbances, dtype=float).T
