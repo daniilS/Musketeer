@@ -1,5 +1,7 @@
 from abc import abstractmethod
 
+import numpy as np
+
 from . import moduleFrame
 
 
@@ -18,9 +20,9 @@ class GetConcs(Proportionality):
 
 class GetFraction(Proportionality):
     def run(self, signalVars, totalConcs):
-        # divide by total host concs
-        # TODO: support proportionality to other total concs
-        return signalVars / totalConcs[:, [0]]
+        # divide by total concs
+        # TODO: support different signals caused by different parent species
+        return signalVars / np.sum(signalVars, axis=1, keepdims=True)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
