@@ -228,9 +228,9 @@ class VolumesPopup(moduleFrame.Popup):
         unknownConcsFrame.pack(expand=True, fill="both")
         unknownConcsLabel = WrappedLabel(
             unknownConcsFrame,
-            text="Leave cells blank to optimise that concentration as a variable.",
+            text="Leave cells blank to optimise that concentration as a variable.\n",
         )
-        unknownConcsLabel.pack()
+        unknownConcsLabel.pack(expand=False, fill="both")
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
         try:
             self.unknownTotalConcsLinkedVar.set(
