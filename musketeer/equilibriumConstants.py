@@ -18,6 +18,27 @@ class EquilibriumConstants(moduleFrame.Strategy):
         "initialKs",
     )
 
+    # TODO: Either properly save masked arrays, or remove them from the codebase.
+    @property
+    def knownKs(self):
+        return self._knownKs
+
+    @knownKs.setter
+    def knownKs(self, value):
+        if not isinstance(value, ma.MaskedArray):
+            value = ma.masked_invalid(value)
+        self._knownKs = value
+
+    @property
+    def initialKs(self):
+        return self._initialKs
+
+    @initialKs.setter
+    def initialKs(self, value):
+        if not isinstance(value, ma.MaskedArray):
+            value = ma.masked_invalid(value)
+        self._initialKs = value
+
     @property
     def outputNames(self):
         return self.titration.speciation.variableNames
@@ -55,6 +76,7 @@ class GetKsAll(EquilibriumConstants):
         return ma.array(np.empty(self.outputCount), mask=True)
 
 
+# TODO: make trimerIndices work with polymers
 class GetKsNonspecific(EquilibriumConstants):
     @property
     def kNames(self):
@@ -75,30 +97,30 @@ class GetKsNonspecific(EquilibriumConstants):
 class CustomKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
-        if hasattr(titration, "kVarsNames"):
-            kVarsNames = titration.kVarsNames
-        else:
-            kVarsNames = [f"K_{name}" for name in titration.boundNames]
-        if hasattr(titration, "ksMatrix"):
-            ksMatrix = titration.ksMatrix
-        else:
-            ksMatrix = np.identity(titration.boundCount, dtype=int)
-        if (
-            hasattr(titration, "knownKs")
-            and len(titration.knownKs) == ksMatrix.shape[0]
+        self.outputNames = self.titration.speciation.variableNames
+
+        if hasattr(titration.equilibriumConstants, "ksMatrix") and (
+            titration.equilibriumConstants.ksMatrix.shape
+            == (
+                len(titration.equilibriumConstants.kNames),
+                len(self.outputNames),
+            )
         ):
-            knownKs = np.where(np.isnan(titration.knownKs), "", titration.knownKs)
+            kNames = titration.equilibriumConstants.kNames
+            ksMatrix = titration.equilibriumConstants.ksMatrix
         else:
-            knownKs = np.full(ksMatrix.shape[0], "")
-        columnTitles = np.append(titration.boundNames, "Value")
-        self.width = max([len(title) for title in columnTitles]) + 1
+            kNames = self.outputNames.copy()
+            ksMatrix = np.identity(len(self.outputNames), dtype=int)
+
+        columnTitles = np.append(self.outputNames, "Value")
+        self.width = max([len(title) for title in columnTitles] + [14]) + 1
 
         super().__init__(
             master,
             0,
             0,
             columnTitles,
-            maskBlanks=True,
+            allowGuesses=True,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
             boldTitles=True,
@@ -108,7 +130,18 @@ class CustomKsTable(Table):
             self.headerCells - 1, 1, "Global K for:", font=self.titleFont
         )
         self.addConstantsRow()
-        for name, contributions, value in zip(kVarsNames, ksMatrix, knownKs):
+        for name, contributions, knownK, initialK in zip(
+            kNames,
+            ksMatrix,
+            titration.equilibriumConstants.knownKs,
+            titration.equilibriumConstants.initialKs,
+        ):
+            if knownK is not ma.masked:
+                value = f"{knownK:g}"
+            elif initialK is not ma.masked:
+                value = f"~{initialK:g}"
+            else:
+                value = ""
             self.addRow(name, np.append(contributions, value))
 
     def newRow(self):
@@ -117,15 +150,15 @@ class CustomKsTable(Table):
         self.addRow("New variable", defaultEntries)
 
     def addConstantsRow(self):
-        if hasattr(self.titration, "ksConstants"):
-            ksConstants = self.titration.ksConstants
-        else:
-            ksConstants = np.full(len(self.columnTitles) - 1, "1")
+        try:
+            statisticalFactors = self.titration.statisticalFactors
+        except AttributeError:
+            statisticalFactors = np.full(len(self.columnTitles) - 1, "1")
         # Value column doesn't have a statistical factor
-        ksConstants = np.append(ksConstants, "")
+        statisticalFactors = np.append(statisticalFactors, "")
         oldRowOptions = self.rowOptions
         self.rowOptions = ("readonlyTitles",)
-        self.addRow("Statistical factor", ksConstants)
+        self.addRow("Statistical factor", statisticalFactors)
         self.rowOptions = oldRowOptions
 
         # Value column doesn't have a statistical factor
@@ -142,7 +175,7 @@ class CustomKsTable(Table):
                 self.data[0, :-1],
                 self.data[1:, :-1].T.astype(int),
             ):
-                label = f"Global K for {globalK} = {statFactor:g}"
+                label = f"Global K for {globalK} = {statFactor}"
                 for variable, factor in zip(variables, variableFactors):
                     if factor == 0 or factor == "":
                         continue
@@ -151,16 +184,13 @@ class CustomKsTable(Table):
                         continue
                     label += str(factor).translate(trans)
                 labels.append(label)
-            self.label.configure(text="\n".join(labels))
+            self.equationsLabel.configure(text="\n".join(labels))
         except Exception:
             pass
         return True
 
-    def convertData(self, number):
-        if number == "":
-            return np.nan
-        else:
-            return float(number)
+    def convertData(self, string):
+        return string
 
 
 class CustomKsPopup(moduleFrame.Popup):
@@ -202,7 +232,7 @@ class CustomKsPopup(moduleFrame.Popup):
             self.frame, anchor="center", font=self.labelFont, padding=5
         )
         self.equationsLabel.pack(fill="both")
-        self.customKsTable.label = self.equationsLabel
+        self.customKsTable.equationsLabel = self.equationsLabel
         self.customKsTable.createLabels()
 
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
@@ -216,16 +246,24 @@ class CustomKsPopup(moduleFrame.Popup):
         self.customKsTable.createLabels()
 
     def saveData(self):
-        ksConstants = self.customKsTable.data[0, :-1]
-        kVarsNames = self.customKsTable.rowTitles[1:]
-        ksMatrix = self.customKsTable.data[1:, :-1]
-        knownKs = self.customKsTable.data[1:, -1]
+        self.statisticalFactors = self.customKsTable.data[0, :-1].astype(int)
+        self.kNames = self.customKsTable.rowTitles[1:]
+        self.ksMatrix = self.customKsTable.data[1:, :-1].astype(int)
 
-        self.titration.ksConstants = ksConstants
-        self.titration.kVarsNames = kVarsNames
-        self.titration.ksMatrix = ksMatrix
-        self.titration.knownKs = knownKs
-        self.titration.knownAlphas = np.full(self.titration.boundCount, np.nan)
+        kCells = self.customKsTable.data[1:, -1]
+        self.knownKs = ma.array(
+            [
+                ma.masked if kCell == "" or kCell.startswith("~") else float(kCell)
+                for kCell in kCells
+            ]
+        )
+        self.initialKs = ma.array(
+            [
+                float(kCell[1:]) if kCell.startswith("~") else ma.masked
+                for kCell in kCells
+            ]
+        )
+
         self.saved = True
         self.destroy()
 
@@ -234,30 +272,23 @@ class CustomKsPopup(moduleFrame.Popup):
 class GetKsCustom(EquilibriumConstants):
     Popup = CustomKsPopup
 
-    popupAttributes = ("ksConstants", "kVarsNames", "ksMatrix", "knownKs")
+    popupAttributes = (
+        "ksMatrix",
+        "statisticalFactors",
+        "kNames",
+        "knownKs",
+        "initialKs",
+    )
 
-    def __init__(self, titration):
-        self.titration = titration
-        titration.kVarsCount = self.kVarsCount
-        titration.alphaVarsCount = self.alphaVarsCount
-
-    def __call__(self, kVars, alphaVars):
+    def run(self, kVars):
         # microKs as a column vector, with the unknown values filled in
-        microKs = self.titration.knownKs.copy()
-        microKs[np.isnan(microKs)] = kVars
+        microKs = self.knownKs.copy()
+        microKs[self.knownMask] = kVars
         microKs = np.atleast_2d(microKs).T
 
         # perform the calculation as previewed in the popup
-        globalKs = self.titration.ksConstants * np.prod(
-            microKs**self.titration.ksMatrix, 0
-        )
-        return (globalKs, alphaVars)
-
-    def kVarsCount(self):
-        return np.count_nonzero(np.isnan(self.titration.knownKs))
-
-    def alphaVarsCount(self):
-        return 0
+        globalKs = self.statisticalFactors * np.prod(microKs**self.ksMatrix, 0)
+        return globalKs
 
 
 class KnownKsTable(Table):
@@ -335,21 +366,19 @@ class KnownKsPopup(moduleFrame.Popup):
     def saveData(self):
         kCells = self.knownKsTable.data[:, 0]
 
-        knownKs = ma.array(
+        self.knownKs = ma.array(
             [
                 ma.masked if kCell == "" or kCell.startswith("~") else float(kCell)
                 for kCell in kCells
             ]
         )
-        initialKs = ma.array(
+        self.initialKs = ma.array(
             [
                 float(kCell[1:]) if kCell.startswith("~") else ma.masked
                 for kCell in kCells
             ]
         )
 
-        self.knownKs = knownKs
-        self.initialKs = initialKs
         self.saved = True
         self.destroy()
 
@@ -368,8 +397,8 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Fix any K values?"
     dropdownOptions = {
         "No, optimise all Ks": GetKsAll,
-        "Assume second binding weak": GetKsNonspecific,
+        # "Assume second binding weak": GetKsNonspecific,
         "Fix some known Ks": GetKsKnown,
-        # "Custom": GetKsCustom,
+        "Custom": GetKsCustom,
     }
     attributeName = "equilibriumConstants"

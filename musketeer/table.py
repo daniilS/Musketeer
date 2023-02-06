@@ -180,7 +180,7 @@ class Table(ttk.Frame):
         return button
 
     def deleteRowButton(self, *args, **kwargs):
-        button = self.button(*args, **kwargs)
+        button = self.button(*args, style="danger.Outline.TButton", **kwargs)
         button.configure(
             command=lambda: self.deleteRow(
                 button.grid_info()["row"] - self.headerGridRows
@@ -189,7 +189,7 @@ class Table(ttk.Frame):
         return button
 
     def deleteColumnButton(self, *args, **kwargs):
-        button = self.button(*args, **kwargs)
+        button = self.button(*args, style="danger.Outline.TButton", **kwargs)
         button.configure(
             command=lambda button=button: self.deleteColumn(
                 button.grid_info()["column"]
@@ -224,7 +224,7 @@ class Table(ttk.Frame):
         row = self.cells.shape[0]
         newRow = np.full(self.cells.shape[1], None)
         if "delete" in self.rowOptions:
-            newRow[0] = self.deleteRowButton(row, 0, "Delete")
+            newRow[0] = self.deleteRowButton(row, 0, "Delete Row")
         if "readonlyTitles" in self.rowOptions:
             newRow[1] = self.readonlyEntry(row, 1, firstEntry, font=self.titleFont)
         elif "titles" in self.rowOptions:
@@ -242,7 +242,7 @@ class Table(ttk.Frame):
         newColumn = np.full(self.cells.shape[0], None)
         if "delete" in self.columnOptions:
             newColumn[self.headerCells - 2] = self.deleteColumnButton(
-                self.headerCells - 2, column, "Delete"
+                self.headerCells - 2, column, "Delete Column"
             )
         if "readonlyTitles" in self.columnOptions:
             newColumn[self.headerCells - 1] = self.readonlyEntry(

@@ -29,7 +29,7 @@ class GetSignalVarsFromMatrix(Contributors):
 
 class ContributorsTable(Table):
     def __init__(self, master, titration):
-        columnTitles = np.concatenate((titration.freeNames, titration.boundNames))
+        columnTitles = titration.speciation.outputNames
         self.width = max([len(title) for title in columnTitles]) + 5
         super().__init__(
             master,
@@ -40,8 +40,15 @@ class ContributorsTable(Table):
             columnOptions=("readonlyTitles",),
             boldTitles=True,
         )
+        if (
+            titration.contributors.contributorsMatrix.shape[1]
+            == titration.speciation.outputCount
+        ):
+            contributorsMatrix = titration.contributors.contributorsMatrix
+        else:
+            contributorsMatrix = np.eye(titration.speciation.outputCount)
         for name, contributions in zip(
-            titration.contributorNames(), titration.contributorsMatrix()
+            titration.contributors.contributorNames, contributorsMatrix
         ):
             self.addRow(name, contributions)
 
@@ -90,12 +97,11 @@ class ContributorsPopup(moduleFrame.Popup):
         self.contributorsTable.pack(expand=True, fill="both")
 
     def saveData(self):
-        _contributorsMatrix = self.contributorsTable.data
-        if np.all(_contributorsMatrix % 1 == 0):
-            _contributorsMatrix = _contributorsMatrix.astype(int)
+        self.contributorsMatrix = self.contributorsTable.data
+        if np.all(self.contributorsMatrix % 1 == 0):
+            self.contributorsMatrix = self.contributorsMatrix.astype(int)
 
-        self.titration._contributorsMatrix = _contributorsMatrix
-        self.titration._contributorNames = self.contributorsTable.rowTitles
+        self.contributorNames = self.contributorsTable.rowTitles
 
         self.saved = True
         self.destroy()
@@ -104,18 +110,7 @@ class ContributorsPopup(moduleFrame.Popup):
 # TODO: convert to new format
 class GetSignalVarsCustom(GetSignalVarsFromMatrix):
     Popup = ContributorsPopup
-    popupAttributes = ("_contributorsMatrix", "_contributorNames")
-
-    def __init__(self, titration, *args, **kwargs):
-        titration._contributorsMatrix = titration.contributorsMatrix()
-        titration._contributorNames = titration.contributorNames()
-        super().__init__(titration, *args, **kwargs)
-
-    def contributorsMatrix(self):
-        return self.titration._contributorsMatrix
-
-    def contributorNames(self):
-        return self.titration._contributorNames
+    popupAttributes = ("contributorsMatrix", "contributorNames")
 
 
 class GetSignalVarsAll(Contributors):
@@ -169,6 +164,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownOptions = {
         "Only Host": GetSignalVarsHost,
         "All": GetSignalVarsAll,
-        # "Custom": GetSignalVarsCustom,
+        "Custom": GetSignalVarsCustom,
     }
     attributeName = "contributors"

@@ -93,8 +93,10 @@ class ModuleFrame(ttk.LabelFrame):
             self.stringVar.set(defaultValue)
             self.callback(defaultValue)
             return
+        elif setDefault:
+            setattr(self.titration, self.attributeName, None)
 
-        if not hasattr(self.titration, self.attributeName):
+        if getattr(self.titration, self.attributeName) is None:
             self.stringVar.set("")
             return
         self.lastValue = list(self.dropdownOptions.keys())[

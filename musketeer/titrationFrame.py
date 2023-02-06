@@ -130,6 +130,8 @@ class TitrationFrame(ttk.Frame):
 
                 for module in titrationModules:
                     moduleFrame = module.ModuleFrame
+                    # in case no valid strategy is present in the loaded file
+                    setattr(fit, moduleFrame.attributeName, None)
 
                     try:
                         SelectedStrategy = moduleFrame.dropdownOptions[
@@ -198,7 +200,10 @@ class TitrationFrame(ttk.Frame):
             nb.add(nb.inputSpectraFrame, text="Input Spectra")
 
         if hasattr(titration, "fitResult"):
-            self.showFit(nb)
+            try:
+                self.showFit(nb)
+            except Exception:
+                pass  # TODO make more robust
         self.notebook.select(str(nb))
 
     def copyFit(self):
@@ -295,10 +300,10 @@ class TitrationFrame(ttk.Frame):
 
             for module in titrationModules:
                 moduleFrame = module.ModuleFrame
-                try:
-                    strategy = getattr(titration, moduleFrame.attributeName)
-                except AttributeError:
+                strategy = getattr(titration, moduleFrame.attributeName)
+                if strategy is None:
                     continue
+
                 options[f"{fit}.{moduleFrame.attributeName}"] = list(
                     moduleFrame.dropdownOptions.keys()
                 )[
@@ -446,11 +451,11 @@ class ContinuousFittedFrame(ttk.Frame):
     def populate(self):
         self.fig = Figure(layout="constrained")
         self.ax = self.fig.add_subplot()
-        canvas = FigureCanvasTkAgg(self.fig, master=self)
-        canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
-        toolbar = NavigationToolbarVertical(canvas, self, pack_toolbar=False)
+        toolbar = NavigationToolbarVertical(self.canvas, self, pack_toolbar=False)
         toolbar.update()
         toolbar.grid(row=1, column=0, sticky="ne")
 
@@ -541,6 +546,7 @@ class ContinuousFittedFrame(ttk.Frame):
 
         self.ax.legend()
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
+        self.canvas.draw()
 
 
 class FittedFrame(ttk.Frame):
@@ -925,8 +931,32 @@ class ResultsFrame(ttk.Frame):
     def formatK(self, k):
         return f"{float(f'{k:.{self.sigfigs}g}'):.{max(self.sigfigs, 6)}g}"
 
+    @property
+    def bic(self):
+        # Bayesian Information Criterion
+        numParameters = (
+            self.titration.equilibriumConstants.variableCount
+            + self.titration.totalConcentrations.variableCount
+            + self.titration.contributors.contributorsMatrix.shape[0]
+        )
+        numDataPoints = self.titration.numAdditions
+        dataSize = np.ma.count(self.titration.processedData)
+        chiSquared = np.sum(
+            (self.titration.lastFittedCurves - self.titration.processedData) ** 2
+            / self.titration.lastFittedCurves
+        )
+        return numDataPoints * np.log(
+            chiSquared / numDataPoints
+        ) + numParameters * np.log(numDataPoints)
+
     def showResults(self):
         titration = self.titration
+        bicLabel = ttk.Label(
+            self,
+            text=f"Bayesian information criterion (lower is better): {self.bic:.3g}",
+        )
+        bicLabel.pack(side="top", pady=15)
+
         kTable = Table(
             self,
             0,
@@ -936,17 +966,16 @@ class ResultsFrame(ttk.Frame):
             columnOptions=("readonlyTitles",),
         )
 
-        ks = titration.lastKs
+        ks = titration.lastKVars
 
         for (
             name,
             value,
-        ) in zip(titration.equilibriumConstants.outputNames, ks):
+        ) in zip(titration.equilibriumConstants.variableNames, ks):
             kTable.addRow(name, [self.formatK(value)])
         kTable.pack(side="top", pady=15)
 
-        concVarsCount = titration.totalConcentrations.variableCount
-        if concVarsCount > 0:
+        if titration.totalConcentrations.variableCount > 0:
             concsTable = Table(
                 self,
                 0,
@@ -956,7 +985,7 @@ class ResultsFrame(ttk.Frame):
                 columnOptions=["readonlyTitles"],
             )
             concNames = self.titration.totalConcentrations.variableNames
-            concs = titration.fitResult[titration.equilibriumConstants.variableCount :]
+            concs = titration.lastTotalConcVars
             for concName, conc in zip(concNames, concs):
                 concsTable.addRow(
                     concName,
@@ -979,7 +1008,10 @@ class ResultsFrame(ttk.Frame):
         sheet.pack(side="top", pady=15, fill="x")
 
         saveButton = ttk.Button(
-            self, text="Save as CSV", command=self.saveCSV, style="success.TButton"
+            self,
+            text="Save fitted spectra to CSV",
+            command=self.saveCSV,
+            style="success.TButton",
         )
         saveButton.pack(side="top", pady=15)
 

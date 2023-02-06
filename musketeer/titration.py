@@ -16,6 +16,8 @@ titrationAttributes = (
     "xQuantity",
     "xUnit",
     "fitResult",
+    "lastKVars",
+    "lastTotalConcVars",
     "lastKs",
     "lastTotalConcs",
     "lastFreeConcs",
@@ -176,7 +178,9 @@ class Titration:
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[: self.equilibriumConstants.variableCount]
+        self.lastKVars = kVars
         totalConcVars = ksAndTotalConcs[self.equilibriumConstants.variableCount :]
+        self.lastTotalConcVars = totalConcVars
 
         # get all Ks and total concs, as some are fixed and thus aren't passed
         # to the function as arguments
@@ -200,6 +204,7 @@ class Titration:
         )
 
         combinedResiduals = self.combineResiduals.run(residuals)
+        self.lastResiduals = combinedResiduals
 
         return combinedResiduals
 

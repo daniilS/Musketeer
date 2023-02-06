@@ -9,7 +9,7 @@ from numpy import ma
 
 from . import moduleFrame
 from .scrolledFrame import ScrolledFrame
-from .table import ButtonFrame, Table
+from .table import ButtonFrame, Table, WrappedLabel
 
 DEFAULT_INITIAL_CONC = 1e-4
 
@@ -226,8 +226,9 @@ class VolumesPopup(moduleFrame.Popup):
 
         unknownConcsFrame = ttk.Frame(innerFrame, borderwidth=5)
         unknownConcsFrame.pack(expand=True, fill="both")
-        unknownConcsLabel = ttk.Label(
-            unknownConcsFrame, text="Leave cells blank for unknown concentrations."
+        unknownConcsLabel = WrappedLabel(
+            unknownConcsFrame,
+            text="Leave cells blank to optimise that concentration as a variable.",
         )
         unknownConcsLabel.pack()
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
@@ -240,7 +241,7 @@ class VolumesPopup(moduleFrame.Popup):
         unknownTotalConcsCheckbutton = ttk.Checkbutton(
             unknownConcsFrame,
             variable=self.unknownTotalConcsLinkedVar,
-            text="Link unknown concentrations for the same species in different stocks",
+            text="Link unknown concentrations in the same row?",
         )
         unknownTotalConcsCheckbutton.pack()
 
