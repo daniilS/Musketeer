@@ -74,6 +74,8 @@ class Titration:
     @signalTitles.setter
     def signalTitles(self, titles):
         # TODO: replace flag with just setting titles to None
+        if titles.size == 0:
+            return
         self.hasSignalTitles = True
         try:
             _signalTitles = np.array(titles, dtype=float)
@@ -139,6 +141,8 @@ class Titration:
 
     @additionTitles.setter
     def additionTitles(self, additionTitles):
+        if additionTitles.size == 0:
+            return
         self.hasAdditionTitles = True
         self._additionTitles = additionTitles
 

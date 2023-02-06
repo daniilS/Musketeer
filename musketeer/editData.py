@@ -153,7 +153,7 @@ class EditDataPopup(moduleFrame.Popup):
         elif titration.hasAdditionTitles:
             data = np.c_[titration.additionTitles, data]
         elif titration.hasSignalTitles:
-            data = np.r_[titration.signalTitlesStrings, data]
+            data = np.r_[[titration.signalTitlesStrings], data]
 
         if titration.transposeData:
             data = data.T
