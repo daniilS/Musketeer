@@ -468,7 +468,7 @@ class ContinuousFittedFrame(ttk.Frame):
 
         self.deconvolutionVar = tk.StringVar()
         deconvolutionOptions = (
-            "Normalised contributions",
+            f"Molar {self.titration.yQuantity}",
             "Deconvolution at start",
             "Deconvolution at endpoint",
         )
@@ -511,7 +511,7 @@ class ContinuousFittedFrame(ttk.Frame):
         wavelengths = titration.processedSignalTitles
 
         deconvolution = self.deconvolutionVar.get()
-        if deconvolution == "Normalised contributions":
+        if deconvolution == f"Molar {titration.yQuantity}":
             for spectrum, name in zip(spectra, names):
                 self.ax.plot(wavelengths, spectrum, label=name)
             self.ax.set_ylabel(f"molar {titration.yQuantity} / {titration.yUnit} M⁻¹")
