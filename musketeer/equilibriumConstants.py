@@ -150,9 +150,13 @@ class CustomKsTable(Table):
         self.addRow("New variable", defaultEntries)
 
     def addConstantsRow(self):
-        try:
-            statisticalFactors = self.titration.statisticalFactors
-        except AttributeError:
+        if (
+            hasattr(self.titration.equilibriumConstants, "statisticalFactors")
+            and len(self.titration.equilibriumConstants.statisticalFactors)
+            == len(self.columnTitles) - 1
+        ):
+            statisticalFactors = self.titration.equilibriumConstants.statisticalFactors
+        else:
             statisticalFactors = np.full(len(self.columnTitles) - 1, "1")
         # Value column doesn't have a statistical factor
         statisticalFactors = np.append(statisticalFactors, "")
