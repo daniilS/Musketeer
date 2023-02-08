@@ -360,8 +360,10 @@ class InputSpectraFrame(ttk.Frame):
             side="left"
         )
 
-        minWL = self.titration.signalTitles.min()
-        maxWL = self.titration.signalTitles.max()
+        minWL, maxWL = self.titration.continuousRange
+        minWL = max(minWL, self.titration.signalTitles.min())
+        maxWL = min(maxWL, self.titration.signalTitles.max())
+
         decimals = self.titration.signalTitlesDecimals
         step = 1 / (10**decimals)
 
