@@ -940,11 +940,11 @@ class ResultsFrame(ttk.Frame):
             + self.titration.contributors.contributorsMatrix.shape[0]
         )
         numDataPoints = self.titration.numAdditions
-        dataSize = np.ma.count(self.titration.processedData)
         chiSquared = np.sum(
             (self.titration.lastFittedCurves - self.titration.processedData) ** 2
-            / self.titration.lastFittedCurves
+            / np.abs(self.titration.lastFittedCurves)
         )
+
         return numDataPoints * np.log(
             chiSquared / numDataPoints
         ) + numParameters * np.log(numDataPoints)
