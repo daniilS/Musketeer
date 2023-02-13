@@ -82,7 +82,17 @@ class Table(ttk.Frame):
 
     # all widget creation methods use cell rows, not grid rows, as arguments
 
-    def entry(self, row, column, text="", align="left", columnspan=1, **kwargs):
+    def entry(
+        self,
+        row,
+        column,
+        text="",
+        align="left",
+        columnspan=1,
+        *,
+        addCallback=True,
+        **kwargs,
+    ):
         entry = ttk.Entry(
             self,
             width=self.width * columnspan,
@@ -92,7 +102,7 @@ class Table(ttk.Frame):
 
         entry.stringVar = tk.StringVar(entry)
         entry.configure(textvariable=entry.stringVar)
-        if self.callback is not None:
+        if self.callback is not None and addCallback:
             # Callback is registered once for the entire table, but StringVar.trace_add
             # only supports python functions.
             self.tk.eval(
@@ -138,7 +148,7 @@ class Table(ttk.Frame):
             entry.configure(font="TkTextFont")
 
     def readonlyEntry(self, *args, **kwargs):
-        entry = self.entry(*args, style="TLabel", **kwargs)
+        entry = self.entry(*args, style="TLabel", addCallback=False, **kwargs)
         entry.state(["readonly"])
         entry.grid(padx=5, pady=5)
         entry.configure(takefocus=False)
