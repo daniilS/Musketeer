@@ -488,4 +488,9 @@ class WrappedLabel(ttk.Frame):
     def labelPadding(self):
         # The Tk C API returns the padding as a "pixels" object, so need to convert it
         # to string first before converting to int.
-        return int(str(self.label.cget("padding")[0]))
+        padding = self.label.cget("padding")
+        if type(padding) is tuple:
+            return int(str(padding[0]))
+        else:
+            # no padding set
+            return 0
