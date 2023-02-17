@@ -481,5 +481,11 @@ class WrappedLabel(ttk.Frame):
         self.label.bind("<Configure>", self.callback)
 
     def callback(self, event):
-        self.label.configure(wraplength=event.width - 4)
+        self.label.configure(wraplength=event.width - 2 * self.labelPadding - 4)
         self.configure(height=self.label.winfo_reqheight())
+
+    @property
+    def labelPadding(self):
+        # The Tk C API returns the padding as a "pixels" object, so need to convert it
+        # to string first before converting to int.
+        return int(str(self.label.cget("padding")[0]))
