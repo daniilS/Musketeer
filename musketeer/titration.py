@@ -32,6 +32,7 @@ class Titration:
     def __init__(self, title="Titration"):
         self.title = title
         self.continuousRange = np.array([-np.inf, np.inf])
+        self.continuous = False
         self.hasSignalTitles = False
         self.hasAdditionTitles = False
         self.transposeData = False

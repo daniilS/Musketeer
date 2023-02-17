@@ -159,7 +159,6 @@ class TitrationsNotebook(InteractiveNotebook):
     def newFile(self, *args):
         titration = Titration("Fit 1")
         titration.rawData = np.empty((0, 0))
-        titration.continuous = False
 
         titrationFrame = TitrationFrame(self, titration, padding=padding)
         self.add(titrationFrame, text="New Titration", sticky="nesw")
