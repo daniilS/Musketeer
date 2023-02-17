@@ -346,14 +346,15 @@ class TitrationFrame(ttk.Frame):
             filePath = self.filePath
 
         if filePath != "":
-            if filePath != self.filePath:
-                self.filePath = filePath
-                self.master.tab(self, text=PurePath(self.filePath).name)
             try:
-                with open(self.filePath, "wb") as f:
+                with open(filePath, "wb") as f:
                     np.savez_compressed(f, **options)
             except Exception as e:
                 mb.showerror(title="Failed to save file", message=e, parent=self)
+            else:
+                if filePath != self.filePath:
+                    self.filePath = filePath
+                    self.master.tab(self, text=PurePath(self.filePath).name)
 
 
 class InputSpectraFrame(ttk.Frame):
