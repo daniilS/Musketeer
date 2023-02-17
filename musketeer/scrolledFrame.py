@@ -3,6 +3,7 @@ import sys
 import time
 import tkinter as tk
 import tkinter.ttk as ttk
+
 from packaging.version import parse as v_parse
 
 # TODO: replace with custom implementation to solve flickering issues
@@ -31,6 +32,8 @@ class ScrolledFrame(ttk.Frame):
 
     def deliver_event(self, event):
         widget = event.widget
+        if type(widget) is str:
+            return
 
         event_name = f"<{event.type._name_}>"
         if any(

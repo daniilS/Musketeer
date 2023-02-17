@@ -214,13 +214,21 @@ class TitrationFrame(ttk.Frame):
         for moduleFrame in self.moduleFrames.values():
             moduleFrame.update(nb.titration)
 
+    def fitCallback(self, *args):
+        self.update()
+
     def fitData(self):
         nb = self.currentTab
+        self.tk.eval("tk busy .")
+        self.update()
         try:
-            nb.titration.fitData()
+            nb.titration.fitData(self.fitCallback)
         except Exception as e:
             mb.showerror(title="Failed to fit data", message=e, parent=self)
             return
+        finally:
+            self.tk.eval("tk busy forget .")
+            self.update()
         self.showFit(nb)
 
     def showFit(self, nb):

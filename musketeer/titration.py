@@ -217,7 +217,7 @@ class Titration:
         ksAndTotalConcs = 10**logKsAndTotalConcs
         return self.optimisationFunc(ksAndTotalConcs)
 
-    def optimise(self):
+    def optimise(self, callback=None):
         initialGuessKs = np.log10(self.equilibriumConstants.variableInitialGuesses)
         initialGuessConcs = np.log10(self.totalConcentrations.variableInitialGuesses)
         initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
@@ -226,10 +226,11 @@ class Titration:
             self.optimisationFuncLog,
             x0=initialGuess,
             method="nelder-mead",
+            callback=callback,
         )
         # to make sure the last fit is the optimal one
         self.optimisationFuncLog(result.x)
         return result.x
 
-    def fitData(self):
-        self.fitResult = 10 ** self.optimise()
+    def fitData(self, callback=None):
+        self.fitResult = 10 ** self.optimise(callback)
