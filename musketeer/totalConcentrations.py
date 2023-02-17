@@ -134,7 +134,7 @@ class VolumesTable(Table):
         except AttributeError:
             pass
 
-        self.label(1, 1, "Addition title:")
+        self.readonlyEntry(self.headerCells - 1, 1, "Addition title:", align="left")
 
         if (
             hasattr(titration, "totalConcentrations")
@@ -165,21 +165,21 @@ class VolumesTable(Table):
     def addColumn(self, firstEntry="", data=None):
         super().addColumn(firstEntry, data)
         column = self.cells.shape[1] - 1
-        copyFirstButton = self.button(0, column, "Copy first")
+        copyFirstButton = self.button(self.headerCells - 2, column, "Copy first")
         copyFirstButton.configure(
             command=lambda button=copyFirstButton: self.copyFirst(
                 button.grid_info()["column"]
             )
         )
-        self.cells[0, column] = copyFirstButton
+        self.cells[self.headerCells - 2, column] = copyFirstButton
 
-        copyTitlesButton = self.button(1, column, "Copy from titles")
+        copyTitlesButton = self.button(self.headerCells - 1, column, "Copy from titles")
         copyTitlesButton.configure(
             command=lambda button=copyTitlesButton: self.copyFromTitles(
                 button.grid_info()["column"]
             )
         )
-        self.cells[1, column] = copyTitlesButton
+        self.cells[self.headerCells - 1, column] = copyTitlesButton
 
     def copyFirst(self, column):
         cells = self.cells[self.headerCells :, column]
@@ -373,7 +373,7 @@ class ConcsTable(Table):
             1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
         )
 
-        self.label(self.headerCells - 1, 1, "Addition title:")
+        self.readonlyEntry(self.headerCells - 1, 1, "Addition title:", align="left")
         if hasattr(
             self.titration, "totalConcentrations"
         ) and self.titration.totalConcentrations.totalConcs.shape == (
@@ -395,21 +395,21 @@ class ConcsTable(Table):
     def addColumn(self, firstEntry="", data=None):
         super().addColumn(firstEntry, data)
         column = self.cells.shape[1] - 1
-        copyFirstButton = self.button(0, column, "Copy first")
+        copyFirstButton = self.button(self.headerCells - 2, column, "Copy first")
         copyFirstButton.configure(
             command=lambda button=copyFirstButton: self.copyFirst(
                 button.grid_info()["column"]
             )
         )
-        self.cells[0, column] = copyFirstButton
+        self.cells[self.headerCells - 2, column] = copyFirstButton
 
-        copyTitlesButton = self.button(1, column, "Copy from titles")
+        copyTitlesButton = self.button(self.headerCells - 1, column, "Copy from titles")
         copyTitlesButton.configure(
             command=lambda button=copyTitlesButton: self.copyFromTitles(
                 button.grid_info()["column"]
             )
         )
-        self.cells[1, column] = copyTitlesButton
+        self.cells[self.headerCells - 1, column] = copyTitlesButton
 
     def copyFirst(self, column):
         cells = self.cells[self.headerCells :, column]

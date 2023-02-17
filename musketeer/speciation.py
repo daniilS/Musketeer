@@ -139,9 +139,50 @@ class SpeciationTable(Table):
             self.addRow(boundName, stoichiometry)
 
     def updateTitles(self, *args, **kwargs):
+        for cell, title in zip(
+            self.cells[2 : self.headerCells :, 1], self.columnTitles
+        ):
+            cell.set(title)
+
         self.rowTitles = stoichiometriesToBoundNames(
             self.columnTitles, self.data, polymerMode="unchanged"
         )
+
+    def addFreeRow(self, index=-1):
+        row = self.cells.shape[0]
+        freeRow = np.full(self.cells.shape[1], None)
+
+        freeRow[0] = self.deleteRowButton(row, 0, "Delete Row", state="disabled")
+        freeRow[1] = self.readonlyEntry(
+            row, 1, self.columnTitles[index], font=self.titleFont
+        )
+
+        freeRow[2:] = [
+            self.readonlyEntry(row, 2 + column, "0", align="right")
+            for column in range(self.cells.shape[1] - 2)
+        ]
+        freeRow[-1].set("1")
+
+        self.cells = np.insert(self.cells, self.headerCells, freeRow, axis=0)
+        self.headerCells += 1
+
+        self.redraw()
+
+    def addColumn(self, firstEntry="", data=None):
+        super().addColumn(firstEntry, data)
+
+        for row in range(2, self.headerCells):
+            self.cells[row, -1] = self.readonlyEntry(
+                row, self.cells.shape[-1], "0", align="right"
+            )
+
+        self.addFreeRow()
+
+    def deleteColumn(self, column):
+        super().deleteColumn(column)
+        self.headerCells -= 1
+        self.deleteRow(column)
+        self.updateTitles()
 
     def convertData(self, number):
         if number == "n":

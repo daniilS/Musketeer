@@ -59,7 +59,7 @@ class Table(ttk.Frame):
 
         if "new" in rowOptions:
             self.newRowButton = self.button(
-                self.headerCells - 1,
+                1,
                 0,
                 "New row",
                 self.newRow,
@@ -67,7 +67,7 @@ class Table(ttk.Frame):
             )
         if "new" in columnOptions:
             self.newColumnButton = self.button(
-                self.headerCells - 2,
+                0,
                 1,
                 "New column",
                 self.newColumn,
@@ -251,21 +251,17 @@ class Table(ttk.Frame):
         column = self.cells.shape[1]
         newColumn = np.full(self.cells.shape[0], None)
         if "delete" in self.columnOptions:
-            newColumn[self.headerCells - 2] = self.deleteColumnButton(
-                self.headerCells - 2, column, "Delete Column"
-            )
+            newColumn[0] = self.deleteColumnButton(0, column, "Delete Column")
         if "readonlyTitles" in self.columnOptions:
-            newColumn[self.headerCells - 1] = self.readonlyEntry(
-                self.headerCells - 1,
+            newColumn[1] = self.readonlyEntry(
+                1,
                 column,
                 firstEntry,
                 align="center",
                 font=self.titleFont,
             )
         elif "titles" in self.columnOptions:
-            newColumn[self.headerCells - 1] = self.entry(
-                self.headerCells - 1, column, firstEntry, font=self.titleFont
-            )
+            newColumn[1] = self.entry(1, column, firstEntry, font=self.titleFont)
         for row in range(self.headerCells, self.cells.shape[0]):
             entry = self.entry(row, column, align="right")
             if data is not None:
@@ -409,7 +405,7 @@ class Table(ttk.Frame):
         if self.dataCells.shape != data.shape:
             raise ValueError(
                 "Requested data shape {data.shape} does not match table shape"
-                " {cells.shape}."
+                " {self.dataCells.shape}."
             )
         for cell, datum in zip(self.dataCells.flat, data.flat):
             cell.set(datum)
@@ -425,7 +421,7 @@ class Table(ttk.Frame):
 
     @property
     def columnTitles(self):
-        return np.array([title.get() for title in self.cells[self.headerCells - 1, 2:]])
+        return np.array([title.get() for title in self.cells[1, 2:]])
 
     @columnTitles.setter
     def columnTitles(self, titles):
@@ -438,7 +434,7 @@ class Table(ttk.Frame):
             for _ in range(difference):
                 self.deleteColumn(self.cells.shape[1])
         if "titles" in self.columnOptions or "readonlyTitles" in self.columnOptions:
-            for cell, title in zip(self.cells[self.headerCells - 1, 2:], titles):
+            for cell, title in zip(self.cells[1, 2:], titles):
                 cell.set(title)
 
 
