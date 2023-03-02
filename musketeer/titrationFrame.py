@@ -11,6 +11,7 @@ import tksheet
 from cycler import cycler
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from numpy import ma
 from scipy.interpolate import make_interp_spline
 from ttkbootstrap.widgets import InteractiveNotebook
 
@@ -101,32 +102,54 @@ class TitrationFrame(ttk.Frame):
             self.originalTitration = titration
             self.newFit()
         elif type(titration) is np.lib.npyio.NpzFile:
+            # TODO: move this to titrationReader.py
             self.originalTitration = Titration()
             for attribute in titrationAttributes:
                 try:
-                    value = titration[f".original.{attribute}"]
+                    data = titration[f".original.{attribute}"]
                 except KeyError:
                     continue
-                if value.shape == ():
-                    value = value.item()
-                setattr(self.originalTitration, attribute, value)
+                else:
+                    if data.shape == ():
+                        data = data.item()
+
+                try:
+                    mask = titration[f".original.{attribute}.mask"]
+                except KeyError:
+                    pass
+                else:
+                    if mask.shape == ():
+                        mask = mask.item()
+                    data = ma.masked_array(data, mask)
+                setattr(self.originalTitration, attribute, data)
 
             for name in titration[".fits"]:
                 fit = Titration()
 
                 for attribute in titrationAttributes:
                     try:
-                        value = titration[f"{name}.{attribute}"]
+                        data = titration[f"{name}.{attribute}"]
                     except KeyError:
                         continue
+                    else:
+                        if data.shape == ():
+                            data = data.item()
 
-                    if value.shape == ():
-                        value = value.item()
-                    if (type(value) == type(COPY_ORIGINAL_ARRAY)) and (
-                        value == COPY_ORIGINAL_ARRAY
+                    if (
+                        type(data) is type(COPY_ORIGINAL_ARRAY)
+                        and data == COPY_ORIGINAL_ARRAY
                     ):
-                        value = getattr(self.originalTitration, attribute).copy()
-                    setattr(fit, attribute, value)
+                        data = deepcopy(getattr(self.originalTitration, attribute))
+                    else:
+                        try:
+                            mask = titration[f"{name}.{attribute}.mask"]
+                        except KeyError:
+                            pass
+                        else:
+                            if mask.shape == ():
+                                mask = mask.item()
+                            data = ma.masked_array(data, mask)
+                    setattr(fit, attribute, data)
 
                 for module in titrationModules:
                     moduleFrame = module.ModuleFrame
@@ -145,21 +168,31 @@ class TitrationFrame(ttk.Frame):
                     for popupAttributeName in selectedStrategy.popupAttributes:
                         key = f"{name}.{moduleFrame.attributeName}.{popupAttributeName}"
                         try:
-                            popupAttribute = titration[key]
+                            data = titration[key]
                         except KeyError:
                             continue
-                        if popupAttribute.shape == ():
-                            popupAttribute = popupAttribute.item()
-                        setattr(selectedStrategy, popupAttributeName, popupAttribute)
+                        else:
+                            if data.shape == ():
+                                data = data.item()
+
+                        try:
+                            mask = titration[f"{key}.mask"]
+                        except KeyError:
+                            pass
+                        else:
+                            if mask.shape == ():
+                                mask = mask.item()
+                            data = ma.masked_array(data, mask)
+                        setattr(selectedStrategy, popupAttributeName, data)
 
                     try:
                         selectedStrategy.checkAttributes()
                     except NotImplementedError:
                         # required attribute missing
                         continue
-
                     setattr(fit, moduleFrame.attributeName, selectedStrategy)
 
+                # TODO: display tabs as they're being loaded
                 self.newFit(fit, name, setDefault=False)
 
             self.numFits = titration[".numFits"].item()
@@ -276,11 +309,15 @@ class TitrationFrame(ttk.Frame):
 
         for titrationAttribute in titrationAttributes:
             try:
-                options[f".original.{titrationAttribute}"] = getattr(
-                    self.originalTitration, titrationAttribute
-                )
+                data = getattr(self.originalTitration, titrationAttribute)
             except AttributeError:
                 continue
+
+            if isinstance(data, ma.MaskedArray):
+                options[f".original.{titrationAttribute}"] = data.data
+                options[f".original.{titrationAttribute}.mask"] = data.mask
+            else:
+                options[f".original.{titrationAttribute}"] = data
 
         fits = np.array([])
 
@@ -300,11 +337,15 @@ class TitrationFrame(ttk.Frame):
                     continue
 
                 try:
-                    options[f"{fit}.{titrationAttribute}"] = getattr(
-                        titration, titrationAttribute
-                    )
+                    data = getattr(titration, titrationAttribute)
                 except AttributeError:
                     continue
+
+                if isinstance(data, ma.MaskedArray):
+                    options[f"{fit}.{titrationAttribute}"] = data.data
+                    options[f"{fit}.{titrationAttribute}.mask"] = data.mask
+                else:
+                    options[f"{fit}.{titrationAttribute}"] = data
 
             for module in titrationModules:
                 moduleFrame = module.ModuleFrame
@@ -321,9 +362,14 @@ class TitrationFrame(ttk.Frame):
                 ]
 
                 for popupAttributeName in strategy.popupAttributes:
-                    options[
-                        f"{fit}.{moduleFrame.attributeName}.{popupAttributeName}"
-                    ] = getattr(strategy, popupAttributeName)
+                    key = f"{fit}.{moduleFrame.attributeName}.{popupAttributeName}"
+                    data = getattr(strategy, popupAttributeName)
+
+                    if isinstance(data, ma.MaskedArray):
+                        options[key] = data.data
+                        options[f"{key}.mask"] = data.mask
+                    else:
+                        options[key] = data
 
         options[".fits"] = fits
 

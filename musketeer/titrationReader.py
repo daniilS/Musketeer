@@ -26,6 +26,7 @@ def find_nearest(array, value):
     return array[idx]
 
 
+# TODO: convert to classes, register using ABC
 def readUV(filePath):
     titration = Titration()
     # set default parameters for UV-Vis titrations
