@@ -187,12 +187,15 @@ class TitrationsNotebook(InteractiveNotebook):
             mb.showerror(title="Failed to read file", message=e, parent=self)
             return
 
+        self.tk.eval("tk busy .")
+        self.update()
         # create a tab for each titration, and let the titration object handle
         # its own I/O
         for titration in titrations:
             titrationFrame = TitrationFrame(self, titration, filePath, padding=padding)
             self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
             self.select(str(titrationFrame))
+        self.tk.eval("tk busy forget .")
 
 
 notebook = TitrationsNotebook(frame)
