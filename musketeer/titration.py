@@ -42,6 +42,10 @@ class Titration:
         return self.processedData.shape[0]
 
     @property
+    def numSignals(self):
+        return self.processedData.shape[1]
+
+    @property
     def columnFilter(self):
         if self.continuous:
             from_, to = self.continuousRange
