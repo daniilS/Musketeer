@@ -26,7 +26,7 @@ class GetFraction(Proportionality):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Proportionality"
+    group = "Experiment"
     dropdownLabelText = "What are the signals proportional to?"
     dropdownOptions = {
         "Concentration (slow exchange)": GetConcs,

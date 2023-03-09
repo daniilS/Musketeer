@@ -397,7 +397,7 @@ class GetKsKnown(EquilibriumConstants):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Equilibrium constants"
+    group = "Equilibria"
     dropdownLabelText = "Fix any K values?"
     dropdownOptions = {
         "No, optimise all Ks": GetKsAll,

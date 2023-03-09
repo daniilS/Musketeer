@@ -1,11 +1,11 @@
 import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
-from tkinter import font
 
 import numpy as np
 from numpy import ma
 
+from . import style
 from .style import cellWidth, padding
 
 
@@ -41,13 +41,11 @@ class Table(ttk.Frame):
         self.callback = callback
 
         if Table.titleFont is None:
-            Table.titleFont = font.nametofont("TkTextFont").copy()
-            Table.titleFont["weight"] = "bold"
+            Table.titleFont = style.boldFont
         if not boldTitles:
             self.titleFont = "TkTextFont"
         if Table.italicFont is None:
-            Table.italicFont = font.nametofont("TkTextFont").copy()
-            Table.italicFont["slant"] = "italic"
+            Table.italicFont = style.italicFont
 
         # Grid rows at the top that will be left empty for a subclass to fill
         # in with other widgets.

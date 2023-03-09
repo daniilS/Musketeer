@@ -27,6 +27,7 @@ from . import (
     speciation,
     totalConcentrations,
 )
+from .moduleFrame import GroupFrame
 from .patchMatplotlib import NavigationToolbarVertical
 from .scrolledFrame import ScrolledFrame
 from .style import padding
@@ -62,19 +63,25 @@ class TitrationFrame(ttk.Frame):
             ttk.Frame, stretch=True, padding=(0, 0, padding, 0)
         )
 
+        self.options.groupFrames = {}
+        experimentFrame = self.options.groupFrames["Experiment"] = GroupFrame(
+            self.options, "Experiment"
+        )
+        experimentFrame.grid(sticky="nesw", pady=padding)
+
         editDataButton = ttk.Button(
-            self.options,
+            experimentFrame,
             text="Edit data",
             command=self.editData,
             style="Outline.TButton",
         )
-        editDataButton.grid(sticky="nesw", pady=padding)
+        editDataButton.pack(fill="x", padx=padding)
 
         self.moduleFrames = {}
         for mod in titrationModules:
             moduleFrame = mod.ModuleFrame(self.options)
             self.moduleFrames[mod.__name__] = moduleFrame
-            moduleFrame.grid(sticky="nesw", pady=padding, ipady=padding)
+            moduleFrame.pack(fill="x", padx=padding)
 
         fitDataButton = ttk.Button(
             self.options, style="success.TButton", text="Fit", command=self.fitData

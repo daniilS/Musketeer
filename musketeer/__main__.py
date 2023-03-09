@@ -7,6 +7,7 @@ import tkinter.ttk as ttk
 from pathlib import PurePath
 from tkinter import font
 
+import matplotlib as mpl
 import numpy as np
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook

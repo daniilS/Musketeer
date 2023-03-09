@@ -2,6 +2,9 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from abc import ABC
 
+from . import style
+from .style import padding
+
 
 # all module strategies should be a subclass
 class Strategy(ABC):
@@ -58,19 +61,51 @@ class Popup(tk.Toplevel):
         return self.saved
 
 
-class ModuleFrame(ttk.LabelFrame):
-    frameLabel = ""
+class GroupFrame(ttk.LabelFrame):
+    def __init__(self, master, group, *args, **kwargs):
+        super().__init__(
+            master,
+            labelanchor="n",
+            borderwidth=5,
+            *args,
+            **kwargs,
+        )
+
+        self.labelWidget = ttk.Label(
+            self,
+            text=group,
+            font=style.italicFont,
+        )
+        self.configure(labelwidget=self.labelWidget)
+
+
+class ModuleFrame(ttk.Frame):
+    group = ""
     dropdownLabelText = ""
     dropdownOptions = {}
     attributeName = ""
     setDefault = True
 
     def __init__(self, parent, *args, **kwargs):
-        super().__init__(parent, text=self.frameLabel, borderwidth=5, *args, **kwargs)
+        try:
+            groupFrames = parent.groupFrames
+        except AttributeError:
+            groupFrames = parent.groupFrames = {}
+
+        try:
+            labelFrame = groupFrames[self.group]
+        except KeyError:
+            labelFrame = groupFrames[self.group] = GroupFrame(parent, self.group)
+            labelFrame.grid(sticky="nesw", pady=padding)
+
+        super().__init__(labelFrame, *args, **kwargs)
+
         self.stringVar = tk.StringVar()
 
-        self.dropdownLabel = ttk.Label(self, text=self.dropdownLabelText)
-        self.dropdownLabel.pack()
+        self.dropdownLabel = ttk.Label(
+            self, text=self.dropdownLabelText, justify="left"
+        )
+        self.dropdownLabel.pack(fill="x")
 
         strategies = list(self.dropdownOptions.keys())
         self.lastValue = ""
@@ -84,7 +119,7 @@ class ModuleFrame(ttk.LabelFrame):
         )
         optionMenu.configure(width=30)
 
-        optionMenu.pack(fill="x", pady=(5, 0))
+        optionMenu.pack(fill="x", pady=(2, padding))
 
     def update(self, titration, setDefault=False):
         self.titration = titration

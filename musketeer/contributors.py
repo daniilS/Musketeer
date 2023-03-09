@@ -358,7 +358,7 @@ class GetSignalVarsHost(GetSignalVarsSingle):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Contributors"
+    group = "Signals"
     dropdownLabelText = "What contributes to the signals?"
     dropdownOptions = {
         "Only Host": GetSignalVarsHost,

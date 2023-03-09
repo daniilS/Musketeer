@@ -423,7 +423,7 @@ class SpeciationCustom(SpeciationCOGS):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Speciation"
+    group = "Equilibria"
     dropdownLabelText = "Select a binding isotherm:"
     dropdownOptions = {
         "1:1 binding": SpeciationHG,

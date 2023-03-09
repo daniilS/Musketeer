@@ -177,7 +177,7 @@ class FitSignalsCustom(FitSignalsConstrained):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Signal constraints"
+    group = "Signals"
     dropdownLabelText = "Apply constraints to fitted signals?"
     dropdownOptions = {
         "No": FitSignalsOrdinary,

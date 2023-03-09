@@ -32,7 +32,7 @@ class ResidualsSumNormalised(combineResiduals):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Normalise residuals"
+    group = "Fitting"
     dropdownLabelText = "Normalise residuals?"
     dropdownOptions = {
         "No": ResidualsSum,

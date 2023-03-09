@@ -478,7 +478,7 @@ class GetTotalConcs(totalConcentrations):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Total concentrations"
+    group = "Experiment"
     dropdownLabelText = "Enter concentrations or volumes:"
     dropdownOptions = {
         "Volumes": GetTotalConcsFromVolumes,

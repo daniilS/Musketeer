@@ -109,8 +109,8 @@ class GetAllSpectra(KnownSignals):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    frameLabel = "Spectra"
-    dropdownLabelText = "Which spectra to optimise?"
+    group = "Signals"
+    dropdownLabelText = "Specify any known spectra?"
     dropdownOptions = {
         "Optimise all spectra": GetAllSpectra,
         # "Specify some known spectra": GetKnownSpectra,
