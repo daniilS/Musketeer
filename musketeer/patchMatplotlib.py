@@ -2,9 +2,9 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import matplotlib
-from matplotlib import cbook
-from matplotlib.backend_bases import NavigationToolbar2, _Mode
-from matplotlib.backends._backend_tk import NavigationToolbar2Tk, ToolTip
+from matplotlib import cbook, offsetbox
+from matplotlib.backend_bases import NavigationToolbar2, _Mode, cursors
+from matplotlib.backends._backend_tk import NavigationToolbar2Tk, ToolTip, cursord
 from tksheet import _tksheet, _tksheet_column_headers, _tksheet_main_table
 
 matplotlib.use("TkAgg")
@@ -38,6 +38,9 @@ class NavigationToolbarVertical(NavigationToolbar2Tk):
 
         self._buttons = {}
         for text, tooltip_text, image_file, callback in self.toolitems:
+            if callback == "configure_subplots":
+                # configure subplots doesn't work with constrained layout
+                continue
             if text is None:
                 # Add a spacer; return value is unused.
                 self._Spacer()
@@ -128,11 +131,105 @@ def nop(self):
     pass
 
 
+def __init__(self, ref_artist, use_blit=False):
+    self.ref_artist = ref_artist
+    if not ref_artist.pickable():
+        ref_artist.set_picker(True)
+    self.got_artist = False
+    self._hover = False
+    self._use_blit = use_blit and self.canvas.supports_blit
+    self.cids = [
+        self.canvas.callbacks._connect_picklable("pick_event", self.on_pick),
+        self.canvas.callbacks._connect_picklable(
+            "button_release_event", self.on_release
+        ),
+        self.canvas.callbacks._connect_picklable("motion_notify_event", self.on_motion),
+    ]
+
+
+def on_motion(self, evt):
+    # Only check if the widget lock is available, setting it would prevent
+    # picking.
+    if not (self._check_still_parented() and self.canvas.widgetlock.available(self)):
+        return
+
+    picker = self.ref_artist.get_picker()
+    if callable(picker):
+        inside, _ = picker(self, evt)
+    else:
+        inside, _ = self.ref_artist.contains(evt)
+
+    # If the mouse is moving quickly while dragging, it may leave the artist,
+    # but should still use the move cursor.
+    if inside or self.got_artist:
+        # Ideally, this should use an open hand cursor on hover, and a closed
+        # hand when dragging, but those cursors are not natively provided by
+        # all platforms.
+        self._hover = True
+        self.canvas.set_cursor(cursors.MOVE)
+    elif self._hover:
+        # Only change the cursor back if this is the widget that set it, to
+        # avoid multiple draggable widgets fighting over the cursor.
+        self._hover = False
+        self.canvas.set_cursor(cursors.POINTER)
+
+    if self._check_still_parented() and self.got_artist:
+        dx = evt.x - self.mouse_x
+        dy = evt.y - self.mouse_y
+        self.update_offset(dx, dy)
+        if self._use_blit:
+            self.canvas.restore_region(self.background)
+            self.ref_artist.draw(self.ref_artist.figure._get_renderer())
+            self.canvas.blit()
+        else:
+            self.canvas.draw()
+
+
+def on_pick(self, evt):
+    if self._check_still_parented() and evt.artist == self.ref_artist:
+        self.mouse_x = evt.mouseevent.x
+        self.mouse_y = evt.mouseevent.y
+        self.got_artist = True
+        if self._use_blit:
+            self.ref_artist.set_animated(True)
+            self.canvas.draw()
+            self.background = self.canvas.copy_from_bbox(self.ref_artist.figure.bbox)
+            self.ref_artist.draw(self.ref_artist.figure._get_renderer())
+            self.canvas.blit()
+        self.save_offset()
+
+
+def on_release(self, event):
+    if self._check_still_parented() and self.got_artist:
+        self.finalize_offset()
+        self.got_artist = False
+
+        if self._use_blit:
+            self.ref_artist.set_animated(False)
+
+
+def disconnect(self):
+    """Disconnect the callbacks."""
+    for cid in self.cids:
+        self.canvas.mpl_disconnect(cid)
+    if self._hover:
+        self.canvas.set_cursor(cursors.POINTER)
+
+
 def applyPatch():
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._Spacer = _Spacer
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
+
+    # implements PR #25412
+    offsetbox.DraggableBase.__init__ = __init__
+    offsetbox.DraggableBase.on_motion = on_motion
+    offsetbox.DraggableBase.on_pick = on_pick
+    offsetbox.DraggableBase.on_release = on_release
+    offsetbox.DraggableBase.disconnect = disconnect
+    # implements PR #25413
+    cursord[cursors.SELECT_REGION] = "crosshair"
 
     # remove calls to update() from tksheet
     _tksheet.Sheet.update = nop

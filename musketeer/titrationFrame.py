@@ -601,7 +601,7 @@ class ContinuousFittedFrame(ttk.Frame):
                 )
             self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
 
-        self.ax.legend()
+        self.ax.legend(draggable=True)
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         self.canvas.draw()
 
@@ -786,7 +786,7 @@ class FittedFrame(ttk.Frame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend()
+        self.ax.legend(draggable=True)
 
         self.canvas.draw()
 
@@ -972,7 +972,7 @@ class SpeciationFrame(ttk.Frame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend()
+        self.ax.legend(draggable=True)
 
         self.canvas.draw()
 
