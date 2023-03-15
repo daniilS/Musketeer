@@ -4,7 +4,12 @@ import tkinter.ttk as ttk
 import matplotlib
 from matplotlib import cbook, offsetbox
 from matplotlib.backend_bases import NavigationToolbar2, _Mode, cursors
-from matplotlib.backends._backend_tk import NavigationToolbar2Tk, ToolTip, cursord
+from matplotlib.backends._backend_tk import (
+    FigureCanvasTk,
+    NavigationToolbar2Tk,
+    ToolTip,
+    cursord,
+)
 from tksheet import _tksheet, _tksheet_column_headers, _tksheet_main_table
 
 matplotlib.use("TkAgg")
@@ -216,6 +221,15 @@ def disconnect(self):
         self.canvas.set_cursor(cursors.POINTER)
 
 
+original_scroll_event_windows = FigureCanvasTk.scroll_event_windows
+
+
+def scroll_event_windows(self, event):
+    # gives an error when scrolling over "tk busy" otherwise
+    if type(event.widget) is not str:
+        original_scroll_event_windows(self, event)
+
+
 def applyPatch():
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
@@ -230,6 +244,8 @@ def applyPatch():
     offsetbox.DraggableBase.disconnect = disconnect
     # implements PR #25413
     cursord[cursors.SELECT_REGION] = "crosshair"
+
+    FigureCanvasTk.scroll_event_windows = scroll_event_windows
 
     # remove calls to update() from tksheet
     _tksheet.Sheet.update = nop
