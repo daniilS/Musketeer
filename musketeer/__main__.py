@@ -7,13 +7,13 @@ import tkinter.ttk as ttk
 from pathlib import PurePath
 from tkinter import font
 
-import matplotlib as mpl
 import numpy as np
 import ttkbootstrap
 from ttkbootstrap.widgets import InteractiveNotebook
 
 from . import patchMatplotlib, titrationReader, windowsHighDpiPatch
-from .style import padding
+from .style import defaultFigureParams, figureParams, padding
+from .table import ButtonFrame
 from .titration import Titration
 from .titrationFrame import TitrationFrame
 
@@ -66,6 +66,88 @@ except Exception:
     pass
 frame = ttk.Frame(root, padding=padding)
 frame.pack(expand=True, fill="both")
+
+
+class DpiPopup(tk.Toplevel):
+    def __init__(self, master, saveCallback, *args, **kwargs):
+        super().__init__(
+            master,
+            padx=padding,
+            pady=padding,
+            *args,
+            **kwargs,
+        )
+        self.title("Change figure DPI")
+        self.resizable(False, False)
+        self.saveCallback = saveCallback
+
+        scaleLabel = ttk.Label(self, text="Scale:", justify="left", state="normal")
+        scaleLabel.grid(row=0, column=0, sticky="ew")
+
+        self.scaleDropdown = ttk.Combobox(
+            self,
+            values=[f"{i}%" for i in [60, 80, 100, 125, 150, 200]],
+            justify="right",
+            width=5,
+        )
+        self.scaleDropdown.grid(row=0, column=2, sticky="ew")
+
+        resLabel = ttk.Label(self, text="Resolution:", justify="left")
+        resLabel.grid(row=1, column=0, sticky="ew")
+
+        self.resDropdown = ttk.Combobox(
+            self,
+            values=[
+                f"{int(y*4/3)} x {y}" for y in [240, 360, 480, 600, 960, 1200, 1440]
+            ],
+            justify="right",
+            width=10,
+            state="readonly",
+        )
+        self.resDropdown.grid(row=1, column=2, sticky="ew")
+
+        self.rowconfigure(0, pad=10)
+        self.rowconfigure(1, pad=10)
+
+        self.columnconfigure(0, pad=10)
+        self.columnconfigure(1, weight=1)
+
+        self.initValues()
+
+        buttonFrame = ButtonFrame(self, self.reset, self.save, self.destroy)
+        buttonFrame.saveButton.configure(text="Save")
+
+        buttonFrame.applyButton = ttk.Button(
+            buttonFrame, text="Apply", command=self.apply, style="success.TButton"
+        )
+        buttonFrame.applyButton.pack(
+            side="right", after=buttonFrame.saveButton, padx=padding
+        )
+
+        buttonFrame.grid(row=2, column=0, columnspan=3, sticky="esw")
+
+    def reset(self):
+        self.scaleDropdown.set(f"{defaultFigureParams['scale']}%")
+        self.resDropdown.set(f"{defaultFigureParams['x']} x {defaultFigureParams['y']}")
+
+    def initValues(self):
+        self.scaleDropdown.set(f"{figureParams['scale']}%")
+        self.resDropdown.set(f"{figureParams['x']} x {figureParams['y']}")
+
+    def save(self):
+        if self.apply():  # returns False if failed to apply
+            self.destroy()
+
+    def apply(self):
+        try:
+            scale = int(self.scaleDropdown.get().strip("%"))
+            x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
+            figureParams.update(scale=scale, x=x, y=y)
+            self.saveCallback()
+            return True
+        except Exception as e:
+            mb.showerror(title="Could not apply settings", message=e, parent=self)
+            return False
 
 
 class TitrationsNotebook(InteractiveNotebook):
@@ -136,6 +218,12 @@ class TitrationsNotebook(InteractiveNotebook):
             fileMenu, "Save As", self.saveFileAs, keys=("Shift", "s"), underline=5
         )
 
+        editMenu = tk.Menu(self.menuBar, tearoff=False)
+        self.menuBar.add_cascade(label="Edit", menu=editMenu, underline=0)
+        editMenu.add_command(
+            label="Change figure DPI", command=self.editDpi, underline=0
+        )
+
         self.winfo_toplevel().config(menu=self.menuBar)
 
     def addMenuCommand(self, fileMenu, label, command, keys=None, underline=0):
@@ -161,9 +249,10 @@ class TitrationsNotebook(InteractiveNotebook):
         titration = Titration("Fit 1")
         titration.rawData = np.empty((0, 0))
 
-        titrationFrame = TitrationFrame(self, titration, padding=padding)
+        titrationFrame = TitrationFrame(self, padding=padding)
         self.add(titrationFrame, text="New Titration", sticky="nesw")
         self.select(str(titrationFrame))
+        titrationFrame.loadTitration(titration)
 
     def saveFile(self, *args):
         self.nametowidget(self.select()).saveFile()
@@ -193,10 +282,30 @@ class TitrationsNotebook(InteractiveNotebook):
         # create a tab for each titration, and let the titration object handle
         # its own I/O
         for titration in titrations:
-            titrationFrame = TitrationFrame(self, titration, filePath, padding=padding)
+            titrationFrame = TitrationFrame(self, filePath, padding=padding)
             self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
             self.select(str(titrationFrame))
+            titrationFrame.loadTitration(titration)
         self.tk.eval("tk busy forget .")
+
+    def editDpi(self, *args):
+        popup = DpiPopup(self, self.updateDpi)
+        popup.withdraw()
+        self.update()
+        root = self.winfo_toplevel()
+        x = root.winfo_x() + root.winfo_width() / 2 - popup.winfo_width() / 2
+        y = root.winfo_y() + root.winfo_height() / 2 - popup.winfo_height() / 2
+        popup.geometry(f"+{int(x)}+{int(y)}")
+        popup.transient(self)
+        popup.grab_set()
+        popup.deiconify()
+        popup.wait_window()
+
+    def updateDpi(self):
+        for tab in self.tabs():
+            if isinstance(titrationFrame := self.nametowidget(tab), TitrationFrame):
+                titrationFrame.updateDpi()
+        self.update()
 
 
 notebook = TitrationsNotebook(frame)

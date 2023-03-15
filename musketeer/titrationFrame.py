@@ -6,9 +6,12 @@ import tkinter.ttk as ttk
 from copy import deepcopy
 from pathlib import PurePath
 
+import matplotlib as mpl
 import numpy as np
+import packaging.version
 import tksheet
 from cycler import cycler
+from matplotlib.backend_bases import ResizeEvent
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from numpy import ma
@@ -30,7 +33,7 @@ from . import (
 from .moduleFrame import GroupFrame
 from .patchMatplotlib import NavigationToolbarVertical
 from .scrolledFrame import ScrolledFrame
-from .style import padding
+from .style import defaultFigureParams, figureParams, padding
 from .table import Table
 from .titration import Titration, titrationAttributes
 
@@ -39,11 +42,11 @@ from .titration import Titration, titrationAttributes
 COPY_ORIGINAL_ARRAY = "COPY_OGIRINAL_ARRAY"
 
 titrationModules = [
+    totalConcentrations,
+    proportionality,
     speciation,
     equilibriumConstants,
-    totalConcentrations,
     contributors,
-    proportionality,
     knownSignals,
     fitSignals,
     combineResiduals,
@@ -51,7 +54,7 @@ titrationModules = [
 
 
 class TitrationFrame(ttk.Frame):
-    def __init__(self, parent, titration, filePath=None, *args, **kwargs):
+    def __init__(self, parent, filePath=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.filePath = filePath
         self.numFits = 0
@@ -105,12 +108,14 @@ class TitrationFrame(ttk.Frame):
         )
         self.notebook.grid(column=1, row=0, sticky="nesw")
 
+    def loadTitration(self, titration):
         if type(titration) is Titration:
             self.originalTitration = titration
             self.newFit()
         elif type(titration) is np.lib.npyio.NpzFile:
             # TODO: move this to titrationReader.py
             self.originalTitration = Titration()
+            fileVersion = packaging.version.parse(titration[".version"].item())
             for attribute in titrationAttributes:
                 try:
                     data = titration[f".original.{attribute}"]
@@ -177,7 +182,32 @@ class TitrationFrame(ttk.Frame):
                         try:
                             data = titration[key]
                         except KeyError:
-                            continue
+                            # backwards compatibility:
+                            # version 1.2.0 moved freeNames from speciation to
+                            #
+                            if (
+                                fileVersion < packaging.version.parse("1.2.0")
+                                and moduleFrame.attributeName == "totalConcentrations"
+                                and popupAttributeName == "freeNames"
+                            ):
+                                if (key := f"{name}.speciation.freeNames") in titration:
+                                    # freeNames set in custom speciation
+                                    data = titration[key]
+                                else:
+                                    # could be ["Host"] or ["Host", "Guest"]
+                                    if (
+                                        key := f"{name}.totalConcentrations.stockConcs"
+                                    ) in titration:
+                                        freeCount = titration[key].shape[0]
+                                    elif (
+                                        key := f"{name}.totalConcentrations.totalConcs"
+                                    ) in titration:
+                                        freeCount = titration[key].shape[1]
+                                    else:
+                                        continue
+                                    data = np.array(["Host", "Guest"][:freeCount])
+                            else:
+                                continue
                         else:
                             if data.shape == ():
                                 data = data.item()
@@ -199,7 +229,6 @@ class TitrationFrame(ttk.Frame):
                         continue
                     setattr(fit, moduleFrame.attributeName, selectedStrategy)
 
-                # TODO: display tabs as they're being loaded
                 self.newFit(fit, name, setDefault=False)
 
             self.numFits = titration[".numFits"].item()
@@ -217,97 +246,41 @@ class TitrationFrame(ttk.Frame):
         if hasattr(self.currentTab, "inputSpectraFrame"):
             self.currentTab.inputSpectraFrame.plot()
 
+    def updateDpi(self):
+        for tab in self.notebook.tabs():
+            if isinstance(fitNotebook := self.nametowidget(tab), FitNotebook):
+                fitNotebook.updateDpi()
+
     @property
     def currentTab(self):
         return self.notebook.nametowidget(self.notebook.select())
 
-    # TODO: make inner notebooks into separate class
     def newFit(self, titration=None, name=None, setDefault=True):
         if titration is None:
             titration = deepcopy(self.originalTitration)
         for moduleFrame in self.moduleFrames.values():
             moduleFrame.update(titration, setDefault)
         self.numFits += 1
-        nb = ttk.Notebook(self, padding=padding, style="Flat.TNotebook")
-        nb.titration = titration
+
+        fitNotebook = FitNotebook(self, titration)
         if name is None:
             name = f"Fit {self.numFits}"
             titration.title = name
-        self.notebook.add(nb, text=name)
 
-        if titration.continuous:
-            nb.inputSpectraFrame = InputSpectraFrame(nb, nb.titration)
-            nb.add(nb.inputSpectraFrame, text="Input Spectra")
-
-        if hasattr(titration, "fitResult"):
-            try:
-                self.showFit(nb)
-            except Exception:
-                pass  # TODO make more robust
-        self.notebook.select(str(nb))
+        self.notebook.add(fitNotebook, text=name)
+        self.notebook.select(str(fitNotebook))
+        fitNotebook.loadTabs()
 
     def copyFit(self):
         self.newFit(deepcopy(self.currentTab.titration), setDefault=False)
 
     def switchFit(self, event):
-        nb = self.currentTab
+        fitNotebook = self.currentTab
         for moduleFrame in self.moduleFrames.values():
-            moduleFrame.update(nb.titration)
-
-    def fitCallback(self, *args):
-        self.update()
+            moduleFrame.update(fitNotebook.titration)
 
     def fitData(self):
-        nb = self.currentTab
-        self.tk.eval("tk busy .")
-        self.update()
-        try:
-            nb.titration.fitData(self.fitCallback)
-        except Exception as e:
-            mb.showerror(title="Failed to fit data", message=e, parent=self)
-            return
-        finally:
-            self.tk.eval("tk busy forget .")
-            self.update()
-        self.showFit(nb)
-
-    def showFit(self, nb):
-        if hasattr(nb.titration, "fitResult"):
-            lastTabClass = type(nb.nametowidget(nb.select()))
-            for tab in nb.tabs():
-                widget = nb.nametowidget(tab)
-                if isinstance(widget, InputSpectraFrame):
-                    continue
-                nb.forget(widget)
-                widget.destroy()
-        else:
-            lastTabClass = None
-
-        if nb.titration.continuous:
-            nb.continuousFittedFrame = ContinuousFittedFrame(nb, nb.titration)
-            nb.add(nb.continuousFittedFrame, text="Fitted Spectra")
-            nb.discreteFittedFrame = DiscreteFromContinuousFittedFrame(nb, nb.titration)
-            nb.add(
-                nb.discreteFittedFrame, text=f"Fit at select {nb.titration.xQuantity}"
-            )
-        else:
-            nb.discreteFittedFrame = DiscreteFittedFrame(nb, nb.titration)
-            nb.add(nb.discreteFittedFrame, text="Fitted signals")
-
-        nb.speciationFrame = SpeciationFrame(nb, nb.titration)
-        nb.add(nb.speciationFrame, text="Speciation")
-
-        nb.resultsFrame = ResultsFrame(nb, nb.titration)
-        nb.add(nb.resultsFrame, text="Results")
-
-        if lastTabClass is not None:
-            for tab in nb.tabs():
-                widget = nb.nametowidget(tab)
-                if isinstance(widget, lastTabClass):
-                    nb.select(str(widget))
-                    break
-        else:
-            nb.select(str(nb.discreteFittedFrame))
+        self.currentTab.fitData()
 
     def saveFile(self, saveAs=False):
         options = {}
@@ -410,13 +383,185 @@ class TitrationFrame(ttk.Frame):
                     self.master.tab(self, text=PurePath(self.filePath).name)
 
 
-class InputSpectraFrame(ttk.Frame):
+class FitNotebook(ttk.Notebook):
+    def __init__(self, master, titration, *args, **kwargs):
+        super().__init__(master, padding=padding, style="Flat.TNotebook")
+        self.titration = titration
+
+    def add(self, *args, **kwargs):
+        super().add(*args, **kwargs)
+        self.update()
+
+    def loadTabs(self):
+        if self.titration.continuous:
+            self.inputSpectraFrame = InputSpectraFrame(self, self.titration)
+            self.add(self.inputSpectraFrame, text="Input Spectra")
+
+        if hasattr(self.titration, "fitResult"):
+            try:
+                self.showFit()
+            except Exception as e:
+                print("Warning: failed to load previous fit result:", e)
+
+    def fitData(self):
+        self.tk.eval("tk busy .")
+        self.update()
+        try:
+            self.titration.fitData(self.fitCallback)
+        except Exception as e:
+            mb.showerror(title="Failed to fit data", message=e, parent=self)
+            return
+        finally:
+            self.tk.eval("tk busy forget .")
+            self.update()
+        self.showFit()
+
+    def fitCallback(self, *args):
+        self.update()
+
+    def showFit(self):
+        if hasattr(self.titration, "fitResult"):
+            lastTabClass = type(self.nametowidget(self.select()))
+            for tab in self.tabs():
+                widget = self.nametowidget(tab)
+                if isinstance(widget, InputSpectraFrame):
+                    continue
+                self.forget(widget)
+                widget.destroy()
+        else:
+            lastTabClass = None
+
+        if self.titration.continuous:
+            self.continuousFittedFrame = ContinuousFittedFrame(self, self.titration)
+            self.add(self.continuousFittedFrame, text="Fitted Spectra")
+            self.discreteFittedFrame = DiscreteFromContinuousFittedFrame(
+                self, self.titration
+            )
+            self.add(
+                self.discreteFittedFrame,
+                text=f"Fit at select {self.titration.xQuantity}",
+            )
+        else:
+            self.discreteFittedFrame = DiscreteFittedFrame(self, self.titration)
+            self.add(self.discreteFittedFrame, text="Fitted signals")
+
+        self.speciationFrame = SpeciationFrame(self, self.titration)
+        self.add(self.speciationFrame, text="Speciation")
+
+        self.resultsFrame = ResultsFrame(self, self.titration)
+        self.add(self.resultsFrame, text="Results")
+
+        if lastTabClass is not None:
+            for tab in self.tabs():
+                widget = self.nametowidget(tab)
+                if isinstance(widget, lastTabClass):
+                    self.select(str(widget))
+                    break
+        else:
+            self.select(str(self.discreteFittedFrame))
+
+    def updateDpi(self):
+        for tab in self.tabs():
+            if isinstance(plotFrame := self.nametowidget(tab), PlotFrame):
+                plotFrame.updateDpi()
+
+
+class PlotFrame(ttk.Frame):
+    @property
+    def dpi(self):
+        return figureParams["x"] / self.figwidth
+
+    @property
+    def figwidth(self):
+        return defaultFigureParams["x"] * 80 / figureParams["scale"] / 100
+
+    @property
+    def figheight(self):
+        return defaultFigureParams["y"] * 80 / figureParams["scale"] / 100
+
+    @property
+    def canvaswidth(self):
+        return figureParams["x"]
+
+    @property
+    def canvasheight(self):
+        return figureParams["y"]
+
+    def updateDpi(self):
+        self.fig.set_size_inches(self.figwidth, self.figheight)
+        mpl.rcParams["savefig.dpi"] = self.dpi
+        self.fig.canvas.get_tk_widget().configure(
+            width=self.canvaswidth, height=self.canvasheight
+        )
+        self.fig.canvas.updateDpi(
+            self.fig.canvas.get_tk_widget().winfo_width(),
+            self.fig.canvas.get_tk_widget().winfo_height(),
+        )
+        self.fig.canvas.draw_idle()
+
+
+class FigureCanvasTkAggFixedRatio(FigureCanvasTkAgg):
+    @property
+    def dpi(self):
+        return figureParams["x"] / self.figwidth
+
+    @property
+    def figwidth(self):
+        return defaultFigureParams["x"] / 100 * 80 / figureParams["scale"]
+
+    @property
+    def figheight(self):
+        return defaultFigureParams["y"] / 100 * 80 / figureParams["scale"]
+
+    @property
+    def desiredCanvaswidth(self):
+        return figureParams["x"]
+
+    @property
+    def desiredCanvasheight(self):
+        return figureParams["y"]
+
+    def updateDpi(self, width, height):
+        if width == 1 and height == 1:
+            return width, height
+
+        if width == self.desiredCanvaswidth and height == self.desiredCanvasheight:
+            self.figure.set_dpi(self.dpi)
+        else:
+            desiredRatio = self.desiredCanvasheight / self.desiredCanvaswidth
+            actualRatio = height / width
+            if actualRatio > desiredRatio:
+                height = width * desiredRatio
+                self.figure.set_dpi(height / self.figheight)
+            elif actualRatio < desiredRatio:
+                width = height / desiredRatio
+                self.figure.set_dpi(width / self.figwidth)
+
+        return width, height
+
+    def resize(self, event):
+        width, height = event.width, event.height
+
+        width, height = self.updateDpi(width, height)
+
+        self.get_tk_widget().delete(self._tkphoto)
+        self._tkphoto = tk.PhotoImage(
+            master=self.get_tk_widget(), width=int(width), height=int(height)
+        )
+        self.get_tk_widget().create_image(
+            int(width / 2), int(height / 2), image=self._tkphoto
+        )
+        ResizeEvent("resize_event", self)._process()
+        self.draw_idle()
+
+
+class InputSpectraFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
 
         rangeSelection = ttk.Frame(self)
-        rangeSelection.grid(row=0, column=1, sticky="s", pady=padding)
+        rangeSelection.grid(row=0, column=1, sticky="s")
 
         ttk.Label(rangeSelection, text=f"Range of {titration.xQuantity} to fit:").pack(
             side="left"
@@ -443,14 +588,16 @@ class InputSpectraFrame(ttk.Frame):
         self.toSpinbox.set(f"{maxWL:.{decimals}f}")
         self.toSpinbox.pack(padx=padding, side="left")
 
-        self.fig = Figure(layout="constrained")
+        self.fig = Figure(
+            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+        )
         self.ax = self.fig.add_subplot()
 
         ttk.Button(rangeSelection, text="Update", command=self.updateWLRange).pack(
             side="left"
         )
 
-        canvas = FigureCanvasTkAgg(self.fig, master=self)
+        canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
@@ -505,7 +652,7 @@ class InputSpectraFrame(ttk.Frame):
         self.plot()
 
 
-class ContinuousFittedFrame(ttk.Frame):
+class ContinuousFittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
@@ -513,9 +660,11 @@ class ContinuousFittedFrame(ttk.Frame):
         self.plot()
 
     def populate(self):
-        self.fig = Figure(layout="constrained")
+        self.fig = Figure(
+            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+        )
         self.ax = self.fig.add_subplot()
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
@@ -613,21 +762,23 @@ class ContinuousFittedFrame(ttk.Frame):
         self.canvas.draw()
 
 
-class FittedFrame(ttk.Frame):
+class FittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.speciation.freeNames[-1]
+        self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.normalisation = False
         self.smooth = True
         self.logScale = False
 
     def populate(self):
-        self.fig = Figure(layout="constrained")
+        self.fig = Figure(
+            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+        )
         self.ax = self.fig.add_subplot()
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
@@ -820,11 +971,11 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
         self.plot()
 
 
-class SpeciationFrame(ttk.Frame):
+class SpeciationFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.speciation.freeNames[-1]
+        self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.speciesVar = tk.StringVar(self)
         self.logScale = False
@@ -834,10 +985,12 @@ class SpeciationFrame(ttk.Frame):
 
     def populate(self):
         titration = self.titration
-        self.fig = Figure(layout="constrained")
+        self.fig = Figure(
+            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+        )
         self.ax = self.fig.add_subplot()
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
 
@@ -855,9 +1008,9 @@ class SpeciationFrame(ttk.Frame):
         self.speciesDropdown = ttk.OptionMenu(
             self.optionsFrame,
             self.speciesVar,
-            titration.speciation.freeNames[0],
+            titration.totalConcentrations.freeNames[0],
             command=lambda *args: self.plot(),
-            *titration.speciation.freeNames,
+            *titration.totalConcentrations.freeNames,
             style="primary.Outline.TMenubutton",
         )
         self.speciesDropdown.pack()
@@ -911,9 +1064,9 @@ class SpeciationFrame(ttk.Frame):
 
     @property
     def freeIndex(self):
-        return np.where(self.titration.speciation.freeNames == self.speciesVar.get())[
-            0
-        ][0]
+        return np.where(
+            self.titration.totalConcentrations.freeNames == self.speciesVar.get()
+        )[0][0]
 
     def plot(self):
         self.ax.clear()

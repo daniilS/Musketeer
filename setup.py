@@ -36,7 +36,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     license="MIT",
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: End Users/Desktop",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
@@ -48,12 +48,13 @@ setuptools.setup(
     packages=["musketeer"],
     include_package_data=True,
     install_requires=[
-        "numpy",
-        "scipy",
         "matplotlib >= 3.7.1",
+        "numpy",
+        "packaging",
+        "scipy",
         "ttkbootstrap >=0.5.2, <1.0",
         "ttkwidgets",
         "tksheet",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
 )

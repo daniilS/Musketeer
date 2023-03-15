@@ -156,7 +156,7 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
             and len(titration.contributors.signalToSpeciesMap) == titration.numSignals
             and np.all(
                 titration.contributors.signalToSpeciesMap
-                <= titration.speciation.freeCount
+                <= titration.totalConcentrations.freeCount
             )
         ):
             signalToSpeciesMap = titration.contributors.signalToSpeciesMap
@@ -171,7 +171,7 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
 
         for i, (freeName, contributorNames, contributorsMatrix) in enumerate(
             zip(
-                titration.speciation.freeNames,
+                titration.totalConcentrations.freeNames,
                 contributorNamesPerSpecies,
                 contributorsMatrixPerSpecies,
             )
@@ -214,7 +214,7 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
 
             mapVar = tk.StringVar(self)
             self.mapVars.append(mapVar)
-            for j in range(len(titration.speciation.freeNames)):
+            for j in range(len(titration.totalConcentrations.freeNames)):
                 radioButton = ttk.Radiobutton(
                     radioFrame, variable=mapVar, value=j, command=self.updateTabs
                 )
@@ -234,9 +234,9 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
         contributorsMatrixPerSpecies = ma.array(
             np.empty(
                 (
-                    self.titration.speciation.freeCount,
-                    self.titration.speciation.freeCount,
-                    self.titration.speciation.outputCount,
+                    self.titration.totalConcentrations.freeCount,
+                    self.titration.totalConcentrations.freeCount,
+                    self.titration.totalConcentrations.outputCount,
                 ),
                 dtype=int,
             ),
@@ -245,15 +245,15 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
         contributorNamesPerSpecies = ma.array(
             np.empty(
                 (
-                    self.titration.speciation.freeCount,
-                    self.titration.speciation.freeCount,
+                    self.titration.totalConcentrations.freeCount,
+                    self.titration.totalConcentrations.freeCount,
                 ),
                 dtype=object,
             ),
             mask=True,
         )
 
-        for i, name in enumerate(self.titration.speciation.freeNames):
+        for i, name in enumerate(self.titration.totalConcentrations.freeNames):
             filter = self.filter(i)
             contributorsMatrixPerSpecies[i, i, filter.astype(bool)] = 1
             contributorNamesPerSpecies[i, i] = name
@@ -261,7 +261,7 @@ class ContributorsPerSpeciesNotebook(ttk.Notebook):
         return contributorsMatrixPerSpecies, contributorNamesPerSpecies
 
     def filter(self, index):
-        free = np.zeros(self.titration.speciation.freeCount, dtype=int)
+        free = np.zeros(self.titration.totalConcentrations.freeCount, dtype=int)
         free[index] = 1
         bound = abs(self.titration.speciation.stoichiometries[:, index])
         return np.concatenate((free, bound))

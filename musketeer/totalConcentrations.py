@@ -38,6 +38,7 @@ class totalConcentrations(moduleFrame.Strategy):
     requiredAttributes = (
         "concsUnit",
         "totalConcs",
+        "freeNames",
         "variableNames",
     )
 
@@ -45,6 +46,10 @@ class totalConcentrations(moduleFrame.Strategy):
     @property
     def variableInitialGuesses(self):
         return np.full(len(self.variableNames), DEFAULT_INITIAL_CONC)
+
+    @property
+    def freeCount(self):
+        return len(self.freeNames)
 
     @abstractmethod
     def run(self, totalConcVars):
@@ -57,13 +62,19 @@ class StockTable(Table):
             stockTitles = titration.totalConcentrations.stockTitles
         except AttributeError:
             stockTitles = ("Stock 1", "Stock 2")
+
+        try:
+            freeNames = titration.totalConcentrations.freeNames
+        except AttributeError:
+            freeNames = ("Host", "Guest")
+
         super().__init__(
             master,
             2,
             0,
             stockTitles,
             maskBlanks=True,
-            rowOptions=("readonlyTitles",),
+            rowOptions=("titles", "new", "delete"),
             columnOptions=("titles", "new", "delete"),
         )
 
@@ -79,31 +90,19 @@ class StockTable(Table):
         except AttributeError:
             pass
 
-        if (
-            hasattr(titration, "totalConcentrations")
-            and hasattr(titration.totalConcentrations, "stockConcs")
-            and (
-                self.titration.totalConcentrations.stockConcs.shape[0]
-                == len(self.titration.speciation.freeNames)
-            )
-        ):
-            self.populate(titration.totalConcentrations.stockConcs)
-        else:
-            self.populateDefault()
+        try:
+            self.populate(freeNames, titration.totalConcentrations.stockConcs)
+        except AttributeError:
+            self.populateDefault(freeNames)
 
-    def deleteRowButton(self, *args, **kwargs):
-        button = super().deleteRowButton(*args, **kwargs)
-        button.state(["disabled"])
-        return button
-
-    def populate(self, stockConcs):
-        for name, row in zip(self.titration.speciation.freeNames, stockConcs):
+    def populate(self, freeNames, stockConcs):
+        for name, row in zip(freeNames, stockConcs):
             self.addRow(
                 name, [convertConc(conc, "M", self.concsUnit.get()) for conc in row]
             )
 
-    def populateDefault(self):
-        for name in self.titration.speciation.freeNames:
+    def populateDefault(self, freeNames):
+        for name in freeNames:
             self.addRow(name)
 
 
@@ -118,7 +117,7 @@ class VolumesTable(Table):
             2,
             2,
             stockTitles,
-            rowOptions=("readonlyTitles",),
+            rowOptions=("readonlyTitles", "delete"),
             columnOptions=(),
         )
 
@@ -137,7 +136,7 @@ class VolumesTable(Table):
         self.readonlyEntry(self.headerCells - 1, 1, "Addition title:", align="left")
 
         if (
-            hasattr(titration, "totalConcentrations")
+            self.titration.totalConcentrations is not None
             and hasattr(titration.totalConcentrations, "volumes")
             and (
                 self.titration.totalConcentrations.volumes.shape[0]
@@ -147,6 +146,12 @@ class VolumesTable(Table):
             self.populate(titration.totalConcentrations.volumes)
         else:
             self.populateDefault()
+
+    # TODO: instead make the columnspan of the titles 2
+    def deleteRowButton(self, *args, **kwargs):
+        button = super().deleteRowButton(*args, **kwargs)
+        button.state(["disabled"])
+        return button
 
     def populate(self, volumes):
         for name, row in zip(self.titration.additionTitles, volumes):
@@ -272,18 +277,16 @@ class VolumesPopup(moduleFrame.Popup):
             table.populateDefault()
 
     def saveData(self):
-        stockTitles = self.stockTable.columnTitles
-        stockConcs = self.stockTable.data
-        volumes = self.volumesTable.data
+        self.freeNames = self.stockTable.rowTitles
 
-        self.stockTitles = stockTitles
+        self.stockTitles = self.stockTable.columnTitles
         self.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
 
         self.concsUnit = self.stockTable.concsUnit.get()
-        self.stockConcs = stockConcs * prefixes[self.concsUnit.strip("M")]
+        self.stockConcs = self.stockTable.data * prefixes[self.concsUnit.strip("M")]
 
         self.volumesUnit = self.volumesTable.volumesUnit.get()
-        self.volumes = volumes * prefixes[self.volumesUnit.strip("L")]
+        self.volumes = self.volumesTable.data * prefixes[self.volumesUnit.strip("L")]
 
         self.saved = True
         self.destroy()
@@ -298,6 +301,7 @@ class GetTotalConcsFromVolumes(totalConcentrations):
         "stockConcs",
         "volumesUnit",
         "volumes",
+        "freeNames",
     )
 
     def run(self, totalConcVars):
@@ -334,13 +338,11 @@ class GetTotalConcsFromVolumes(totalConcentrations):
     def variableNames(self):
         if self.unknownTotalConcsLinked:
             # return the number of rows (= species) with blank cells
-            concVarsNames = self.titration.speciation.freeNames[self.rowsWithBlanks]
+            concVarsNames = self.freeNames[self.rowsWithBlanks]
             return np.array([f"[{name}]" for name in concVarsNames])
         else:
             concVarsNames = []
-            for freeName, concs in zip(
-                self.titration.speciation.freeNames, self.stockConcs
-            ):
+            for freeName, concs in zip(self.freeNames, self.stockConcs):
                 concVarsNames.extend(
                     [
                         f"[{freeName}] in {stock}"
@@ -355,13 +357,18 @@ class ConcsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
 
+        try:
+            freeNames = titration.totalConcentrations.freeNames
+        except AttributeError:
+            freeNames = ("Host", "Guest")
+
         super().__init__(
             master,
             2,
             2,
-            titration.speciation.freeNames,
+            freeNames,
             rowOptions=("readonlyTitles",),
-            columnOptions=("readonlyTitles",),
+            columnOptions=("titles", "new", "delete"),
         )
 
         self.populateDefault()
@@ -374,11 +381,11 @@ class ConcsTable(Table):
         )
 
         self.readonlyEntry(self.headerCells - 1, 1, "Addition title:", align="left")
-        if hasattr(
-            self.titration, "totalConcentrations"
-        ) and self.titration.totalConcentrations.totalConcs.shape == (
-            len(self.titration.additionTitles),
-            len(self.titration.speciation.freeNames),
+
+        if (
+            self.titration.totalConcentrations is not None
+            and self.titration.totalConcentrations.totalConcs.shape[0]
+            == len(self.titration.additionTitles)
         ):
             self.concsUnit.set(self.titration.totalConcentrations.concsUnit)
             for name, row in zip(
@@ -453,12 +460,16 @@ class ConcsPopup(moduleFrame.Popup):
 
     def reset(self):
         self.concsTable.resetData()
-        self.concsTable.columnTitles = self.titration.speciation.freeNames
+        try:
+            self.concsTable.columnTitles = self.titration.totalConcentrations.freeNames
+        except AttributeError:
+            self.concsTable.columnTitles = ("Host", "Guest")
         self.concsTable.populateDefault()
 
     def saveData(self):
         self.concsUnit = self.concsTable.concsUnit.get()
         self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
+        self.freeNames = self.concsTable.columnTitles
 
         self.saved = True
         self.destroy()
@@ -469,6 +480,7 @@ class GetTotalConcs(totalConcentrations):
     popupAttributes = (
         "concsUnit",
         "totalConcs",
+        "freeNames",
     )
 
     def run(self, totalConcVars):

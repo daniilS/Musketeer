@@ -18,17 +18,6 @@ class EquilibriumConstants(moduleFrame.Strategy):
         "initialKs",
     )
 
-    # TODO: Either properly save masked arrays, or remove them from the codebase.
-    @property
-    def knownKs(self):
-        return self._knownKs
-
-    @knownKs.setter
-    def knownKs(self, value):
-        if not isinstance(value, ma.MaskedArray):
-            value = ma.masked_invalid(value)
-        self._knownKs = value
-
     @property
     def initialKs(self):
         return self._initialKs

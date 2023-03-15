@@ -48,15 +48,24 @@ def stoichiometriesToBoundNames(freeNames, stoichiometries, polymerMode):
 
 
 class Speciation(moduleFrame.Strategy):
-    requiredAttributes = ("freeNames", "stoichiometries")
+    requiredAttributes = ("stoichiometries",)
 
     @abstractmethod
     def run(self, variables, totalConcs):
         pass
 
+    # Other modules need to access freeNames and freeCount, but totalConcentrations
+    # may not yet be loaded.
+    @property
+    def freeNames(self):
+        try:
+            return self.titration.totalConcentrations.freeNames
+        except AttributeError:
+            return np.array(["Host", "Guest"])
+
     @property
     def freeCount(self):
-        return self.stoichiometries.shape[1]
+        return len(self.freeNames)
 
     @property
     def boundCount(self):
@@ -81,13 +90,17 @@ class Speciation(moduleFrame.Strategy):
     @property
     def boundNames(self):
         return stoichiometriesToBoundNames(
-            self.freeNames, self.stoichiometries, "unchanged"
+            self.freeNames,
+            self.stoichiometries,
+            "unchanged",
         )
 
     @property
     def variableNames(self):
         return stoichiometriesToBoundNames(
-            self.freeNames, self.stoichiometries, "dimer+polymer"
+            self.freeNames,
+            self.stoichiometries,
+            "dimer+polymer",
         )
 
     @property
@@ -95,7 +108,9 @@ class Speciation(moduleFrame.Strategy):
         return np.append(
             self.freeNames,
             stoichiometriesToBoundNames(
-                self.freeNames, self.stoichiometries, "terminal+internal"
+                self.freeNames,
+                self.stoichiometries,
+                "terminal+internal",
             ),
         )
 
@@ -127,9 +142,9 @@ class SpeciationTable(Table):
             master,
             0,
             0,
-            titration.speciation.freeNames,
+            titration.totalConcentrations.freeNames,
             rowOptions=("readonlyTitles", "new", "delete"),
-            columnOptions=("titles", "new", "delete"),
+            columnOptions=("readonlyTitles",),
             boldTitles=True,
             callback=self.updateTitles,
         )
@@ -219,10 +234,7 @@ class SpeciationPopup(moduleFrame.Popup):
         self.speciationTable.pack(expand=True, fill="both")
 
     def saveData(self):
-        stoichiometries = self.speciationTable.data
-
-        self.stoichiometries = stoichiometries
-        self.freeNames = self.speciationTable.columnTitles
+        self.stoichiometries = self.speciationTable.data
 
         self.saved = True
         self.destroy()
@@ -244,7 +256,6 @@ class SpeciationDimerisation(Speciation):
 
 
 class SpeciationHG(Speciation):
-    freeNames = np.array(["Host", "Guest"])
     stoichiometries = np.array([[1, 1]])
 
     def run(self, variables, totalConcs):
@@ -328,7 +339,7 @@ class SpeciationCOGS(Speciation):
     def run(self, variables, totalConcs):
         ks, polymerKs = self.variablesToKs(variables)
         numPoints = totalConcs.shape[0]
-        free = np.zeros((numPoints, self.freeCount))
+        free = np.zeros((numPoints, self.titration.totalConcentrations.freeCount))
         bound = np.zeros((numPoints, self.complexCount + 2 * self.polymerCount))
         for i in range(numPoints):
             free[i], bound[i] = self.COGS(
@@ -413,13 +424,12 @@ class SpeciationCustomGrad(speciationGrad):
 
 
 class SpeciationHG2(SpeciationCOGS):
-    freeNames = np.array(["Host", "Guest"])
     stoichiometries = np.array([[1, 1], [1, 2]])
 
 
 class SpeciationCustom(SpeciationCOGS):
     Popup = SpeciationPopup
-    popupAttributes = ("freeNames", "stoichiometries")
+    popupAttributes = ("stoichiometries",)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

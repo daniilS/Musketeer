@@ -3,6 +3,10 @@ from tkinter import font
 padding = 5
 cellWidth = 17
 
+figureParams = {"scale": 100, "x": 640, "y": 480}
+
+defaultFigureParams = {"scale": 100, "x": 640, "y": 480}
+
 
 def __getattr__(name):
     if name in ["boldFont", "italicFont"]:
