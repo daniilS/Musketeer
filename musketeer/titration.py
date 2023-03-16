@@ -171,6 +171,16 @@ class Titration:
             -abs(np.diff(movement)), prominence=0
         )
         inflectionProminences = inflectionProperties["prominences"]
+        # remove peaks that got detected twice
+        duplicatesFilter = [
+            index not in peakIndices
+            and index + 1 not in peakIndices
+            and index - 1 not in peakIndices
+            for index in inflectionIndices
+        ]
+        inflectionIndices = inflectionIndices[duplicatesFilter]
+        inflectionProminences = inflectionProminences[duplicatesFilter]
+        # select the two most prominent inflection points
         inflectionFilter = inflectionProminences.argsort()[-maxShoulderPeaks:]
         largestInflectionsIndices = inflectionIndices[inflectionFilter]
 
