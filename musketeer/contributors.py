@@ -211,9 +211,8 @@ class ContributorConcsPerMoleculePopup(moduleFrame.Popup):
                 self.tables.append(None)
 
     def reset(self):
-        # TODO: FIX!
-        self.contributorsTable.destroy()
-        self.createTable()
+        self.notebook.destroy()
+        self.createNotebook()
 
     def saveData(self):
         contributorsMatrix = []
