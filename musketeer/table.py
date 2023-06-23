@@ -11,6 +11,7 @@ from .style import cellWidth, padding
 
 class Table(ttk.Frame):
     width = cellWidth
+    rowTitleWidth = None
 
     titleFont = None
     italicFont = None
@@ -89,11 +90,12 @@ class Table(ttk.Frame):
         columnspan=1,
         *,
         addCallback=True,
+        width=None,
         **kwargs,
     ):
         entry = ttk.Entry(
             self,
-            width=self.width * columnspan,
+            width=width or self.width * columnspan,
             justify=align,
             **kwargs,
         )
@@ -231,12 +233,17 @@ class Table(ttk.Frame):
     def addRow(self, firstEntry="", data=None):
         row = self.cells.shape[0]
         newRow = np.full(self.cells.shape[1], None)
+        rowTitleWidth = self.rowTitleWidth or self.width
         if "delete" in self.rowOptions:
             newRow[0] = self.deleteRowButton(row, 0, "Delete Row")
         if "readonlyTitles" in self.rowOptions:
-            newRow[1] = self.readonlyEntry(row, 1, firstEntry, font=self.titleFont)
+            newRow[1] = self.readonlyEntry(
+                row, 1, firstEntry, font=self.titleFont, width=rowTitleWidth
+            )
         elif "titles" in self.rowOptions:
-            newRow[1] = self.entry(row, 1, firstEntry, font=self.titleFont)
+            newRow[1] = self.entry(
+                row, 1, firstEntry, font=self.titleFont, width=rowTitleWidth
+            )
         for column in range(self.cells.shape[1] - 2):
             entry = self.entry(row, 2 + column, align="right")
             if data is not None:
