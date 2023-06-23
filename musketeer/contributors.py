@@ -1,6 +1,6 @@
+import math
 import tkinter as tk
 import tkinter.ttk as ttk
-from abc import abstractmethod
 
 import numpy as np
 from numpy import ma
@@ -11,27 +11,45 @@ from .style import padding
 from .table import ButtonFrame, Table, WrappedLabel
 
 
-class Contributors(moduleFrame.Strategy):
+class Contributors:
+    requiredAttributes = ()
+
+
+class ContributorConcs(moduleFrame.Strategy):
     requiredAttributes = (
         "contributorsMatrix",
-        "contributorNames",
+        "outputNames",
+        "contributorsCountPerMolecule",
     )
 
-    @abstractmethod
-    def run(self, freeConcs, boundConcs):
-        pass
-
-
-class GetSignalVarsFromMatrix(Contributors):
     def run(self, freeConcs, boundConcs):
         allConcs = np.concatenate((freeConcs, boundConcs), 1)
-        variableConcs = allConcs @ self.contributorsMatrix.T
-        return variableConcs
+        return allConcs @ self.contributorsMatrix.T, self.contributorsCountPerMolecule
 
 
 class ContributorsTable(Table):
-    def __init__(self, master, rowTitles, columnTitles, data):
-        self.width = max([len(title) for title in columnTitles])
+    def __init__(
+        self, master, outputNames, speciesNames, contributorsMatrix, speciesFilter
+    ):
+        if len(speciesNames) != len(speciesFilter):
+            raise ValueError(
+                f"Lengths of speciesNames ({len(speciesNames)}) and speciesFilter"
+                f" ({len(speciesFilter)}) do not match."
+            )
+
+        self.speciesFilter = speciesFilter
+        self.width = max(
+            [len(name) for name in np.concatenate([outputNames, speciesNames])]
+        )
+
+        if contributorsMatrix.shape[1] == len(speciesFilter):
+            data = contributorsMatrix[:, speciesFilter]
+            rowTitles = outputNames
+        else:
+            data = np.eye(np.count_nonzero(speciesFilter), dtype=int)
+            rowTitles = speciesNames[speciesFilter]
+        columnTitles = speciesNames[speciesFilter]
+
         super().__init__(
             master,
             0,
@@ -49,11 +67,26 @@ class ContributorsTable(Table):
         self.addRow("New state", defaultEntries)
 
     def convertData(self, number):
-        # if all entries happen to be integers, this is handled by saveData()
+        # if all entries happen to be integers, this is handled by processData()
         return float(number)
 
+    def processData(self):
+        matrix = np.zeros([self.data.shape[0], len(self.speciesFilter)])
+        matrix[:, self.speciesFilter] = self.data
+        if np.all(matrix % 1 == 0):
+            matrix = matrix.astype(int)
 
-class ContributorsPopup(moduleFrame.Popup):
+        contributorsMatrix = matrix
+        outputNames = self.rowTitles
+        # Returns an array so that ContributorConcsPopup can save it directly as a
+        # popup attribute. ContributorConcsPerMoleculePopup will convert it to a long
+        # array.
+        contributorsCountPerMolecule = np.array([matrix.shape[0]])
+
+        return contributorsMatrix, outputNames, contributorsCountPerMolecule
+
+
+class ContributorConcsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
@@ -83,20 +116,12 @@ class ContributorsPopup(moduleFrame.Popup):
         self.createTable()
 
     def createTable(self):
-        titration = self.titration
-        if (
-            titration.contributors.contributorsMatrix.shape[1]
-            == titration.speciation.outputCount
-        ):
-            contributorsMatrix = titration.contributors.contributorsMatrix
-        else:
-            contributorsMatrix = np.eye(titration.speciation.outputCount)
-
         self.contributorsTable = ContributorsTable(
             self.innerFrame,
-            titration.contributors.contributorNames,
-            titration.speciation.outputNames,
-            contributorsMatrix,
+            self.titration.contributors.outputNames,
+            self.titration.speciation.outputNames,
+            self.titration.contributors.contributorsMatrix,
+            self.titration.contributingSpecies.filter,
         )
         self.contributorsTable.pack(expand=True, fill="both")
 
@@ -105,265 +130,351 @@ class ContributorsPopup(moduleFrame.Popup):
         self.createTable()
 
     def saveData(self):
-        self.contributorsMatrix = self.contributorsTable.data
-        if np.all(self.contributorsMatrix % 1 == 0):
-            self.contributorsMatrix = self.contributorsMatrix.astype(int)
-
-        self.contributorNames = self.contributorsTable.rowTitles
+        (
+            self.contributorsMatrix,
+            self.outputNames,
+            self.contributorsCountPerMolecule,
+        ) = self.contributorsTable.processData()
 
         self.saved = True
         self.destroy()
 
 
-class GetSignalVarsCustom(GetSignalVarsFromMatrix):
-    Popup = ContributorsPopup
-    popupAttributes = ("contributorsMatrix", "contributorNames")
-
-
-class ContributorsPerSpeciesNotebook(ttk.Notebook):
-    def __init__(self, master, titration, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.titration = titration
-
-        mapTab = ttk.Frame(self)
-        self.add(mapTab, text="Map signal to species", sticky="nsew", padding=padding)
-        contributorsLabel = WrappedLabel(
-            mapTab,
-            padding=padding * 2,
-            text="For each signal, specify which species it is caused by.",
-        )
-        contributorsLabel.pack(expand=False, fill="both")
-
-        if (
-            hasattr(titration.contributors, "contributorsMatrixPerSpecies")
-            and titration.contributors.contributorsMatrixPerSpecies.shape[2]
-            == titration.speciation.outputCount
-        ):
-            contributorsMatrixPerSpecies = (
-                titration.contributors.contributorsMatrixPerSpecies
-            )
-            contributorNamesPerSpecies = (
-                titration.contributors.contributorNamesPerSpecies
-            )
-        else:
-            (
-                contributorsMatrixPerSpecies,
-                contributorNamesPerSpecies,
-            ) = self.createDefaultSetup()
-
-        if (
-            hasattr(titration.contributors, "signalToSpeciesMap")
-            and len(titration.contributors.signalToSpeciesMap) == titration.numSignals
-            and np.all(
-                titration.contributors.signalToSpeciesMap
-                <= titration.totalConcentrations.freeCount
-            )
-        ):
-            signalToSpeciesMap = titration.contributors.signalToSpeciesMap
-        else:
-            signalToSpeciesMap = np.zeros(titration.numSignals, dtype=int)
-
-        self.speciesTabs = []
-        self.mapVars = []
-
-        radioFrame = ttk.Frame(mapTab)
-        radioFrame.pack(expand=True, fill="both")
-
-        for i, (freeName, contributorNames, contributorsMatrix) in enumerate(
-            zip(
-                titration.totalConcentrations.freeNames,
-                contributorNamesPerSpecies,
-                contributorsMatrixPerSpecies,
-            )
-        ):
-            label = ttk.Label(radioFrame, text=freeName)
-            label.grid(row=0, column=i + 1, sticky="w")
-            radioFrame.columnconfigure(i + 1, uniform="map", pad=padding)
-
-            rowTitles = contributorNames[~contributorNames.mask]
-            columnTitles = titration.speciation.outputNames[self.filter(i).astype(bool)]
-            matrix = contributorsMatrix[~contributorsMatrix.mask].reshape(
-                (len(rowTitles), len(columnTitles))
-            )
-            tab = ttk.Frame(self)
-            contributorsLabel = WrappedLabel(
-                tab,
-                padding=padding * 2,
-                text=(
-                    "On each row, enter a state that contributes to the observed"
-                    " signal. For each column, specify how many of the state that"
-                    " species contains."
-                ),
-            )
-            contributorsLabel.pack(expand=False, fill="both")
-
-            scrolledFrame = ScrolledFrame(tab, max_width=1500)
-            scrolledFrame.pack(expand=True, fill="both")
-            innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
-
-            table = ContributorsTable(innerFrame, rowTitles, columnTitles, matrix)
-            table.pack(expand=True, fill="both")
-            self.add(tab, text=freeName, state="hidden", sticky="nsew", padding=padding)
-            self.speciesTabs.append(tab)
-
-        for i, (title, index) in enumerate(
-            zip(titration.processedSignalTitlesStrings, signalToSpeciesMap)
-        ):
-            label = ttk.Label(radioFrame, text=title)
-            label.grid(row=i + 1, column=0, padx=padding)
-
-            mapVar = tk.StringVar(self)
-            self.mapVars.append(mapVar)
-            for j in range(len(titration.totalConcentrations.freeNames)):
-                radioButton = ttk.Radiobutton(
-                    radioFrame, variable=mapVar, value=j, command=self.updateTabs
-                )
-                radioButton.grid(row=i + 1, column=j + 1, sticky="w")
-                if j == index:
-                    radioButton.invoke()
-
-    def updateTabs(self):
-        # show tabs that have any signals mapped to them, hide the rest
-        for i, tab in enumerate(self.speciesTabs):
-            if any(mapVar.get() == str(i) for mapVar in self.mapVars):
-                self.tab(tab, state="normal")
-            else:
-                self.tab(tab, state="hidden")
-
-    def createDefaultSetup(self):
-        contributorsMatrixPerSpecies = ma.array(
-            np.empty(
-                (
-                    self.titration.totalConcentrations.freeCount,
-                    self.titration.totalConcentrations.freeCount,
-                    self.titration.totalConcentrations.outputCount,
-                ),
-                dtype=int,
-            ),
-            mask=True,
-        )
-        contributorNamesPerSpecies = ma.array(
-            np.empty(
-                (
-                    self.titration.totalConcentrations.freeCount,
-                    self.titration.totalConcentrations.freeCount,
-                ),
-                dtype=object,
-            ),
-            mask=True,
-        )
-
-        for i, name in enumerate(self.titration.totalConcentrations.freeNames):
-            filter = self.filter(i)
-            contributorsMatrixPerSpecies[i, i, filter.astype(bool)] = 1
-            contributorNamesPerSpecies[i, i] = name
-
-        return contributorsMatrixPerSpecies, contributorNamesPerSpecies
-
-    def filter(self, index):
-        free = np.zeros(self.titration.totalConcentrations.freeCount, dtype=int)
-        free[index] = 1
-        bound = abs(self.titration.speciation.stoichiometries[:, index])
-        return np.concatenate((free, bound))
-
-
-class ContributorsPerSpeciesPopup(moduleFrame.Popup):
+class ContributorConcsPerMoleculePopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
-        self.title("Enter the contributing species")
+        self.title("Enter the contributing states")
 
         height = int(self.master.winfo_height() * 0.4)
         self.frame = ttk.Frame(self, height=height)
         self.frame.pack(expand=True, fill="both")
 
+        contributorsLabel = WrappedLabel(
+            self.frame,
+            padding=padding * 2,
+            text=(
+                "On each row, enter a state that contributes to the observed"
+                " signal. For each column, specify how many of the state that"
+                " species contains."
+            ),
+        )
+        contributorsLabel.pack(expand=False, fill="both")
+
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
-        self.notebook = ContributorsPerSpeciesNotebook(
-            self.frame, titration, style="Flat.TNotebook"
-        )
+
+        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame.pack(expand=True, fill="both")
+        self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
+        self.createNotebook()
+
+    def createNotebook(self):
+        self.notebook = ttk.Notebook(self.innerFrame, style="Flat.TNotebook")
         self.notebook.pack(expand=True, fill="both", padx=padding, pady=padding)
 
+        self.tables = []
+
+        splitIndices = np.cumsum(
+            self.titration.contributors.contributorsCountPerMolecule
+        )[:-1]
+
+        outputNamesPerMolecule = np.split(
+            self.titration.contributors.outputNames, splitIndices
+        )
+        contributorsMatrixPerMolecule = np.vsplit(
+            self.titration.contributors.contributorsMatrix, splitIndices
+        )
+        moleculeHasSignals = [
+            index in self.titration.contributingSpecies.signalToMoleculeMap
+            for index in range(self.titration.speciation.freeCount)
+        ]
+
+        for molecule, outputNames, contributorsMatrix, speciesFilter, hasSignals in zip(
+            self.titration.speciation.freeNames,
+            outputNamesPerMolecule,
+            contributorsMatrixPerMolecule,
+            self.titration.contributingSpecies.filter,  # already 1 row per molecule
+            moleculeHasSignals,
+        ):
+            if hasSignals:
+                table = ContributorsTable(
+                    self.notebook,
+                    outputNames,
+                    self.titration.speciation.outputNames,
+                    contributorsMatrix,
+                    speciesFilter,
+                )
+                self.notebook.add(table, text=molecule)
+                self.tables.append(table)
+            else:
+                self.tables.append(None)
+
     def reset(self):
-        self.notebook.destroy()
-        self.notebook = ContributorsPerSpeciesNotebook(self.frame, self.titration)
-        self.notebook.pack(expand=True, fill="both")
+        # TODO: FIX!
+        self.contributorsTable.destroy()
+        self.createTable()
 
     def saveData(self):
-        raise NotImplementedError
+        contributorsMatrix = []
+        outputNames = []
+        contributorsCountPerMolecule = []
+        for table in self.tables:
+            if table is None:
+                contributorsCountPerMolecule.append(np.array([0]))
+            else:
+                (
+                    matrix,
+                    names,
+                    count,
+                ) = table.processData()
+                contributorsMatrix.append(matrix)
+                outputNames.append(names)
+                contributorsCountPerMolecule.append(count)
+
+        self.contributorsMatrix = np.vstack(contributorsMatrix)
+        self.outputNames = np.concatenate(outputNames)
+        self.contributorsCountPerMolecule = np.concatenate(contributorsCountPerMolecule)
 
         self.saved = True
         self.destroy()
 
 
-class GetSignalVarsPerSpecies(Contributors):
-    Popup = ContributorsPerSpeciesPopup
-    popupAttributes = (
-        "contributorsMatrixPerSpecies",
-        "contributorNamesPerSpecies",
-        "signalToSpeciesMap",
-    )
-
-    contributorsMatrix = None
-    contributorNames = None
-
-    def run(*args):
-        # TODO: implement
-        raise NotImplementedError
-
-
-class GetSignalVarsAll(Contributors):
+class ContributorConcsAll(ContributorConcs):
     @property
-    def contributorNames(self):
-        return self.titration.speciation.outputNames
+    def outputNames(self):
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        filter = self.titration.contributingSpecies.filter
+        if singleMoleculeIndex is None or type(singleMoleculeIndex) is int:
+            return self.titration.speciation.outputNames[filter]
+        elif type(singleMoleculeIndex) is np.ndarray:
+            names = []
+            for i in singleMoleculeIndex:
+                moleculeName = self.titration.speciation.freeNames[i]
+                allNames = np.array(
+                    [
+                        f"{moleculeName} in {complex}"
+                        for complex in self.titration.speciation.outputNames
+                    ]
+                )
+                allNames[i] = f"Free {moleculeName}"
+                names.extend(allNames[filter[i]])
+            return np.array(names)
 
     @property
     def contributorsMatrix(self):
-        return np.identity(self.titration.speciation.outputCount, dtype=int)
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        filter = self.titration.contributingSpecies.filter
+        if singleMoleculeIndex is None:
+            return np.diag(filter).astype(int)[filter]
+        elif type(singleMoleculeIndex) is int:
+            return self.matrixFromSingleMolecule(singleMoleculeIndex, filter)
+        elif type(singleMoleculeIndex) is np.ndarray:
+            # The index will currently always be equal to np.arange(freeCount), so a
+            # matrix will be returned for each molecule. It may at some point become
+            # more useful to instead only return matrices for the molecules that have
+            # at least one signal mapped to them.
+            return np.vstack(
+                [
+                    self.matrixFromSingleMolecule(i, filter[i])
+                    for i in singleMoleculeIndex
+                ]
+            )
 
-    def run(self, freeConcs, boundConcs):
-        allConcs = np.concatenate((freeConcs, boundConcs), 1)
-        return allConcs
+    @property
+    def contributorsCountPerMolecule(self):
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        filter = self.titration.contributingSpecies.filter
+        if type(singleMoleculeIndex) is np.ndarray:
+            return np.array(
+                [
+                    self.matrixFromSingleMolecule(i, filter[i]).shape[0]
+                    for i in singleMoleculeIndex
+                ]
+            )
+        else:
+            return np.array([self.contributorsMatrix.shape[0]])
+
+    def matrixFromSingleMolecule(self, index, filter):
+        free = np.zeros(self.titration.speciation.freeCount, dtype=int)
+        free[index] = 1
+        bound = abs(self.titration.speciation.outputStoichiometries[:, index])
+        return np.diag(np.concatenate((free, bound)))[filter]
 
 
-class GetSignalVarsSingle(GetSignalVarsFromMatrix):
-    requiredAttributes = GetSignalVarsFromMatrix.requiredAttributes + (
-        "contributorIndex",
-    )
-
-    # TODO: make this work with polymers
-    def filter(self):
-        hostFree = np.zeros(self.titration.speciation.freeCount, dtype=int)
-        hostFree[self.contributorIndex] = 1
-
-        hostBound = abs(
-            self.titration.speciation.stoichiometries[:, self.contributorIndex]
+class ContributorConcsIdentical(ContributorConcs):
+    def calculateStates(self):
+        moleculeCount = self.titration.speciation.freeCount
+        freeStates = np.zeros(
+            [self.titration.speciation.outputCount, moleculeCount], dtype=int
+        )
+        boundStates = np.zeros(
+            [self.titration.speciation.outputCount, moleculeCount], dtype=int
         )
 
-        return np.concatenate((hostFree, hostBound))
+        # for each molecule, the maximum number of bonds it is known to form to each
+        # other molecule
+        # rows are the host molecules, columns are the guest molecules
+        maximumValencyPerGuest = np.zeros([moleculeCount, moleculeCount], dtype=int)
+        # maximum total number of bonds each molecule can form
+        maximumTotalValency = np.zeros(moleculeCount, dtype=int)
+
+        stoichiometries = self.titration.speciation.outputStoichiometries
+        # n-mer means host has n-1 binding sites for binding itself
+        # 1 becomes 0, because that's the host molecule itself
+        # -1 becomes -2 becomes 2, as polymers imply 2 binding sites
+        guestStoichiometries = np.repeat(
+            stoichiometries[np.newaxis, :, :], moleculeCount, axis=0
+        )
+        guestStoichiometries[range(moleculeCount), :, range(moleculeCount)] -= 1
+        guestStoichiometries = np.abs(guestStoichiometries)
+
+        # calculate maximum valency per guest and maximum total valency
+        for host in range(moleculeCount):
+            singleHost = np.abs(stoichiometries)[:, host] == 1
+            maximumValencyPerGuest[host] = np.max(
+                guestStoichiometries[host][singleHost, :], axis=0, initial=0
+            )
+
+            # We only consider guests that form binary complexes with the host
+            formsBinaryComplex = np.zeros(moleculeCount, dtype=bool)
+            for guest in range(moleculeCount):
+                binaryComplex = np.zeros(moleculeCount, dtype=int)
+                binaryComplex[host] = 1
+                binaryComplex[guest] = 1
+                formsBinaryComplex[guest] = np.any(
+                    np.all(
+                        # want to match -1 iff host == guest
+                        np.abs(stoichiometries) == binaryComplex,
+                        axis=1,
+                    )
+                )
+            maximumValencyPerGuest[host, ~formsBinaryComplex] = 0
+
+            # Find the maximum number of guests that can bind to one host molecule at
+            # the same time, counting only those guests which can also form binary
+            # complexes with the host.
+            maximumTotalValency[host] = np.max(
+                np.sum(
+                    guestStoichiometries[host][singleHost, :][:, formsBinaryComplex],
+                    axis=1,
+                ),
+                initial=0,
+            )
+
+        # calculate number of free and bound states for each molecule in each complex
+        for host in range(moleculeCount):
+            freeStates[host, host] = maximumTotalValency[host]
+            for index, complex in enumerate(guestStoichiometries[host]):
+                if stoichiometries[index, host] < 1:
+                    # complexes handled separately below
+                    continue
+                else:
+                    hostStoichiometry = stoichiometries[index, host]
+                    maximumTotalValencyHost = (
+                        maximumTotalValency[host] * hostStoichiometry
+                    )
+                valencyPerGuest = np.minimum(
+                    complex * maximumValencyPerGuest[:, host],
+                    maximumValencyPerGuest[host, :] * hostStoichiometry,
+                )
+                totalValency = np.minimum(
+                    np.sum(valencyPerGuest),
+                    maximumTotalValencyHost,
+                )
+                freeStates[moleculeCount + index, host] = (
+                    maximumTotalValencyHost - totalValency
+                )
+                boundStates[moleculeCount + index, host] = totalValency
+
+            complexIndices = np.where(stoichiometries[:, host] < 0)[0]
+            terminal = complexIndices[0::2]
+            internal = complexIndices[1::2]
+            # Crude assumption for polymers with odd numbers of binding sites - users
+            # are really expected to manually enter a contributors table in such cases.
+            freeStates[moleculeCount + terminal, host] = math.ceil(
+                maximumTotalValency[host] / 2
+            )
+            boundStates[moleculeCount + terminal, host] = math.floor(
+                maximumTotalValency[host] / 2
+            )
+            freeStates[moleculeCount + internal, host] = 0
+            boundStates[moleculeCount + internal, host] = maximumTotalValency[host]
+
+        return freeStates, boundStates
+
+    def getContributorsMatrixAndNames(self):
+        freeStates, boundStates = self.calculateStates()
+        allStates = np.empty(
+            [
+                2 * self.titration.speciation.freeCount,
+                self.titration.speciation.outputCount,
+            ],
+            dtype=int,
+        )
+        allStates[0::2] = freeStates.T
+        allStates[1::2] = boundStates.T
+
+        allNames = np.concatenate(
+            [
+                [f"Free {molecule} site", f"Bound {molecule} site"]
+                for molecule in self.titration.speciation.freeNames
+            ]
+        )
+
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        if singleMoleculeIndex is None:
+            relevantStates = allStates[:, self.titration.contributingSpecies.filter]
+            rowFilter = np.any(relevantStates, axis=1)
+        elif type(singleMoleculeIndex) is int:
+            rowFilter = np.array([2 * singleMoleculeIndex, 2 * singleMoleculeIndex + 1])
+        elif type(singleMoleculeIndex) is np.ndarray:
+            rowFilter = np.empty(2 * len(singleMoleculeIndex), dtype=int)
+            rowFilter[0::2] = 2 * singleMoleculeIndex
+            rowFilter[1::2] = 2 * singleMoleculeIndex + 1
+        return allStates[rowFilter], allNames[rowFilter]
 
     @property
-    def contributorNames(self):
-        return self.titration.speciation.outputNames[self.filter().astype(bool)]
+    def outputNames(self):
+        _, names = self.getContributorsMatrixAndNames()
+        return names
 
     @property
     def contributorsMatrix(self):
-        matrix = np.diag(self.filter())
-        emptyRows = np.all(matrix == 0, axis=1)
-        return matrix[~emptyRows]
+        matrix, _ = self.getContributorsMatrixAndNames()
+        return matrix
+
+    @property
+    def contributorsCountPerMolecule(self):
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        if type(singleMoleculeIndex) is np.ndarray:
+            return np.array([2] * len(singleMoleculeIndex))
+        else:
+            return np.array([self.contributorsMatrix.shape[0]])
 
 
-class GetSignalVarsHost(GetSignalVarsSingle):
-    contributorIndex = 0
+class ContributorConcsCustom(ContributorConcs):
+    @property
+    def Popup(self):
+        singleMoleculeIndex = self.titration.contributingSpecies.singleMoleculeIndex
+        if type(singleMoleculeIndex) is np.ndarray:
+            return ContributorConcsPerMoleculePopup
+        else:
+            return ContributorConcsPopup
+
+    popupAttributes = (
+        "contributorsMatrix",
+        "outputNames",
+        "contributorsCountPerMolecule",
+    )
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    group = "Signals"
-    dropdownLabelText = "What contributes to the signals?"
+    group = "Spectra"
+    dropdownLabelText = "Specify relationship between fitted spectra?"
     dropdownOptions = {
-        "Only Host": GetSignalVarsHost,
-        "All": GetSignalVarsAll,
-        "Custom": GetSignalVarsCustom,
-        # "Custom per species": GetSignalVarsPerSpecies,
+        "All species have different spectra": ContributorConcsAll,
+        "All binding sites have identical spectra": ContributorConcsIdentical,
+        "Custom": ContributorConcsCustom,
     }
     attributeName = "contributors"
