@@ -32,8 +32,7 @@ def readUV(filePath):
     # set default parameters for UV-Vis titrations
     fillPredefinedParams(titration, predefinedParams["UV-Vis"])
 
-    with open(filePath, "r", newline="") as inFile:
-
+    with open(filePath, "r", newline="", encoding="utf-8-sig") as inFile:
         reader = csv.reader(inFile)
 
         titleRow = next(reader)[::2]
@@ -116,7 +115,7 @@ def readNMR(filePath):
     plotFrequencies = []
     plotIntensities = []
 
-    with open(filePath, "r", newline="") as inFile:
+    with open(filePath, "r", newline="", encoding="utf-8-sig") as inFile:
         reader = csv.reader(inFile, delimiter="\t")
         for row in reader:
             if not row or not row[0]:
