@@ -168,11 +168,20 @@ class CustomKsTable(Table):
                 self.data[0, :-1],
                 self.data[1:, :-1].T.astype(int),
             ):
-                label = f"Global K for {globalK} = {statFactor}"
+                if (int(statFactor) != 1) or all(variableFactors == 0):
+                    label = f"Global K for {globalK} = {statFactor}"
+                    needsCross = True
+                else:
+                    label = f"Global K for {globalK} ="
+                    needsCross = False
                 for variable, factor in zip(variables, variableFactors):
                     if factor == 0 or factor == "":
                         continue
-                    label += f" × {variable}"
+                    if needsCross:
+                        label += " ×"
+                    else:
+                        needsCross = True
+                    label += f" {variable}"
                     if factor == 1:
                         continue
                     label += str(factor).translate(trans)
@@ -199,12 +208,12 @@ class CustomKsPopup(moduleFrame.Popup):
         customKsLabel = WrappedLabel(
             self.frame,
             text=(
-                "Each row represents a variable that will be optimised. The global K"
-                " for each complex is the product of a statistical factor and all the"
-                " variables raised to the exponent specified in the cells.\n\nIn the"
-                " final column, specify a value to fix the variable, leave empty to"
-                " optimise the variable, or write ~number to provide an initial guess"
-                " for the optimisation."
+                "Each row represents a variable that will be optimised. Each column"
+                " represents a complex. The global K for each complex is the product of"
+                " a statistical factor, and all the variables raised to the exponents"
+                " specified in that column.\n\nIn the final column, specify a value to"
+                " fix the variable, leave empty to optimise the variable, or write"
+                " ~number to provide an initial guess for the optimisation."
             ),
             padding=5,
         )
@@ -274,6 +283,7 @@ class GetKsCustom(EquilibriumConstants):
     )
 
     def run(self, kVars):
+        # print(kVars)
         # microKs as a column vector, with the unknown values filled in
         microKs = self.knownKs.copy()
         microKs[self.knownMask] = kVars
