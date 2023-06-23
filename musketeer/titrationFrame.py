@@ -283,11 +283,7 @@ class TitrationFrame(ttk.Frame):
             moduleFrame.update(fitNotebook.titration)
 
     def fitData(self):
-        import time
-
-        start = time.process_time()
         self.currentTab.fitData()
-        print("Total time:", time.process_time() - start)
 
     def saveFile(self, saveAs=False):
         options = {}
@@ -1124,8 +1120,7 @@ class SpeciationFrame(PlotFrame):
 
         boundConcs = titration.lastBoundConcs * factor
         boundConcs = boundConcs[additionsFilter, :][:, boundFilter]
-        # TODO: make this work with polymers
-        boundNames = titration.speciation.boundNames[boundFilter]
+        boundNames = titration.speciation.outputBoundNames[boundFilter]
 
         curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
         names = np.append(freeName, boundNames)
@@ -1258,6 +1253,7 @@ class ResultsFrame(ttk.Frame):
         sheet.RI.configure(height=0)
 
         sheet.enable_bindings()
+        sheet.set_width_of_index_to_text()
         sheet.pack(side="top", pady=15, fill="both", expand=True)
 
         saveButton = ttk.Button(

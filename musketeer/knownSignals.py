@@ -41,6 +41,7 @@ class KnownSpectraPopup(moduleFrame.Popup):
         self.sheet.RI.configure(height=0)
 
         self.sheet.enable_bindings()
+        self.sheet.set_width_of_index_to_text()
 
         buttonFrame = ButtonFrame(self, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
@@ -177,6 +178,7 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
                     set_all_heights_and_widths=True,
                 )
                 sheet.enable_bindings()
+                sheet.set_width_of_index_to_text()
 
                 self.notebook.add(sheet, text=molecule)
                 self.sheets.append(sheet)
