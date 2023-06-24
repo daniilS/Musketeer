@@ -15,15 +15,15 @@ class combineResiduals(moduleFrame.Strategy):
 
 class ResidualsSum(combineResiduals):
     def run(self, residuals):
-        return np.sum(residuals)
+        return np.sqrt(np.sum(residuals))
 
 
 class ResidualsSumScaled(combineResiduals):
-    # TODO: test
+    # Provided for legacy reasons, not currently recommended
     # sum of the residuals, scaled by the number of data points for each signal
     def run(self, residuals):
         numPoints = self.titration.processedData.count(axis=0)
-        return np.sum(residuals / numPoints)
+        return np.sqrt(np.sum(residuals / numPoints))
 
 
 class ResidualsSumNormalised(combineResiduals):
