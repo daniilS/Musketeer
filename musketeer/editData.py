@@ -195,6 +195,7 @@ class EditDataPopup(moduleFrame.Popup):
         else:
             rawData = data
 
+        rawData = rawData.astype(object)  # to allow setting values to "nan"
         rawData[rawData == ""] = "nan"
         return ma.masked_invalid(rawData.astype(float))
 
@@ -216,7 +217,7 @@ class EditDataPopup(moduleFrame.Popup):
         )
         if filePath == "":
             return
-        with open(filePath) as file:
+        with open(filePath, encoding="utf-8-sig") as file:
             d = csv.Sniffer().sniff(file.readline() + file.readline())
             file.seek(0)
             data = list(csv.reader(file, dialect=d))

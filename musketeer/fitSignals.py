@@ -1,3 +1,4 @@
+import itertools
 import tkinter.ttk as ttk
 from abc import abstractmethod
 
@@ -14,52 +15,102 @@ class FitSignals(moduleFrame.Strategy):
     requiredAttributes = ()
 
     @abstractmethod
-    def run(self, signalVars, knownSpectra):
+    def leastSquares(self, x, y):
         pass
 
+    def run(self, contributorConcs, knownSpectra):
+        hasMissingDatapoints = ma.is_masked(self.titration.processedData)
+        hasKnownSpectra = np.any(ma.getmaskarray(knownSpectra) == False)  # noqa: E712
+        hasDifferentSignalsPerMolecule = hasattr(
+            self.titration.contributingSpecies, "signalToMoleculeMap"
+        )
 
-class FitSignalsOrdinary(FitSignals):
-    def run(self, signalVars, knownSpectra):
-        # rows are additions, columns are contributors
-        knownMask = ~ma.getmaskarray(knownSpectra)[:, 0]
-        knownSignals = signalVars[:, knownMask]
-        unknownSignals = signalVars[:, ~knownMask]
+        if hasMissingDatapoints or hasKnownSpectra or hasDifferentSignalsPerMolecule:
+            # need to process each signal separately
+            explainedData = ma.dot(contributorConcs, knownSpectra).filled(0)
+            unexplainedData = self.titration.processedData - explainedData
 
-        # TODO: investigate why this doesn't work with @
-        knownSpectrum = np.dot(knownSignals, knownSpectra[knownMask, :])
-        unknownSpectrum = self.titration.processedData - knownSpectrum
+            fittedSpectra = knownSpectra.copy()
 
-        if ma.is_masked(unknownSpectrum):
-            signalsCount = unknownSpectrum.shape[1]
-            unknownsCount = unknownSignals.shape[1]
-            fittedSignals = np.empty((unknownsCount, signalsCount))
+            signalsCount = unexplainedData.shape[1]
+            contributorsCount = self.titration.contributors.outputCount
             residuals = np.empty(signalsCount)
 
-            for index, signal in enumerate(unknownSpectrum.T):
-                signalMask = ma.getmaskarray(signal)
+            if hasattr(self.titration.contributingSpecies, "signalToMoleculeMap"):
+                splitIndices = np.cumsum(
+                    self.titration.contributors.contributorsCountPerMolecule
+                )[:-1]
+
+                # For each signal, take only the relevant contributors' concentrations
+                contributorsSlicePerMolecule = np.split(
+                    np.arange(contributorsCount), splitIndices
+                )
+                contributorsSlicePerSignal = [
+                    contributorsSlicePerMolecule[molecule]
+                    for molecule in self.titration.contributingSpecies.signalToMoleculeMap
+                ]
+
+            else:
+                contributorsSlicePerSignal = [
+                    np.arange(contributorsCount)
+                ] * signalsCount
+
+            for index, (
+                signalData,
+                signalKnownSpectra,
+                signalContributorsSlice,
+            ) in enumerate(
+                zip(
+                    unexplainedData.T,
+                    knownSpectra.T,
+                    contributorsSlicePerSignal,
+                )
+            ):
+                dataMask = ~ma.getmaskarray(signalData)
+                unknownSpectraMask = ma.getmaskarray(
+                    signalKnownSpectra[signalContributorsSlice]
+                )
+                unknownSpectraSlice = signalContributorsSlice[unknownSpectraMask]
+                relevantContributorConcs = contributorConcs[dataMask, :][
+                    :, unknownSpectraSlice
+                ]
+
                 try:
-                    fittedSignals[:, index], residuals[index], _, _ = lstsq(
-                        unknownSignals[~signalMask, :], signal.compressed(), rcond=None
+                    (
+                        fittedSpectra[unknownSpectraSlice, index],
+                        residuals[index],
+                    ) = self.leastSquares(
+                        relevantContributorConcs, signalData.compressed()
                     )
                 except ValueError:
                     # Should only happen with incorrect constraints
-                    fittedSignals[:, index], _, _, _ = lstsq(
-                        unknownSignals[~signalMask, :], signal.compressed(), rcond=None
+                    (fittedSpectra[unknownSpectraSlice, index], _) = self.leastSquares(
+                        relevantContributorConcs, signalData.compressed()
                     )
-                    residuals[index] = np.linalg.norm(
-                        unknownSignals[~signalMask, :] @ fittedSignals[:, index]
-                        - signal.compressed(),
-                        ord=2,
+                    residuals[index] = (
+                        np.linalg.norm(
+                            relevantContributorConcs
+                            @ fittedSpectra[unknownSpectraSlice, index]
+                            - signalData.compressed(),
+                            ord=2,
+                        )
+                        ** 2
                     )
+            fittedCurves = ma.dot(contributorConcs, fittedSpectra)
         else:
-            fittedSignals, residuals, _, _ = lstsq(
-                unknownSignals, np.asarray(unknownSpectrum), rcond=None
+            # can process all signals at once
+            fittedSpectra, residuals = self.leastSquares(
+                contributorConcs, self.titration.processedData
             )
+            fittedCurves = ma.dot(contributorConcs, fittedSpectra)
 
-        fittedCurves = unknownSignals @ fittedSignals + knownSpectrum
-        allSignals = knownSpectra.copy()
-        allSignals[~knownMask, :] = fittedSignals
-        return allSignals, residuals, fittedCurves
+        return fittedSpectra, residuals, fittedCurves
+
+
+class FitSignalsUnconstrained(FitSignals):
+    def leastSquares(self, x, y):
+        b, residuals, _, _ = lstsq(x, y, rcond=None)
+        return b, residuals
 
 
 class SignalConstraintsTable(Table):
@@ -126,45 +177,22 @@ class SignalConstraintsPopup(moduleFrame.Popup):
 class FitSignalsConstrained(FitSignals):
     requiredAttributes = FitSignals.requiredAttributes + ("signalConstraints",)
 
-    def run(self, signalVars, knownSpectra):
-        # rows are additions, columns are contributors
-        knownMask = ~ma.getmaskarray(knownSpectra)[:, 0]
-        knownSignals = signalVars[:, knownMask]
-        unknownSignals = signalVars[:, ~knownMask]
-
-        knownSpectrum = np.dot(knownSignals, knownSpectra[knownMask, :])
-        unknownSpectrum = self.titration.processedData - knownSpectrum
-
-        signalsCount = unknownSpectrum.shape[1]
-        unknownsCount = unknownSignals.shape[1]
-        fittedSignals = np.empty((unknownsCount, signalsCount))
-        residuals = np.empty(signalsCount)
-
-        if ma.is_masked(unknownSpectrum):
-            for index, signal in enumerate(unknownSpectrum.T):
-                result = lsq_linear(
-                    unknownSignals[~ma.getmaskarray(signal), :],
-                    signal.compressed(),
-                    self.signalConstraints,
-                    method="bvls",
-                )
-                fittedSignals[:, index] = result.x
-                residuals[index] = result.cost
+    def leastSquares(self, x, y):
+        if y.ndim == 1:
+            return self.leastSquaresSingle(x, y)
         else:
-            for index, signal in enumerate(unknownSpectrum.T):
-                result = lsq_linear(
-                    unknownSignals,
-                    signal,
-                    self.signalConstraints,
-                    method="bvls",
-                )
-                fittedSignals[:, index] = result.x
-                residuals[index] = result.cost
+            b, residuals = zip(*[self.leastSquaresSingle(x, col) for col in y.T])
+            return np.array(b).T, np.array(residuals)
 
-        fittedCurves = unknownSignals @ fittedSignals + knownSpectrum
-        allSignals = knownSpectra.copy()
-        allSignals[~knownMask, :] = fittedSignals
-        return allSignals, residuals, fittedCurves
+    def leastSquaresSingle(self, x, y):
+        result = lsq_linear(
+            x,
+            y,
+            self.signalConstraints,
+            method="bvls",
+        )
+        # cost is 0.5 * ||A x - b||**2
+        return result.x, 2 * result.cost
 
 
 class FitSignalsNonnegative(FitSignalsConstrained):
@@ -176,12 +204,37 @@ class FitSignalsCustom(FitSignalsConstrained):
     popupAttributes = ("signalConstraints",)
 
 
+class FitSignalsODR(FitSignals):
+    def run(self, contributorConcs, knownSpectra):
+        X = np.asarray(contributorConcs)
+        Y = np.asarray(self.titration.processedData)
+        relativeWeightYOverX = 100
+        scaling = (Y.mean() * Y.size) / (X.mean() * X.size) / relativeWeightYOverX
+        m, n = X.shape
+        XY = np.hstack([X, Y / scaling])
+        U, s, Vh = np.linalg.svd(XY)
+        V = Vh.T
+        Vxy = V[:n, n:]
+        Vyy = V[n:, n:]
+        B = scaling * -Vxy @ np.linalg.inv(Vyy)
+        EF = -XY @ V[:, n:] @ V[:, n:].T
+        E, F = EF[:, :n], EF[:, n:]
+        norm = np.linalg.norm(EF, ord="fro")
+        fittedCurves = X @ B
+        # print(f"{s=}")
+        print(f"rank={np.linalg.matrix_rank(Vyy)}")
+        print(np.linalg.norm(E), np.linalg.norm(F))
+        # breakpoint()
+        return B, norm**2, fittedCurves
+
+
 class ModuleFrame(moduleFrame.ModuleFrame):
-    group = "Signals"
-    dropdownLabelText = "Apply constraints to fitted signals?"
+    group = "Spectra"
+    dropdownLabelText = "Apply constraints to fitted spectra?"
     dropdownOptions = {
-        "No": FitSignalsOrdinary,
+        "No": FitSignalsUnconstrained,
         "Nonnegative": FitSignalsNonnegative,
         "Custom constraints": FitSignalsCustom,
+        "USE ODR": FitSignalsODR,
     }
     attributeName = "fitSignals"

@@ -68,6 +68,10 @@ class Titration:
             )
 
     @property
+    def processedSignalCount(self):
+        return self.processedData.shape[1]
+
+    @property
     def signalTitles(self):
         if self.hasSignalTitles:
             return self._signalTitles
@@ -152,11 +156,15 @@ class Titration:
         self._additionTitles = additionTitles
 
     def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
+        numSignals = self.processedData.shape[1]
+        if numSignals <= maxPeaks + maxShoulderPeaks:
+            return np.arange(numSignals)
         # get the total movement for each signal
         movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
-        # get the largest difference from the first point for each signal
-        diff = self.processedData - self.processedData[0]
-        maxDiff = np.max(abs(diff), axis=0)
+        # get the range for each signal
+        totalRange = np.abs(
+            np.max(self.processedData, axis=0) - np.min(self.processedData, axis=0)
+        )
         # find the signals with the largest total movement
         peakIndices, peakProperties = find_peaks(movement, prominence=0)
         prominences = peakProperties["prominences"]
@@ -171,6 +179,16 @@ class Titration:
             -abs(np.diff(movement)), prominence=0
         )
         inflectionProminences = inflectionProperties["prominences"]
+        # remove peaks that got detected twice
+        duplicatesFilter = [
+            index not in peakIndices
+            and index + 1 not in peakIndices
+            and index - 1 not in peakIndices
+            for index in inflectionIndices
+        ]
+        inflectionIndices = inflectionIndices[duplicatesFilter]
+        inflectionProminences = inflectionProminences[duplicatesFilter]
+        # select the two most prominent inflection points
         inflectionFilter = inflectionProminences.argsort()[-maxShoulderPeaks:]
         largestInflectionsIndices = inflectionIndices[inflectionFilter]
 
@@ -178,11 +196,12 @@ class Titration:
         largestPeakIndices = np.sort(
             np.unique(np.concatenate((largestPeakIndices, largestInflectionsIndices)))
         )
+        if len(largestPeakIndices) == 0:
+            return np.array([np.argmax(movement)])
 
-        # discard peaks that don't move far enough away from the baseline
-        # compared to the other peaks
-        peaksDiff = maxDiff[largestPeakIndices]
-        return largestPeakIndices[peaksDiff >= np.max(peaksDiff) * threshold]
+        # discard peaks that don't move far enough compared to the other peaks
+        peaksRange = totalRange[largestPeakIndices]
+        return largestPeakIndices[peaksRange >= np.max(peaksRange) * threshold]
 
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
@@ -201,10 +220,15 @@ class Titration:
         freeConcs, boundConcs = self.speciation.run(speciationVars, totalConcs)
         self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
 
-        signalVars = self.contributors.run(freeConcs, boundConcs)
+        contributingSpeciesFilter = self.contributingSpecies.run()
+        signalVars, contributorsCountPerMolecule = self.contributors.run(
+            freeConcs, boundConcs
+        )
         self.lastSignalVars = signalVars
 
-        proportionalSignalVars = self.proportionality.run(signalVars, totalConcs)
+        proportionalSignalVars = self.proportionality.run(
+            signalVars, contributorsCountPerMolecule
+        )
 
         knownSpectra = self.knownSignals.run()
 

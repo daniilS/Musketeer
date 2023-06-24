@@ -1,3 +1,4 @@
+import functools
 import tkinter as tk
 import tkinter.ttk as ttk
 
@@ -143,12 +144,16 @@ def __init__(self, ref_artist, use_blit=False):
     self.got_artist = False
     self._hover = False
     self._use_blit = use_blit and self.canvas.supports_blit
-    self.cids = [
-        self.canvas.callbacks._connect_picklable("pick_event", self.on_pick),
-        self.canvas.callbacks._connect_picklable(
-            "button_release_event", self.on_release
-        ),
-        self.canvas.callbacks._connect_picklable("motion_notify_event", self.on_motion),
+    callbacks = ref_artist.figure._canvas_callbacks
+    self._disconnectors = [
+        functools.partial(
+            callbacks.disconnect, callbacks._connect_picklable(name, func)
+        )
+        for name, func in [
+            ("pick_event", self.on_pick),
+            ("button_release_event", self.on_release),
+            ("motion_notify_event", self.on_motion),
+        ]
     ]
 
 
@@ -215,8 +220,8 @@ def on_release(self, event):
 
 def disconnect(self):
     """Disconnect the callbacks."""
-    for cid in self.cids:
-        self.canvas.mpl_disconnect(cid)
+    for disconnector in self._disconnectors:
+        disconnector()
     if self._hover:
         self.canvas.set_cursor(cursors.POINTER)
 
@@ -236,8 +241,11 @@ def applyPatch():
     NavigationToolbar2Tk._Spacer = _Spacer
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
 
-    # implements PR #25412
+    # implements PR #25412, and #25442 below mpl version 3.7.2
     offsetbox.DraggableBase.__init__ = __init__
+    offsetbox.DraggableBase.cids = property(
+        lambda self: [disconnect.args[0] for disconnect in self._disconnectors[:2]]
+    )
     offsetbox.DraggableBase.on_motion = on_motion
     offsetbox.DraggableBase.on_pick = on_pick
     offsetbox.DraggableBase.on_release = on_release

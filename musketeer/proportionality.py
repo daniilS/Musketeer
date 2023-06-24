@@ -9,20 +9,26 @@ class Proportionality(moduleFrame.Strategy):
     requiredAttributes = ()
 
     @abstractmethod
-    def run(self, signalVars, totalConcs):
+    def run(self, contributorConcs, contributorsCountPerMolecule):
         pass
 
 
 class GetConcs(Proportionality):
-    def run(self, signalVars, totalConcs):
-        return signalVars
+    def run(self, contributorConcs, contributorsCountPerMolecule):
+        return contributorConcs
 
 
 class GetFraction(Proportionality):
-    def run(self, signalVars, totalConcs):
-        # divide by total concs
-        # TODO: support different signals caused by different parent species
-        return signalVars / np.sum(signalVars, axis=1, keepdims=True)
+    def run(self, contributorConcs, contributorsCountPerMolecule):
+        splitIndices = np.cumsum(contributorsCountPerMolecule, axis=-1)[:-1]
+        concsPerMolecule = np.hsplit(contributorConcs, splitIndices)
+        proportionalConcs = np.hstack(
+            [
+                concs / np.sum(concs, axis=-1, keepdims=True)
+                for concs in concsPerMolecule
+            ]
+        )
+        return np.nan_to_num(proportionalConcs, nan=0.0, copy=False)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import PurePath
 
 import matplotlib as mpl
+import matplotlib.ticker as mtick
 import numpy as np
 import packaging.version
 import tksheet
@@ -21,6 +22,7 @@ from ttkbootstrap.widgets import InteractiveNotebook
 from . import (
     __version__,
     combineResiduals,
+    contributingSpecies,
     contributors,
     editData,
     equilibriumConstants,
@@ -46,6 +48,7 @@ titrationModules = [
     proportionality,
     speciation,
     equilibriumConstants,
+    contributingSpecies,
     contributors,
     knownSignals,
     fitSignals,
@@ -336,8 +339,8 @@ class TitrationFrame(ttk.Frame):
                 options[f"{fit}.{moduleFrame.attributeName}"] = list(
                     moduleFrame.dropdownOptions.keys()
                 )[
-                    list(moduleFrame.dropdownOptions.values()).index(
-                        type(getattr(titration, moduleFrame.attributeName))
+                    [x.__name__ for x in moduleFrame.dropdownOptions.values()].index(
+                        type(getattr(titration, moduleFrame.attributeName)).__name__
                     )
                 ]
 
@@ -567,25 +570,28 @@ class InputSpectraFrame(PlotFrame):
             side="left"
         )
 
-        minWL, maxWL = self.titration.continuousRange
-        minWL = max(minWL, self.titration.signalTitles.min())
-        maxWL = min(maxWL, self.titration.signalTitles.max())
+        signalMin = self.titration.signalTitles.min()
+        signalMax = self.titration.signalTitles.max()
+
+        currentMin, currentMax = self.titration.continuousRange
+        currentMin = max(currentMin, signalMin)
+        currentMax = min(currentMax, signalMax)
 
         decimals = self.titration.signalTitlesDecimals
         step = 1 / (10**decimals)
 
         self.fromSpinbox = ttk.Spinbox(
-            rangeSelection, from_=minWL, to=maxWL, width=5, increment=step
+            rangeSelection, from_=signalMin, to=signalMax, width=5, increment=step
         )
-        self.fromSpinbox.set(f"{minWL:.{decimals}f}")
+        self.fromSpinbox.set(f"{currentMin:.{decimals}f}")
         self.fromSpinbox.pack(padx=padding, side="left")
 
         ttk.Label(rangeSelection, text="to").pack(side="left")
 
         self.toSpinbox = ttk.Spinbox(
-            rangeSelection, from_=minWL, to=maxWL, width=5, increment=step
+            rangeSelection, from_=signalMin, to=signalMax, width=5, increment=step
         )
-        self.toSpinbox.set(f"{maxWL:.{decimals}f}")
+        self.toSpinbox.set(f"{currentMax:.{decimals}f}")
         self.toSpinbox.pack(padx=padding, side="left")
 
         self.fig = Figure(
@@ -689,8 +695,8 @@ class ContinuousFittedFrame(PlotFrame):
             self.optionsFrame,
             self.deconvolutionVar,
             deconvolutionOptions[0],
-            command=lambda *args: self.plot(),
             *deconvolutionOptions,
+            command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
         self.deconvolutionDropdown.pack()
@@ -720,7 +726,7 @@ class ContinuousFittedFrame(PlotFrame):
 
         titration = self.titration
         spectra = titration.lastFittedSpectra
-        names = titration.contributors.contributorNames
+        names = titration.contributors.outputNames
         wavelengths = titration.processedSignalTitles
 
         deconvolution = self.deconvolutionVar.get()
@@ -733,6 +739,8 @@ class ContinuousFittedFrame(PlotFrame):
                 deconvolutionPoint = 0
             elif deconvolution == "Deconvolution at endpoint":
                 deconvolutionPoint = -1
+            else:
+                raise ValueError(f"Unknown deconvolution option {deconvolution}")
 
             self.ax.plot(
                 wavelengths,
@@ -768,7 +776,6 @@ class FittedFrame(PlotFrame):
         self.titration = titration
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
-        self.normalisation = False
         self.smooth = True
         self.logScale = False
 
@@ -788,13 +795,23 @@ class FittedFrame(PlotFrame):
 
         self.toggleButtonsFrame = ttk.Frame(self)
         self.toggleButtonsFrame.grid(row=1, column=2, sticky="w")
-        self.normalisationButton = ttk.Checkbutton(
+
+        self.plotTypeVar = tk.StringVar()
+        self.plotTypes = {
+            f"Absolute {self.titration.yQuantity}": "absolute",
+            f"Change in {self.titration.yQuantity}": "relative",
+            f"Normalised change in {self.titration.yQuantity}": "normalised",
+        }
+        self.plotTypeDropdown = ttk.OptionMenu(
             self.toggleButtonsFrame,
-            text="Normalise movement",
-            command=self.toggleNormalisation,
-            style="Outline.Toolbutton",
+            self.plotTypeVar,
+            [k for (k, v) in self.plotTypes.items() if v == "relative"][0],
+            *self.plotTypes.keys(),
+            command=lambda *args: self.plot(),
+            style="primary.Outline.TMenubutton",
         )
-        self.normalisationButton.pack(pady=padding, fill="x")
+        self.plotTypeDropdown.pack()
+
         self.logScaleButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
             text="Logarithmic x axis",
@@ -842,9 +859,9 @@ class FittedFrame(PlotFrame):
         self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
-    def toggleNormalisation(self):
-        self.normalisation = not self.normalisation
-        self.plot()
+    @property
+    def plotType(self):
+        return self.plotTypes[self.plotTypeVar.get()]
 
     def toggleLogScale(self):
         self.logScale = not self.logScale
@@ -887,7 +904,16 @@ class FittedFrame(PlotFrame):
         xUnit = titration.totalConcentrations.concsUnit
         xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
-        if self.normalisation:
+        if self.plotType == "absolute":
+            curves = self.curves
+            fittedCurves = self.fittedCurves
+            self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
+        elif self.plotType == "relative":
+            fittedZeros = self.fittedCurves[:, [0]]
+            curves = self.curves - fittedZeros
+            fittedCurves = self.fittedCurves - fittedZeros
+            self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
+        elif self.plotType == "normalised":
             curves = self.curves.T
             fittedCurves = self.fittedCurves.T
             # normalise so that all the fitted curves have the same amplitude
@@ -903,16 +929,15 @@ class FittedFrame(PlotFrame):
             fittedCurves = fittedCurves / maxFittedDiff
             fittedCurves[:, negatives] *= -1
             fittedCurves = fittedCurves.T * 100
+
+            fittedZeros = fittedCurves[:, [0]]
+            curves = curves - fittedZeros
+            fittedCurves = fittedCurves - fittedZeros
             self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")
         else:
-            curves = self.curves
-            fittedCurves = self.fittedCurves
-            self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
+            raise ValueError(f"Unknown plot type: {self.plotType}")
 
         for curve, fittedCurve, name in zip(curves, fittedCurves, self.names):
-            fittedZero = fittedCurve[0]
-            curve -= fittedZero
-            fittedCurve -= fittedZero
             self.ax.scatter(xConcs, curve)
 
             # add step - 1 points between each data point
@@ -1090,17 +1115,18 @@ class SpeciationFrame(PlotFrame):
         freeConcs = titration.lastFreeConcs[additionsFilter, :][:, self.freeIndex]
         freeName = self.speciesVar.get()
 
-        factor = abs(titration.speciation.stoichiometries[:, self.freeIndex])
+        factor = abs(titration.speciation.outputStoichiometries[:, self.freeIndex])
         boundFilter = factor.astype(bool)
 
         boundConcs = titration.lastBoundConcs * factor
         boundConcs = boundConcs[additionsFilter, :][:, boundFilter]
-        # TODO: make this work with polymers
-        boundNames = titration.speciation.boundNames[boundFilter]
+        boundNames = titration.speciation.outputBoundNames[boundFilter]
 
         curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
         names = np.append(freeName, boundNames)
         self.ax.set_ylabel(f"% of {freeName}")
+        self.ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100))
+        self.ax.set_ylim(bottom=-5, top=105)
 
         for curve, name in zip(curves, names):
             # add step - 1 points between each data point
@@ -1216,13 +1242,19 @@ class ResultsFrame(ttk.Frame):
 
         sheet = tksheet.Sheet(
             self,
+            empty_vertical=0,
+            empty_horizontal=0,
             data=list(np.around(titration.lastFittedSpectra, 2)),
             headers=list(titration.processedSignalTitlesStrings),
-            row_index=list(titration.contributors.contributorNames),
+            row_index=list(titration.contributors.outputNames),
             set_all_heights_and_widths=True,
         )
+        sheet.MT.configure(height=0)
+        sheet.RI.configure(height=0)
+
         sheet.enable_bindings()
-        sheet.pack(side="top", pady=15, fill="x")
+        sheet.set_width_of_index_to_text()
+        sheet.pack(side="top", pady=15, fill="both", expand=True)
 
         saveButton = ttk.Button(
             self,
@@ -1241,8 +1273,8 @@ class ResultsFrame(ttk.Frame):
             defaultextension=".csv",
         )
         data = self.titration.lastFittedSpectra
-        rowTitles = np.atleast_2d(self.titration.contributors.contributorNames).T
-        columnTitles = np.append("", self.titration.processedSignalTitles)
+        rowTitles = np.atleast_2d(self.titration.contributors.outputNames).T
+        columnTitles = np.append("", self.titration.processedSignalTitlesStrings)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
         try:
             np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
