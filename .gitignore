@@ -7,3 +7,6 @@ dist/
 *.egg-info/
 
 .vscode/
+
+cx_freeze/build/
+cx_freeze/dist/
