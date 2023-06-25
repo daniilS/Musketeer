@@ -14,7 +14,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 
 executables = [
     Executable(
-        "Musketeer_test.py",
+        "musketeer_loader.py",
         base=base,
         target_name="Musketeer",
         shortcut_name="Musketeer",
