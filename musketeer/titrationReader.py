@@ -272,7 +272,7 @@ def readMusketeer(filePath):
 fileReaders = np.array(
     [
         ["Musketeer file", "*.fit", readMusketeer],
-        ["UV-Vis csv file", "*.csv", readUV],
-        ["NMR peak list", "*.csv", readNMR],
+        ["Cary UV-Vis csv file", "*.csv", readUV],
+        ["Mnova NMR peak list", "*.csv", readNMR],
     ]
 )
