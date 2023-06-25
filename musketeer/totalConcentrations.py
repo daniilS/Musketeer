@@ -224,7 +224,11 @@ class VolumesPopup(moduleFrame.Popup):
         self.title("Enter volumes")
 
         height = int(self.master.winfo_height() * 0.8)
-        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame = ScrolledFrame(
+            self,
+            height=height,
+            max_width=self.winfo_toplevel().master.winfo_width() - 200,
+        )
         frame.pack(expand=True, fill="both")
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
@@ -447,7 +451,11 @@ class ConcsPopup(moduleFrame.Popup):
         self.title("Enter concentrations")
 
         height = int(self.master.winfo_height() * 0.8)
-        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame = ScrolledFrame(
+            self,
+            height=height,
+            max_width=self.winfo_toplevel().master.winfo_width() - 200,
+        )
         frame.pack(expand=True, fill="both")
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)

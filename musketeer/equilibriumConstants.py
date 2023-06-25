@@ -213,13 +213,22 @@ class CustomKsPopup(moduleFrame.Popup):
                 " a statistical factor, and all the variables raised to the exponents"
                 " specified in that column.\n\nIn the final column, specify a value to"
                 " fix the variable, leave empty to optimise the variable, or write"
-                " ~number to provide an initial guess for the optimisation."
+                " ~number to provide an initial guess for the optimisation.\n\nThe K"
+                " for each complex is the global equilibrium constant. For polymers, K₂"
+                " is the constant for the formation of the dimer, and Kₙ the constant"
+                " for each subsequent binding."
             ),
             padding=5,
         )
         customKsLabel.pack(expand=False, fill="both")
 
-        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
+        buttonFrame.pack(expand=False, fill="both", side="bottom")
+
+        scrolledFrame = ScrolledFrame(
+            self.frame, max_width=self.winfo_toplevel().master.winfo_width() - 200
+        )
+        scrolledFrame.pack(expand=True, fill="both")
         scrolledFrame.pack(expand=True, fill="both")
 
         self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
@@ -231,14 +240,11 @@ class CustomKsPopup(moduleFrame.Popup):
         self.labelFont["size"] = int(1.3 * self.labelFont["size"])
 
         self.equationsLabel = ttk.Label(
-            self.frame, anchor="center", font=self.labelFont, padding=5
+            self.innerFrame, anchor="center", font=self.labelFont, padding=5
         )
         self.equationsLabel.pack(fill="both")
         self.customKsTable.equationsLabel = self.equationsLabel
         self.customKsTable.createLabels()
-
-        buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
-        buttonFrame.pack(expand=False, fill="both", side="bottom")
 
     def reset(self):
         self.customKsTable.destroy()
@@ -338,10 +344,16 @@ class KnownKsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
-        self.title("Enter known equilibrium constants")
-
         height = int(self.master.winfo_height() * 0.4)
-        frame = ScrolledFrame(self, height=height, max_width=1500)
+        frame = ScrolledFrame(
+            self,
+            height=height,
+            max_width=self.winfo_toplevel().master.winfo_width() - 200,
+        )
+        frame.pack(expand=True, fill="both")
+        frame = ScrolledFrame(
+            self, height=height, max_width=self.winfo_toplevel().winfo_width() - 200
+        )
         frame.pack(expand=True, fill="both")
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
@@ -349,7 +361,10 @@ class KnownKsPopup(moduleFrame.Popup):
             innerFrame,
             text=(
                 "Enter known K values, leave empty to optimise the value, or write"
-                " ~number to provide an initial guess for the optimisation."
+                " ~number to provide an initial guess for the optimisation.\n\nThe K"
+                " for each complex is the global equilibrium constant. For polymers, K₂"
+                " is the constant for the formation of the dimer, and Kₙ the constant"
+                " for each subsequent binding."
             ),
             padding=5,
         )

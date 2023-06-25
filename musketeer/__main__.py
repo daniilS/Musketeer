@@ -4,20 +4,13 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
-from pathlib import PurePath
 from tkinter import font
 
-import numpy as np
 import ttkbootstrap
-from ttkbootstrap.widgets import InteractiveNotebook
 
-from . import patchMatplotlib, titrationReader, windowsHighDpiPatch
-from .style import defaultFigureParams, figureParams, padding
-from .table import ButtonFrame
-from .titration import Titration
-from .titrationFrame import TitrationFrame
+from . import windowsHighDpiPatch
+from .style import padding
 
-patchMatplotlib.applyPatch()
 try:
     appId = "daniilS.musketeer"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(appId)
@@ -25,14 +18,15 @@ except Exception:
     pass
 
 
-DEBUG = True
+fullErrorMessages = True
 olderror = mb.showerror
 
 
+# TODO: convert to simple error message, with an option to expand to the full one
 def newshowerror(title, message, *args, **kwargs):
     import traceback
 
-    if DEBUG and isinstance(message, Exception):
+    if fullErrorMessages and isinstance(message, Exception):
         message = traceback.format_exc()
     return olderror(title, message, *args, **kwargs)
 
@@ -56,16 +50,58 @@ except tk.TclError:
     root.attributes("-zoomed", True)
 root.title("Musketeer")
 
+
+# notes on preferred icon size on Windows:
+# title bar: prefers 16px, actual size 16px (or 24px at 1.5x scaling)
+# if the icon set without calling update() first, the title bar also prefers 32, but
+# will be blurry
+# task bar: prefers 32px, actual size 24px (or 36px at 1.5x scaling)
+# if the preferred size is not provided, the first file provided will be used
+# the least common multiple of 16, 24, and 36 is 144, but using that causes the title
+# bar icon to be blurry
+# 48px seems to give the best quality at all scaling factors
+
+# on Linux, tk documentation recommends providing no more than 2 icons, placing the
+# largest one first
+# on MacOS, only the first icon is used, and it is recommended to provide as large an
+# icon as possible
+
 try:
-    iconData = res.read_binary(__package__, "logo small.png")
-    icon = tk.PhotoImage(data=iconData)
-    root.iconphoto(True, icon)
+    root.update()  # without this, the title bar icon is blurry on Windows
+    iconData48 = res.read_binary(__package__, "logo 48px.png")
+    iconData512 = res.read_binary(__package__, "logo 512px.png")
+    icon48 = tk.PhotoImage(data=iconData48)
+    icon512 = tk.PhotoImage(data=iconData512)
+
+    if root._windowingsystem == "win32":
+        root.iconphoto(True, icon48, icon512)
+    else:
+        root.iconphoto(True, icon512, icon48)
 except Exception:
     # Should currently never happen, but if anything changes about the API in
     # the future, we can survive without an icon.
     pass
 frame = ttk.Frame(root, padding=padding)
 frame.pack(expand=True, fill="both")
+
+
+# Especially on the first startup, when matplotlib needs to build the font cache,
+# importing everything may take a while. So we defer all other imports until now.
+root.tk.eval("tk busy .")
+root.update()
+
+from pathlib import PurePath
+
+import numpy as np
+from ttkbootstrap.widgets import InteractiveNotebook
+
+from . import patchMatplotlib, titrationReader
+from .style import defaultFigureParams, figureParams
+from .table import ButtonFrame
+from .titration import Titration
+from .titrationFrame import TitrationFrame
+
+patchMatplotlib.applyPatch()
 
 
 class DpiPopup(tk.Toplevel):
@@ -311,4 +347,5 @@ class TitrationsNotebook(InteractiveNotebook):
 notebook = TitrationsNotebook(frame)
 notebook.pack(expand=True, fill="both")
 
+root.tk.eval("tk busy forget .")
 root.mainloop()

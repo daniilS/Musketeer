@@ -312,7 +312,9 @@ class SpeciationPopup(moduleFrame.Popup):
         )
         label.pack(expand=False, fill="both")
 
-        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame = ScrolledFrame(
+            self.frame, max_width=self.winfo_toplevel().master.winfo_width() - 200
+        )
         scrolledFrame.pack(expand=True, fill="both")
         self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
 

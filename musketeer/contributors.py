@@ -110,7 +110,9 @@ class ContributorConcsPopup(moduleFrame.Popup):
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
-        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame = ScrolledFrame(
+            self.frame, max_width=self.winfo_toplevel().master.winfo_width() - 200
+        )
         scrolledFrame.pack(expand=True, fill="both")
         self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
         self.createTable()
@@ -164,7 +166,9 @@ class ContributorConcsPerMoleculePopup(moduleFrame.Popup):
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
-        scrolledFrame = ScrolledFrame(self.frame, max_width=1500)
+        scrolledFrame = ScrolledFrame(
+            self.frame, max_width=self.winfo_toplevel().master.winfo_width() - 200
+        )
         scrolledFrame.pack(expand=True, fill="both")
         self.innerFrame = scrolledFrame.display_widget(ttk.Frame, stretch=True)
         self.createNotebook()
