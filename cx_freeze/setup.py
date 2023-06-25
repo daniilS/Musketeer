@@ -1,5 +1,6 @@
 import sys
 
+import musketeer
 from cx_Freeze import Executable, setup
 
 build_options = {
@@ -25,7 +26,7 @@ executables = [
 
 setup(
     name="Musketeer",
-    version="1.3.0",
+    version=musketeer.__version__,
     description="Musketeer",
     options={"build_exe": build_options, "bdist_mis": msi_options},
     executables=executables,
