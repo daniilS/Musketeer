@@ -6,7 +6,7 @@ from cx_Freeze import Executable, setup
 build_options = {
     "packages": [],
     "excludes": [],
-    "include_files": [""] if sys.platform == "win32" else ["logo 512px.png"],
+    "include_files": [] if sys.platform == "win32" else ["logo 512px.png"],
 }
 msi_options = {
     "install_icon": "logo 48px.ico",
