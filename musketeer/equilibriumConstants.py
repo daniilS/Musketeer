@@ -351,10 +351,6 @@ class KnownKsPopup(moduleFrame.Popup):
             max_width=self.winfo_toplevel().master.winfo_width() - 200,
         )
         frame.pack(expand=True, fill="both")
-        frame = ScrolledFrame(
-            self, height=height, max_width=self.winfo_toplevel().winfo_width() - 200
-        )
-        frame.pack(expand=True, fill="both")
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
         knownKsLabel = WrappedLabel(
