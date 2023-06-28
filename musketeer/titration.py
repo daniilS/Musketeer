@@ -84,6 +84,8 @@ class Titration:
     def signalTitles(self, titles):
         # TODO: replace flag with just setting titles to None
         if titles.size == 0:
+            self.hasSignalTitles = False
+            self.continuous = False
             return
         self.hasSignalTitles = True
         try:

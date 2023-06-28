@@ -246,8 +246,12 @@ class TitrationFrame(ttk.Frame):
         popup = editData.EditDataPopup(self.currentTab.titration, master=root)
         popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
         popup.show()
-        if hasattr(self.currentTab, "inputSpectraFrame"):
-            self.currentTab.inputSpectraFrame.plot()
+        self.currentTab.inputSpectraFrame.updateData()
+        if (
+            len(self.currentTab.tabs()) == 1
+            and self.currentTab.inputSpectraFrame.loaded
+        ):
+            self.currentTab.select(self.currentTab.inputSpectraFrame)
 
     def updateDpi(self):
         for tab in self.notebook.tabs():
@@ -391,14 +395,16 @@ class FitNotebook(ttk.Notebook):
         super().__init__(master, padding=padding, style="Flat.TNotebook")
         self.titration = titration
 
-    def add(self, *args, **kwargs):
-        super().add(*args, **kwargs)
+    def add(self, tab, *args, hidden=False, **kwargs):
+        super().add(tab, *args, **kwargs)
+        if hidden:
+            self.hide(tab)
         self.update()
 
     def loadTabs(self):
-        if self.titration.continuous:
-            self.inputSpectraFrame = InputSpectraFrame(self, self.titration)
-            self.add(self.inputSpectraFrame, text="Input Spectra")
+        self.inputSpectraFrame = InputSpectraFrame(self, self.titration)
+        self.add(self.inputSpectraFrame, text="Input Spectra", hidden=True)
+        self.inputSpectraFrame.updateData()
 
         if hasattr(self.titration, "fitResult"):
             try:
@@ -562,36 +568,34 @@ class InputSpectraFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.populate()
 
+        self.loaded = False
+
+    def updateData(self):
+        if self.titration.continuous:
+            if not self.loaded:
+                self.master.add(self, text="Input Spectra")
+                self.loaded = True
+            self.updateRangeSelection()
+            self.plot()
+        else:
+            self.loaded = False
+            self.master.hide(self)
+
+    def populate(self):
         rangeSelection = ttk.Frame(self)
         rangeSelection.grid(row=0, column=1, sticky="s")
 
-        ttk.Label(rangeSelection, text=f"Range of {titration.xQuantity} to fit:").pack(
-            side="left"
-        )
+        self.rangeLabel = ttk.Label(rangeSelection)
+        self.rangeLabel.pack(side="left")
 
-        signalMin = self.titration.signalTitles.min()
-        signalMax = self.titration.signalTitles.max()
-
-        currentMin, currentMax = self.titration.continuousRange
-        currentMin = max(currentMin, signalMin)
-        currentMax = min(currentMax, signalMax)
-
-        decimals = self.titration.signalTitlesDecimals
-        step = 1 / (10**decimals)
-
-        self.fromSpinbox = ttk.Spinbox(
-            rangeSelection, from_=signalMin, to=signalMax, width=5, increment=step
-        )
-        self.fromSpinbox.set(f"{currentMin:.{decimals}f}")
+        self.fromSpinbox = ttk.Spinbox(rangeSelection, width=5)
         self.fromSpinbox.pack(padx=padding, side="left")
 
         ttk.Label(rangeSelection, text="to").pack(side="left")
 
-        self.toSpinbox = ttk.Spinbox(
-            rangeSelection, from_=signalMin, to=signalMax, width=5, increment=step
-        )
-        self.toSpinbox.set(f"{currentMax:.{decimals}f}")
+        self.toSpinbox = ttk.Spinbox(rangeSelection, width=5)
         self.toSpinbox.pack(padx=padding, side="left")
 
         self.fig = Figure(
@@ -629,7 +633,23 @@ class InputSpectraFrame(PlotFrame):
         self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
 
-        self.plot()
+    def updateRangeSelection(self):
+        self.rangeLabel.configure(text=f"Range of {self.titration.xQuantity} to fit:")
+
+        signalMin = self.titration.signalTitles.min()
+        signalMax = self.titration.signalTitles.max()
+
+        currentMin, currentMax = self.titration.continuousRange
+        currentMin = max(currentMin, signalMin)
+        currentMax = min(currentMax, signalMax)
+
+        decimals = self.titration.signalTitlesDecimals
+        step = 1 / (10**decimals)
+
+        self.fromSpinbox.configure(from_=signalMin, to=signalMax, increment=step)
+        self.fromSpinbox.set(f"{currentMin:.{decimals}f}")
+        self.toSpinbox.configure(from_=signalMin, to=signalMax, increment=step)
+        self.toSpinbox.set(f"{currentMax:.{decimals}f}")
 
     def plot(self):
         ax = self.ax

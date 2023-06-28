@@ -174,6 +174,8 @@ class EditDataPopup(moduleFrame.Popup):
         data = data[~np.all(data == "", 1), :][:, ~np.all(data == "", 0)]
 
         titration.hasSignalTitles = self.signalTitlesCheckbutton.instate(["selected"])
+        if not titration.hasSignalTitles:
+            titration.continuous = False
         titration.hasAdditionTitles = self.additionTitlesCheckbutton.instate(
             ["selected"]
         )
