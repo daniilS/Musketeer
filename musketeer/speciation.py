@@ -555,9 +555,6 @@ class SpeciationSolver(Speciation):
                 mask = np.logical_and(lb > ub, np.isclose(lb, ub))
                 lb[mask], ub[mask] = ub[mask], lb[mask]
 
-            if any(lb > ub):
-                breakpoint()
-
             if i == 0:
                 # Initial guess: all species 100% free
                 x0 = ub

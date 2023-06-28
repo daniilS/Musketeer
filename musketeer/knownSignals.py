@@ -52,8 +52,6 @@ class KnownSpectraPopup(moduleFrame.Popup):
         self.sheet.pack(side="top", expand=True, fill="both")
 
     def reset(self):
-        breakpoint()
-        return
         self.sheet.set_sheet_data(
             self.formatData(self.titration.knownSignals.knownSpectra)
         )
