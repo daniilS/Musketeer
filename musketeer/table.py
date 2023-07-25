@@ -365,14 +365,19 @@ class Table(ttk.Frame):
             return "break"
 
     def paste(self, entry):
-        info = entry.grid_info()
-        row, column = info["row"] - self.headerGridRows, info["column"]
-        rows, columns = self.cells[row:, column:].shape
-        pasteContent = self.clipboard_get()
+        try:
+            pasteContent = self.clipboard_get()
+        except tk.TclError:
+            # No text in clipboard
+            return
         if "\n" not in pasteContent and "\r" not in pasteContent:
             # Handle as a regular paste. Copying a single cell or row from Excel should
             # still end the string with a newline.
             return
+        
+        info = entry.grid_info()
+        row, column = info["row"] - self.headerGridRows, info["column"]
+        rows, columns = self.cells[row:, column:].shape
         lines = pasteContent.splitlines()
         if len(lines) > rows:
             mb.showerror(
