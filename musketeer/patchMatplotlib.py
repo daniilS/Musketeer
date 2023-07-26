@@ -4,6 +4,7 @@ import tkinter.ttk as ttk
 
 import matplotlib
 from matplotlib import cbook, offsetbox
+from matplotlib.axes._base import _AxesBase
 from matplotlib.backend_bases import NavigationToolbar2, _Mode, cursors
 from matplotlib.backends._backend_tk import (
     FigureCanvasTk,
@@ -235,6 +236,15 @@ def scroll_event_windows(self, event):
         original_scroll_event_windows(self, event)
 
 
+original_clear = _AxesBase.clear
+
+
+def clear(self, *args, **kwargs):
+    if hasattr(self, "legend_") and self.legend_ is not None:
+        self.legend_.axes = self.legend_.figure = None
+    original_clear(self, *args, **kwargs)
+
+
 def applyPatch():
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
@@ -250,6 +260,8 @@ def applyPatch():
     offsetbox.DraggableBase.on_pick = on_pick
     offsetbox.DraggableBase.on_release = on_release
     offsetbox.DraggableBase.disconnect = disconnect
+    _AxesBase.clear = clear
+
     # implements PR #25413
     cursord[cursors.SELECT_REGION] = "crosshair"
 
