@@ -67,13 +67,17 @@ root.title("Musketeer")
 # icon as possible
 
 try:
-    root.update()  # without this, the title bar icon is blurry on Windows
     iconData48 = res.read_binary(__package__, "logo 48px.png")
     iconData512 = res.read_binary(__package__, "logo 512px.png")
     icon48 = tk.PhotoImage(data=iconData48)
     icon512 = tk.PhotoImage(data=iconData512)
 
     if root._windowingsystem == "win32":
+        # Call before update to make sure the icon appears straight away (otherwise the
+        # default Tk icon may appear for a few seconds first). Call after update is
+        # necessary to make the title bar icon not blurry.
+        root.iconphoto(True, icon48, icon512)
+        root.update()
         root.iconphoto(True, icon48, icon512)
     else:
         root.iconphoto(True, icon512, icon48)
