@@ -13,13 +13,7 @@ from .table import ButtonFrame, Table, WrappedLabel
 LN_10 = np.log(10)
 
 
-def stoichiometriesToBoundNames(freeNames, stoichiometries, polymerMode):
-    polymerModes = ("unchanged", "dimer+polymer", "terminal+internal")
-
-    if polymerMode not in polymerModes:
-        raise ValueError(
-            f"Unknown polymer mode {polymerMode}: must be one of {polymerModes}."
-        )
+def stoichiometriesToBoundNames(freeNames, stoichiometries):
     trans = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 
     boundNames = []
@@ -38,20 +32,195 @@ def stoichiometriesToBoundNames(freeNames, stoichiometries, polymerMode):
                 boundName += freeName + "ₙ"
             else:
                 boundName += freeName + str(stoichiometry).translate(trans)
-        if "ₙ" in boundName and polymerMode == "dimer+polymer":
-            # insert a dimer before the polymer entry
-            boundNames.append(boundName.replace("ₙ", "₂"))
-            boundNames.append(boundName)
-        elif "ₙ" in boundName and polymerMode == "terminal+internal":
-            # separate the terminal and internal parts of the polymer
-            boundNames.append(boundName + " terminal")
-            boundNames.append(boundName + " internal")
-        else:
-            boundNames.append(boundName)
+        boundNames.append(boundName)
     return np.array(boundNames)
 
 
-class Speciation(moduleFrame.Strategy):
+class ComplexSpeciationMixin:
+    @property
+    def complexIndices(self):
+        return ~np.any(self.stoichiometries < 0, 1)
+
+    @property
+    def complexCount(self):
+        return np.count_nonzero(self.complexIndices)
+
+    @property
+    def complexStoichiometries(self):
+        return self.stoichiometries[self.complexIndices]
+
+    @property
+    def complexBoundNames(self):
+        return stoichiometriesToBoundNames(self.freeNames, self.complexStoichiometries)
+
+    complexVariableNames = complexOutputNames = complexBoundNames
+
+    complexOutputStoichiometries = complexStoichiometries
+
+    def complexFreeToBoundConcs(self, freeConcs, complexKs):
+        return complexKs * np.prod(freeConcs**self.complexStoichiometries, axis=1)
+
+    def complexObjective(self, free, complexKs, total, M):
+        return complexKs @ np.prod(free**M, 1)
+
+    def complexJacobian(self, free, complexKs, total, M):
+        return M.T @ (complexKs * np.prod(free**M, 1))
+
+    def complexGetUpperBounds(self, complexKs, total, M):
+        return total
+
+
+class PolymerSpeciationMixin:
+    @property
+    def polymerIndices(self):
+        return np.any(self.stoichiometries < 0, 1)
+
+    @property
+    def polymerCount(self):
+        return np.count_nonzero(self.polymerIndices)
+
+    @property
+    def polymerStoichiometries(self):
+        return self.stoichiometries[self.polymerIndices]
+
+    @property
+    def polymerBoundNames(self):
+        return stoichiometriesToBoundNames(self.freeNames, self.polymerStoichiometries)
+
+    @property
+    def polymerVariableNames(self):
+        variableNames = []
+        for row, boundName in zip(self.polymerStoichiometries, self.polymerBoundNames):
+            if np.count_nonzero(row) == 1:
+                variableNames.append(boundName.replace("ₙ", "₂"))
+            variableNames.append(boundName)
+        return np.array(variableNames)
+
+    @property
+    def polymerOutputNames(self):
+        return np.ravel(
+            [
+                [name + " terminal", name + " internal"]
+                for name in self.polymerBoundNames
+            ]
+        )
+
+    @property
+    def polymerOutputCount(self):
+        return len(self.polymerOutputNames)
+
+    @property
+    def polymerOutputStoichiometries(self):
+        # stoichiometries in terminal+internal mode: duplicate each polymer
+        outputStoichiometries = np.empty([self.polymerOutputCount, self.freeCount])
+        M = self.polymerStoichiometries
+        outputStoichiometries[::2] = np.where(M > 0, M / 2, abs(M))  # terminal rows
+        outputStoichiometries[1::2] = np.where(M > 0, 0, abs(M))  # internal rows
+        return outputStoichiometries
+
+    def splitPolymerKs(self, polymerKs):
+        k2s = np.zeros(self.freeCount)
+        kns = np.zeros(self.freeCount)
+        kabs = np.ones(self.polymerCount)
+        ks = list(polymerKs)
+        for polymerIndex, row in enumerate(self.polymerStoichiometries):
+            freeIndex = np.where(row < 0)[0][0]
+            if np.count_nonzero(row) == 1:
+                k2s[freeIndex], kns[freeIndex] = ks.pop(0), ks.pop(0)
+            else:
+                kabs[polymerIndex] = ks.pop(0)
+        return k2s, kns, kabs
+
+    def getTerminalInternalConcs(self, freeConcs, k2s, kns, kabs):
+        terminal = 2 * freeConcs**2 * k2s / (1 - freeConcs * kns)
+        internal = freeConcs**3 * k2s * kns / (1 - freeConcs * kns)
+        return terminal, internal
+
+    def polymerFreeToBoundConcs(self, freeConcs, k2s, kns, kabs):
+        # Treat the terminal and internal units as additional "free" components, so
+        # that end-capped polymers can be treated as if they're regular complexes.
+        terminal = 2 * freeConcs**2 * k2s / (1 - freeConcs * kns)
+        internal = freeConcs**3 * k2s * kns / (1 - freeConcs * kns) ** 2
+        componentConcs = np.concatenate([freeConcs, terminal, internal])
+
+        freeCount = self.freeCount
+        polymerCount = self.polymerCount
+
+        # split end group (pos) and polymer (neg) stoichiometries
+        pos = np.where(self.polymerStoichiometries < 0, 0, self.polymerStoichiometries)
+        neg = np.where(
+            self.polymerStoichiometries < 0, np.abs(self.polymerStoichiometries), 0
+        )
+
+        # each polymer gives two outputs: terminal and internal
+        fullStoichiometries = np.zeros([polymerCount * 2, freeCount * 3])
+
+        # terminal and internal states both require end cap concentrations
+        fullStoichiometries[::2, :freeCount] = pos
+        fullStoichiometries[1::2, :freeCount] = pos
+        fullStoichiometries[::2, freeCount : freeCount * 2] = neg
+        fullStoichiometries[1::2, freeCount * 2 :] = neg
+        return np.repeat(kabs, 2) * np.prod(
+            componentConcs**fullStoichiometries, axis=1
+        )
+
+    def polymerFreeExactSolutionSingle(self, k2, kn, totalSingle):
+        roots = np.roots(
+            [
+                k2 * kn - kn**2,
+                totalSingle * kn**2 + 2 * kn - 2 * k2,
+                -1 - 2 * totalSingle * kn,
+                totalSingle,
+            ]
+        )
+        real_roots = np.real(roots[np.isreal(roots)])
+        return np.min(real_roots[real_roots > 0])
+
+    def polymerFreeExactSolution(self, k2s, kns, total):
+        return np.array(
+            [
+                self.polymerFreeExactSolutionSingle(k2, kn, totalSingle)
+                for k2, kn, totalSingle in zip(k2s, kns, total)
+            ]
+        )
+
+    def polymerObjective(self, free, k2s, kns, kabs, total, M):
+        if self.polymerCount == 0:
+            return 0.0
+        pos = np.where(M < 0, 0, M)
+        neg = np.where(M < 0, np.abs(M), 0)
+        polymerWithoutFactorOfN = free**2 * k2s / (1 - free * kns)
+
+        polymerIntegral = kabs @ np.prod(
+            free**pos * polymerWithoutFactorOfN**neg, axis=1
+        )
+        return np.sum(polymerIntegral)
+
+    def polymerJacobian(self, free, k2s, kns, kabs, total, M):
+        if self.polymerCount == 0:
+            return np.full(len(free), 0.0)
+
+        pos = np.where(M < 0, 0, M)
+        neg = np.where(M < 0, np.abs(M), 0)
+        polymerWithFactorOfN = (
+            free**2 * k2s * (2 - free * kns) / (1 - free * kns) ** 2
+        )
+        polymerWithoutFactorOfN = free**2 * k2s / (1 - free * kns)
+        polymerConcentration = neg.T @ (
+            kabs * np.prod(free**pos * polymerWithFactorOfN**neg, axis=1)
+        )
+        endCapConcentration = pos.T @ (
+            kabs * np.prod(free**pos * polymerWithoutFactorOfN**neg, axis=1)
+        )
+        return polymerConcentration + endCapConcentration
+
+    def polymerGetUpperBounds(self, k2s, kns, kabs, total, M):
+        if self.polymerCount == 0:
+            return total
+        return self.polymerFreeExactSolution(k2s, kns, total)
+
+
+class Speciation(moduleFrame.Strategy, ComplexSpeciationMixin, PolymerSpeciationMixin):
     requiredAttributes = ("stoichiometries",)
 
     @abstractmethod
@@ -72,123 +241,48 @@ class Speciation(moduleFrame.Strategy):
         return len(self.freeNames)
 
     @property
-    def boundCount(self):
-        return self.complexCount + 2 * self.polymerCount
-
-    @property
-    def polymerIndices(self):
-        return np.any(self.stoichiometries < 0, 1)
-
-    @property
-    def polymerCount(self):
-        return np.count_nonzero(self.stoichiometries < 0)
-
-    @property
-    def complexCount(self):
-        return self.stoichiometries.shape[0] - self.polymerCount
-
-    @property
     def boundNames(self):
-        return stoichiometriesToBoundNames(
-            self.freeNames,
-            self.stoichiometries,
-            "unchanged",
-        )
+        return np.append(self.complexBoundNames, self.polymerBoundNames)
 
     @property
-    def variableStoichiomtries(self):
-        # stoichiometries in dimer+polymer mode: insert a dimer before each polymer
-        dimerRows = self.stoichiometries[self.polymerIndices].copy()
-        dimerRows[dimerRows < 0] = 2
-        return np.insert(
-            self.stoichiometries, *np.where(self.polymerIndices), dimerRows, axis=0
-        )
+    def boundCount(self):
+        return len(self.boundNames)
 
     @property
     def variableNames(self):
-        return stoichiometriesToBoundNames(
-            self.freeNames,
-            self.stoichiometries,
-            "dimer+polymer",
+        return np.concatenate([self.complexVariableNames, self.polymerVariableNames])
+
+    @property
+    def outputNames(self):
+        return np.concatenate(
+            [self.freeNames, self.complexOutputNames, self.polymerOutputNames]
         )
 
     @property
     def outputStoichiometries(self):
-        # stoichiometries in terminal+internal mode: duplicate each polymer
-        polymerRows = self.stoichiometries[self.polymerIndices]
-        return np.insert(
-            self.stoichiometries, *np.where(self.polymerIndices), polymerRows, axis=0
-        )
-
-    @property
-    def outputNames(self):
-        return np.append(
-            self.freeNames,
-            stoichiometriesToBoundNames(
-                self.freeNames,
-                self.stoichiometries,
-                "terminal+internal",
-            ),
-        )
-
-    @property
-    def outputBoundNames(self):
-        return stoichiometriesToBoundNames(
-            self.freeNames,
-            self.stoichiometries,
-            "terminal+internal",
+        return np.vstack(
+            [
+                np.eye(self.freeCount),
+                self.complexOutputStoichiometries,
+                self.polymerOutputStoichiometries,
+            ]
         )
 
     def variablesToKs(self, variables):
-        # The rest of the UI should be agnostic towards the treatment of polymers, so
-        # this function is used to separate out the double K values (dimer and 3+_mer)
-        # for polymers.
-        complexKs = np.empty(self.complexCount)
-        polymerK2s = ma.masked_all(self.freeCount)
-        polymerKns = ma.masked_all(self.freeCount)
+        complexKs = variables[: self.complexCount]
+        polymerKs = variables[self.complexCount :]
+        k2s, kns, kabs = self.splitPolymerKs(polymerKs)
+        return complexKs, k2s, kns, kabs
 
-        polymersCounted = 0
-        # breakpoint()
-        for i in range(self.stoichiometries.shape[0]):
-            if self.polymerIndices[i]:
-                freeIndex = np.where(self.stoichiometries[i] < 0)[0][0]
-                polymerK2s[freeIndex] = variables[i + polymersCounted]
-                polymerKns[freeIndex] = variables[i + polymersCounted + 1]
-                polymersCounted += 1
-            else:
-                complexKs[i - polymersCounted] = variables[i + polymersCounted]
-        if not len(variables) == self.boundCount:
-            raise ValueError(
-                f"Expected {self.boundCount * 2} variables, got {len(variables)}."
-            )
-        return complexKs, polymerK2s, polymerKns
-
-    def freeToBoundConcs(self, freeConcs, complexKs, polymerK2s, polymerKns):
-        boundConcs = []
-        polymersCounted = 0
-        for i in range(self.stoichiometries.shape[0]):
-            if self.polymerIndices[i]:
-                j = np.where(self.stoichiometries[i] < 0)[0][0]
-                terminal = (
-                    2
-                    * freeConcs[j] ** 2
-                    * polymerK2s[j]
-                    / (1 - freeConcs[j] * polymerKns[j])
-                )
-                internal = (
-                    freeConcs[j] ** 3
-                    * polymerK2s[j]
-                    * polymerKns[j]
-                    / (1 - freeConcs[j] * polymerKns[j])
-                )
-                boundConcs.extend([terminal, internal])
-                polymersCounted += 1
-            else:
-                boundConcs.append(
-                    complexKs[i - polymersCounted]
-                    * np.prod(freeConcs ** self.stoichiometries[i])
-                )
-        return boundConcs
+    # TODO: rewrite all non-mixin functions to be agnostic to the components of
+    # polymerKs, by just working with complexKs and polymerKs, or possibly *polymerKs
+    def freeToBoundConcs(self, freeConcs, complexKs, k2s, kns, kabs):
+        return np.hstack(
+            [
+                self.complexFreeToBoundConcs(freeConcs, complexKs),
+                self.polymerFreeToBoundConcs(freeConcs, k2s, kns, kabs),
+            ]
+        )
 
 
 class SpeciationTable(Table):
@@ -233,7 +327,7 @@ class SpeciationTable(Table):
                         ]
                     ).astype(int),
                 )
-            self.updateTitles()
+        self.updateTitles()
 
     def updateTitles(self, *args, **kwargs):
         for cell, title in zip(
@@ -241,9 +335,7 @@ class SpeciationTable(Table):
         ):
             cell.set(title)
 
-        self.rowTitles = stoichiometriesToBoundNames(
-            self.columnTitles, self.data, polymerMode="unchanged"
-        )
+        self.rowTitles = stoichiometriesToBoundNames(self.columnTitles, self.data)
 
     def addFreeRow(self, index=-1):
         row = self.cells.shape[0]
@@ -305,7 +397,7 @@ class SpeciationPopup(moduleFrame.Popup):
             padding=padding * 2,
             text=(
                 "Each column corresponds to a molecule, and each row to a complex.\n"
-                " Define each complex by adding a row with the stoichiometry of each"
+                "Define each complex by adding a row with the stoichiometry of each"
                 " molecule in the complex. For polymers, use 'n'. Leaving a cell blank"
                 " is identical to entering '0'."
             ),
@@ -337,22 +429,26 @@ class SpeciationPopup(moduleFrame.Popup):
 
 
 class SpeciationDimerisation(Speciation):
-    freeNames = np.array(["Host"])
-    stoichiometries = np.array([[2]])
+    @property
+    def stoichiometries(self):
+        M = np.array([[2]])
+        M.resize([1, self.freeCount])
+        return M
 
     def run(self, variables, totalConcs):
         K = variables[0]
         Htot = totalConcs.T[0]
         H = (-1 + np.sqrt(1 + 8 * Htot * K)) / (4 * K)
         H2 = (1 + 4 * Htot * K - np.sqrt(1 + 8 * Htot * K)) / (8 * K)
-
-        free = np.atleast_2d(H).T
-        bound = np.atleast_2d(H2).T
-        return free, bound
+        return np.array([H, H2]).T
 
 
 class SpeciationHG(Speciation):
-    stoichiometries = np.array([[1, 1]])
+    @property
+    def stoichiometries(self):
+        M = np.array([[1, 1]])
+        M.resize([1, self.freeCount])
+        return M
 
     def run(self, variables, totalConcs):
         K = variables[0]
@@ -375,11 +471,11 @@ class SpeciationHG(Speciation):
         ) / (2 * K)
         HG = H * G * K
 
-        free = np.vstack((H, G)).T
-        bound = np.atleast_2d(HG).T
-        return free, bound
+        return np.array([H, G, HG]).T
 
 
+# Old, slower speciation algorithm, currently unused. Left in in case results need to
+# be compared against it.
 class SpeciationCOGS(Speciation):
     def COGS(self, M, y, ks, polymerKs):
         free = y.copy()
@@ -444,109 +540,118 @@ class SpeciationCOGS(Speciation):
 
 
 class SpeciationSolver(Speciation):
-    # Optimise (total * log10(free))
+    # Optimise f(total * log10(free))
     # This makes the derivative equal to ln(10) * (free + bound - total) / total
     #
     # So gtol in the minimisation algorithm can be set to the desired precision in
     # the total concentrations.
-    def speciationLogConst(self, logFreeConst, ks, k2s, kns, total, M):
-        free = 10 ** (logFreeConst / total)
+    def objective(
+        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
+    ):
+        free = 10 ** (logFreeTimesTotal / total)
         return (
             np.sum(free)
-            - np.sum(logFreeConst) * LN_10
-            + ks @ np.prod(free**M, 1)
-            + self.speciationPolymers(free, k2s, kns)
+            - np.sum(logFreeTimesTotal) * LN_10
+            + self.complexObjective(free, complexKs, total, complexM)
+            + self.polymerObjective(free, k2s, kns, kabs, total, polymerM)
         )
 
-    def jacobianCalculatorLogConst(self, logFreeConst, ks, k2s, kns, total, M):
-        free = 10 ** (logFreeConst / total)
+    def jacobian(
+        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
+    ):
+        free = 10 ** (logFreeTimesTotal / total)
         return (
             (
-                (M.T @ (ks * np.prod(free**M, 1)))
-                + free
-                + self.jacobianPolymers(free, k2s, kns).filled(0.0)
+                free
+                + self.complexJacobian(free, complexKs, total, complexM)
+                + self.polymerJacobian(free, k2s, kns, kabs, total, polymerM)
                 - total
             )
             * LN_10
             / total
         )
 
-    def speciationPolymers(self, free, k2s, kns):
-        result = np.sum(k2s * free**2 / (1 - free * kns))
-        if result is np.ma.masked:
-            return 0.0
-        else:
-            return result
-
-    def jacobianPolymers(self, free, k2s, kns):
-        return free**2 * k2s * (2 - free * kns) / (1 - free * kns) ** 2
-
-    def getLowerBoundsLogConst(self, ks, k2s, kns, total, M):
+    # Could be refined iteratively, by computing the LB using this method, then taking
+    # UB = self.freeToBoundConcs(free=LB), calculating a new LB using that UB, etc.
+    def getUpperBounds(self, complexKs, k2s, kns, kabs, total, complexM, polymerM):
         return total * np.log10(
-            (total * self.polymersExactSolution(k2s, kns, total).filled(total))
-            / (total + M.T @ (ks * np.prod(total**M, 1)))
+            np.min(
+                [
+                    self.complexGetUpperBounds(complexKs, total, complexM),
+                    self.polymerGetUpperBounds(k2s, kns, kabs, total, polymerM),
+                ],
+                axis=0,
+            )
         )
 
-    # Could be calculated more precisely, for example as
-    # UB = M @ (ks * np.prod(LOWER_BOUND**M, 1)))
-    # However, as the gradient at the initial guess is almost always negative, the
-    # upper bound is rarely actually used.
-    def getUpperBoundsLogConst(self, ks, k2s, kns, total, M):
-        upperBoundsPolymers = self.polymersExactSolution(k2s, kns, total)
-        return total * np.log10(np.ma.min([total, upperBoundsPolymers], axis=0).data)
-
-    def polymersExactSolution(self, k2s, kns, totals):
-        output = np.ma.masked_all(len(totals))
-        for i, (k2, kn, total) in enumerate(zip(k2s, kns, totals)):
-            if not np.ma.is_masked(k2) and not np.ma.is_masked(kn):
-                output[i] = self.polymersExactSolutionSingle(k2, kn, total)
-        return output
-
-    def polymersExactSolutionSingle(self, k2, kn, total):
-        roots = np.roots(
+    def getLowerBounds(self, complexKs, k2s, kns, kabs, total, complexM, polymerM):
+        maxFree = np.min(
             [
-                k2 * kn - kn**2,
-                total * kn**2 + 2 * kn - 2 * k2,
-                -1 - 2 * total * kn,
-                total,
-            ]
+                self.complexGetUpperBounds(complexKs, total, complexM),
+                self.polymerGetUpperBounds(k2s, kns, kabs, total, polymerM),
+            ],
+            axis=0,
         )
-        real_roots = np.real(roots[np.isreal(roots)])
-        return np.min(real_roots[real_roots > 0])
+        return total * np.log10(
+            (total * maxFree)
+            / (
+                maxFree
+                + self.complexJacobian(maxFree, complexKs, total, complexM)
+                + self.polymerJacobian(maxFree, k2s, kns, kabs, total, polymerM)
+            )
+        )
 
     def run(self, variables, totalConcs):
-        # breakpoint()
-        complexKs, polymerK2s, polymerKns = self.variablesToKs(variables)
+        complexKs, k2s, kns, kabs = self.variablesToKs(variables)
         numPoints = totalConcs.shape[0]
-        M = self.stoichiometries[~self.polymerIndices]
+
         free = np.empty((numPoints, self.freeCount))
-        bound = np.empty((numPoints, self.complexCount + 2 * self.polymerCount))
+        bound = np.empty((numPoints, self.outputCount - self.freeCount))
 
         for i in range(numPoints):
             additionTotalConcs = totalConcs[i]
 
             # Filter the to exclude species and complexes that will have a concentration
             # of 0
-            zeroTotalConcs = additionTotalConcs == 0
-            zeroBound = np.any(self.stoichiometries[:, zeroTotalConcs], 1)
+            zeroFree = additionTotalConcs == 0
+            zeroBound = np.any(self.stoichiometries[:, zeroFree], axis=1)
             if all(zeroBound):
                 free[i] = additionTotalConcs
                 bound[i] = 0
                 continue
             zeroComplexes = zeroBound[~self.polymerIndices]
+            zeroPolymers = zeroBound[self.polymerIndices]
 
             filteredKs = complexKs[~zeroComplexes]
-            filteredTotal = additionTotalConcs[~zeroTotalConcs]
-            filteredM = M[~zeroComplexes, :][:, ~zeroTotalConcs]
+            filteredK2s = k2s[~zeroFree]
+            filteredKns = kns[~zeroFree]
+            filteredKabs = kabs[~zeroPolymers]
 
-            filteredK2s = polymerK2s[~zeroTotalConcs]
-            filteredKns = polymerKns[~zeroTotalConcs]
+            filteredTotal = additionTotalConcs[~zeroFree]
+            filteredComplexM = self.complexStoichiometries[~zeroComplexes, :][
+                :, ~zeroFree
+            ]
+            filteredPolymerM = self.polymerStoichiometries[~zeroPolymers, :][
+                :, ~zeroFree
+            ]
 
-            lb = self.getLowerBoundsLogConst(
-                filteredKs, filteredK2s, filteredKns, filteredTotal, filteredM
+            lb = self.getLowerBounds(
+                filteredKs,
+                filteredK2s,
+                filteredKns,
+                filteredKabs,
+                filteredTotal,
+                filteredComplexM,
+                filteredPolymerM,
             )
-            ub = self.getUpperBoundsLogConst(
-                filteredKs, filteredK2s, filteredKns, filteredTotal, filteredM
+            ub = self.getUpperBounds(
+                filteredKs,
+                filteredK2s,
+                filteredKns,
+                filteredKabs,
+                filteredTotal,
+                filteredComplexM,
+                filteredPolymerM,
             )
             if any(lb > ub):
                 # Correct for rounding errors. Unsure if this is necessary, as the only
@@ -556,7 +661,7 @@ class SpeciationSolver(Speciation):
                 lb[mask], ub[mask] = ub[mask], lb[mask]
 
             if i == 0:
-                # Initial guess: all species 100% free
+                # Initial guess: all species 100% free, only polymers are formed
                 x0 = ub
             else:
                 # If the total concentration increased, the initial guess is that all
@@ -573,13 +678,21 @@ class SpeciationSolver(Speciation):
                 initialGuess[~concsIncreased] *= (
                     totalConcs[i][~concsIncreased] / totalConcs[i - 1][~concsIncreased]
                 )
-                x0 = filteredTotal * np.log10(initialGuess[~zeroTotalConcs])
+                x0 = filteredTotal * np.log10(initialGuess[~zeroFree])
 
             result = minimize(
-                self.speciationLogConst,
+                self.objective,
                 x0=x0,
-                args=(filteredKs, filteredK2s, filteredKns, filteredTotal, filteredM),
-                jac=self.jacobianCalculatorLogConst,
+                args=(
+                    filteredKs,
+                    filteredK2s,
+                    filteredKns,
+                    filteredKabs,
+                    filteredTotal,
+                    filteredComplexM,
+                    filteredPolymerM,
+                ),
+                jac=self.jacobian,
                 bounds=np.vstack((lb, ub)).T,
                 options={
                     "ftol": 0,
@@ -588,20 +701,20 @@ class SpeciationSolver(Speciation):
             )
             logFree = result.x / filteredTotal
 
-            free[i, ~zeroTotalConcs] = 10**logFree
-            free[i, zeroTotalConcs] = 0
-
+            free[i, ~zeroFree] = 10**logFree
+            free[i, zeroFree] = 0
             # get the concentrations of the bound species from those of the free
-            bound[i] = self.freeToBoundConcs(free[i], complexKs, polymerK2s, polymerKns)
+            bound[i] = self.freeToBoundConcs(free[i], complexKs, k2s, kns, kabs)
 
-        return free, bound
+        return np.hstack([free, bound])
 
 
 class SpeciationHG2(SpeciationSolver):
-    stoichiometries = np.array([[1, 1], [1, 2]])
-
-    def run(self, variables, totalConcs):
-        return super().run(variables, totalConcs)
+    @property
+    def stoichiometries(self):
+        M = np.array([[1, 1], [1, 2]])
+        M.resize([1, self.freeCount])
+        return M
 
 
 class SpeciationCustom(SpeciationSolver):

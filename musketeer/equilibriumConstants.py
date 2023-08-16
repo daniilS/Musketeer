@@ -161,7 +161,7 @@ class CustomKsTable(Table):
     def createLabels(self, *args, **kwargs):
         try:
             labels = []
-            trans = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+            trans = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
             variables = self.rowTitles[1:]
             for globalK, statFactor, variableFactors in zip(
                 self.columnTitles[:-1],
@@ -276,7 +276,6 @@ class CustomKsPopup(moduleFrame.Popup):
         self.destroy()
 
 
-# TODO: convert to new format
 class GetKsCustom(EquilibriumConstants):
     Popup = CustomKsPopup
 
@@ -289,7 +288,6 @@ class GetKsCustom(EquilibriumConstants):
     )
 
     def run(self, kVars):
-        # print(kVars)
         # microKs as a column vector, with the unknown values filled in
         microKs = self.knownKs.copy()
         microKs[self.knownMask] = kVars
