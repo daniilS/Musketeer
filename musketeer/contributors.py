@@ -1,9 +1,7 @@
 import math
-import tkinter as tk
 import tkinter.ttk as ttk
 
 import numpy as np
-from numpy import ma
 
 from . import moduleFrame
 from .scrolledFrame import ScrolledFrame
@@ -22,9 +20,11 @@ class ContributorConcs(moduleFrame.Strategy):
         "contributorsCountPerMolecule",
     )
 
-    def run(self, freeConcs, boundConcs):
-        allConcs = np.concatenate((freeConcs, boundConcs), 1)
-        return allConcs @ self.contributorsMatrix.T, self.contributorsCountPerMolecule
+    def run(self, speciesConcs):
+        return (
+            speciesConcs @ self.contributorsMatrix.T,
+            self.contributorsCountPerMolecule,
+        )
 
 
 class ContributorsTable(Table):
@@ -299,12 +299,11 @@ class ContributorConcsAll(ContributorConcs):
             return np.array([self.contributorsMatrix.shape[0]])
 
     def matrixFromSingleMolecule(self, index, filter):
-        free = np.zeros(self.titration.speciation.freeCount, dtype=int)
-        free[index] = 1
-        bound = abs(self.titration.speciation.outputStoichiometries[:, index])
-        return np.diag(np.concatenate((free, bound)))[filter]
+        diagonal = abs(self.titration.speciation.outputStoichiometries[:, index])
+        return np.diag(diagonal)[filter]
 
 
+# TODO: fix for homodimers
 class ContributorConcsIdentical(ContributorConcs):
     def calculateStates(self):
         moleculeCount = self.titration.speciation.freeCount
@@ -322,7 +321,9 @@ class ContributorConcsIdentical(ContributorConcs):
         # maximum total number of bonds each molecule can form
         maximumTotalValency = np.zeros(moleculeCount, dtype=int)
 
-        stoichiometries = self.titration.speciation.outputStoichiometries
+        stoichiometries = self.titration.speciation.outputStoichiometries[
+            self.titration.speciation.freeCount :
+        ]
         # n-mer means host has n-1 binding sites for binding itself
         # 1 becomes 0, because that's the host molecule itself
         # -1 becomes -2 becomes 2, as polymers imply 2 binding sites
@@ -343,8 +344,8 @@ class ContributorConcsIdentical(ContributorConcs):
             formsBinaryComplex = np.zeros(moleculeCount, dtype=bool)
             for guest in range(moleculeCount):
                 binaryComplex = np.zeros(moleculeCount, dtype=int)
-                binaryComplex[host] = 1
-                binaryComplex[guest] = 1
+                binaryComplex[host] += 1
+                binaryComplex[guest] += 1
                 formsBinaryComplex[guest] = np.any(
                     np.all(
                         # want to match -1 iff host == guest

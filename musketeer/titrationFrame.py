@@ -145,7 +145,21 @@ class TitrationFrame(ttk.Frame):
                     try:
                         data = titration[f"{name}.{attribute}"]
                     except KeyError:
-                        continue
+                        # Backwards compatibility:
+                        # Before version 1.4.0, last free and bound concs were stored
+                        # separately.
+                        if (
+                            fileVersion < packaging.version.parse("1.4.0")
+                            and attribute == "lastSpeciesConcs"
+                        ):
+                            try:
+                                freeConcs = titration[f"{name}.lastFreeConcs"]
+                                boundConcs = titration[f"{name}.lastBoundConcs"]
+                            except KeyError:
+                                continue
+                            data = np.hstack([freeConcs, boundConcs])
+                        else:
+                            continue
                     else:
                         if data.shape == ():
                             data = data.item()
@@ -187,7 +201,7 @@ class TitrationFrame(ttk.Frame):
                         except KeyError:
                             # backwards compatibility:
                             # version 1.2.0 moved freeNames from speciation to
-                            #
+                            # totalConcentrations
                             if (
                                 fileVersion < packaging.version.parse("1.2.0")
                                 and moduleFrame.attributeName == "totalConcentrations"
@@ -235,6 +249,7 @@ class TitrationFrame(ttk.Frame):
                 self.newFit(fit, name, setDefault=False)
 
             self.numFits = titration[".numFits"].item()
+            titration.close()
 
         self.notebook.bind("<<NotebookTabChanged>>", self.switchFit, add=True)
 
@@ -1023,6 +1038,7 @@ class SpeciationFrame(PlotFrame):
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.speciesVar = tk.StringVar(self)
+        self.separatePolymers = False
         self.logScale = False
         self.smooth = True
         self.populate()
@@ -1059,6 +1075,17 @@ class SpeciationFrame(PlotFrame):
             style="primary.Outline.TMenubutton",
         )
         self.speciesDropdown.pack()
+
+        self.separatePolymersButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Separate terminal &\ninternal polymers",
+            command=self.toggleSeparatePolymers,
+            style="Outline.Toolbutton",
+        )
+        if titration.speciation.polymerCount == 0:
+            self.separatePolymersButton.state(["disabled"])
+        self.separatePolymersButton.pack(pady=padding, fill="x")
+
         self.logScaleButton = ttk.Checkbutton(
             self.optionsFrame,
             text="Logarithmic x axis",
@@ -1066,6 +1093,7 @@ class SpeciationFrame(PlotFrame):
             style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
+
         self.smoothButton = ttk.Checkbutton(
             self.optionsFrame,
             text="Smooth curves",
@@ -1094,6 +1122,10 @@ class SpeciationFrame(PlotFrame):
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
+
+    def toggleSeparatePolymers(self):
+        self.separatePolymers = not self.separatePolymers
+        self.plot()
 
     def toggleLogScale(self):
         self.logScale = not self.logScale
@@ -1132,21 +1164,39 @@ class SpeciationFrame(PlotFrame):
             / totalConcentrations.prefixes[xUnit.strip("M")]
         )
 
-        freeConcs = titration.lastFreeConcs[additionsFilter, :][:, self.freeIndex]
         freeName = self.speciesVar.get()
 
         factor = abs(titration.speciation.outputStoichiometries[:, self.freeIndex])
-        boundFilter = factor.astype(bool)
+        mask = factor.astype(bool)
 
-        boundConcs = titration.lastBoundConcs * factor
-        boundConcs = boundConcs[additionsFilter, :][:, boundFilter]
-        boundNames = titration.speciation.outputBoundNames[boundFilter]
+        concs = titration.lastSpeciesConcs * factor
+        concs = concs[additionsFilter, :][:, mask]
+        names = titration.speciation.outputNames[mask]
 
-        curves = 100 * np.vstack((freeConcs, boundConcs.T)) / totalConcs
-        names = np.append(freeName, boundNames)
+        curves = 100 * concs.T / totalConcs
         self.ax.set_ylabel(f"% of {freeName}")
         self.ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100))
         self.ax.set_ylim(bottom=-5, top=105)
+
+        if not self.separatePolymers:
+            # Find the indices of terminal species which are followed by matching
+            # internal species. Prepend [False] to instead get the list of the terminal
+            # species, and make the list length match the array. Invert to get all
+            # all indices we want to preserve.
+            keepIndices = np.invert(
+                [False]
+                + [
+                    first.endswith(" terminal")
+                    and second.endswith(" internal")
+                    and first.removesuffix(" terminal")
+                    == second.removesuffix(" internal")
+                    for first, second in zip(names[:-1], names[1:])
+                ]
+            )
+            # Merge the names: keep only the terminal ones, and remove " terminal".
+            names = [name.removesuffix(" terminal") for name in names[keepIndices]]
+            # Merge the curves: add the concs of the internal elements to the terminal.
+            curves = np.add.reduceat(curves, np.where(keepIndices)[0], axis=0)
 
         for curve, name in zip(curves, names):
             # add step - 1 points between each data point

@@ -34,14 +34,9 @@ class GetContributingSpeciesSingle(ContributingSpecies):
 
     @property
     def filter(self):
-        free = np.zeros(self.titration.speciation.freeCount, dtype=bool)
-        free[self.singleMoleculeIndex] = True
-
-        bound = self.titration.speciation.outputStoichiometries[
+        return self.titration.speciation.outputStoichiometries[
             :, self.singleMoleculeIndex
         ].astype(bool)
-
-        return np.concatenate([free, bound])
 
 
 class GetContributingSpeciesHost(GetContributingSpeciesSingle):
@@ -205,17 +200,13 @@ class GetContributingSpeciesPerSignal(ContributingSpecies):
     def filter(self):
         # rows are all contributing molecules, columns are the corresponding
         # contributing species
-        free = np.eye(self.titration.speciation.freeCount, dtype=bool)
-
-        bound = (
+        return (
             self.titration.speciation.outputStoichiometries[
                 :, range(self.titration.speciation.freeCount)
             ]
             .astype(bool)
             .T
         )
-
-        return np.hstack([free, bound])
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

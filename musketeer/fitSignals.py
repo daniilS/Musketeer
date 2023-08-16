@@ -221,10 +221,6 @@ class FitSignalsODR(FitSignals):
         E, F = EF[:, :n], EF[:, n:]
         norm = np.linalg.norm(EF, ord="fro")
         fittedCurves = X @ B
-        # print(f"{s=}")
-        print(f"rank={np.linalg.matrix_rank(Vyy)}")
-        print(np.linalg.norm(E), np.linalg.norm(F))
-        # breakpoint()
         return B, norm**2, fittedCurves
 
 

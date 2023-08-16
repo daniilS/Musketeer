@@ -20,8 +20,7 @@ titrationAttributes = (
     "lastTotalConcVars",
     "lastKs",
     "lastTotalConcs",
-    "lastFreeConcs",
-    "lastBoundConcs",
+    "lastSpeciesConcs",
     "lastSignalVars",
     "lastFittedSpectra",
     "lastFittedCurves",
@@ -219,13 +218,11 @@ class Titration:
         totalConcs = self.totalConcentrations.run(totalConcVars)
         self.lastTotalConcs = totalConcs
 
-        freeConcs, boundConcs = self.speciation.run(speciationVars, totalConcs)
-        self.lastFreeConcs, self.lastBoundConcs = freeConcs, boundConcs
+        speciesConcs = self.speciation.run(speciationVars, totalConcs)
+        self.lastSpeciesConcs = speciesConcs
 
         contributingSpeciesFilter = self.contributingSpecies.run()
-        signalVars, contributorsCountPerMolecule = self.contributors.run(
-            freeConcs, boundConcs
-        )
+        signalVars, contributorsCountPerMolecule = self.contributors.run(speciesConcs)
         self.lastSignalVars = signalVars
 
         proportionalSignalVars = self.proportionality.run(
