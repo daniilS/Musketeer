@@ -67,8 +67,13 @@ root.title("Musketeer")
 # icon as possible
 
 try:
-    iconData48 = res.read_binary(__package__, "logo 48px.png")
-    iconData512 = res.read_binary(__package__, "logo 512px.png")
+    try:
+        iconData48 = (res.files(__package__) / "logo 48px.png").read_bytes()
+        iconData512 = (res.files(__package__) / "logo 512px.png").read_bytes()
+    except AttributeError:
+        # Python 3.8 compatibility
+        iconData48 = res.read_binary(__package__, "logo 48px.png")
+        iconData512 = res.read_binary(__package__, "logo 512px.png")
     icon48 = tk.PhotoImage(data=iconData48)
     icon512 = tk.PhotoImage(data=iconData512)
 
