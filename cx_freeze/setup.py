@@ -32,6 +32,6 @@ setup(
     name="Musketeer",
     version=musketeer.__version__,
     description="Musketeer",
-    options={"build_exe": build_options, "bdist_mis": msi_options},
+    options={"build_exe": build_options, "bdist_msi": msi_options},
     executables=executables,
 )
