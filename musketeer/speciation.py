@@ -712,9 +712,15 @@ class SpeciationSolver(Speciation):
 class SpeciationHG2(SpeciationSolver):
     @property
     def stoichiometries(self):
-        M = np.array([[1, 1], [1, 2]])
-        M.resize([1, self.freeCount])
-        return M
+        if self.freeCount < 2:
+            return np.array([[1] * self.freeCount])
+        else:
+            return np.pad(
+                array=[[1, 1], [1, 2]],
+                pad_width=[[0, 0], [0, self.freeCount - 2]],
+                mode="constant",
+                constant_values=0,
+            )
 
 
 class SpeciationCustom(SpeciationSolver):
