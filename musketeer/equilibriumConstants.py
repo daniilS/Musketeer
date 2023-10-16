@@ -47,7 +47,7 @@ class EquilibriumConstants(moduleFrame.Strategy):
     def run(self, kVars):
         ks = self.knownKs.copy()
         ks[self.knownMask] = kVars
-        return ks
+        return ma.compressed(ks)
 
 
 class GetKsAll(EquilibriumConstants):
