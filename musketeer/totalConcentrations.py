@@ -11,7 +11,7 @@ from . import moduleFrame
 from .scrolledFrame import ScrolledFrame
 from .table import ButtonFrame, Table, WrappedLabel
 
-DEFAULT_INITIAL_CONC = 1e-4
+DEFAULT_INITIAL_CONC = 1e-7
 
 prefixesDecimal = {
     "": Decimal(1),
@@ -371,6 +371,7 @@ class ConcsTable(Table):
             2,
             2,
             freeNames,
+            maskBlanks=True,
             rowOptions=("readonlyTitles",),
             columnOptions=("titles", "new", "delete"),
         )
@@ -460,6 +461,27 @@ class ConcsPopup(moduleFrame.Popup):
 
         innerFrame = frame.display_widget(ttk.Frame, stretch=True)
 
+        unknownConcsFrame = ttk.Frame(innerFrame, borderwidth=5)
+        unknownConcsFrame.pack(expand=True, fill="both")
+        unknownConcsLabel = WrappedLabel(
+            unknownConcsFrame,
+            text="Leave cells blank to optimise that concentration as a variable.\n",
+        )
+        unknownConcsLabel.pack(expand=False, fill="both")
+        self.unknownTotalConcsLinkedVar = tk.BooleanVar()
+        try:
+            self.unknownTotalConcsLinkedVar.set(
+                self.titration.totalConcentrations.unknownTotalConcsLinked
+            )
+        except AttributeError:
+            self.unknownTotalConcsLinkedVar.set(True)
+        unknownTotalConcsCheckbutton = ttk.Checkbutton(
+            unknownConcsFrame,
+            variable=self.unknownTotalConcsLinkedVar,
+            text="Link unknown concentrations in the same column?",
+        )
+        unknownTotalConcsCheckbutton.pack()
+
         self.concsTable = ConcsTable(innerFrame, titration)
         self.concsTable.pack(expand=True, fill="both")
 
@@ -476,6 +498,8 @@ class ConcsPopup(moduleFrame.Popup):
 
     def saveData(self):
         self.concsUnit = self.concsTable.concsUnit.get()
+        self.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
+        print(self.unknownTotalConcsLinked)
         self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
         self.freeNames = self.concsTable.columnTitles
 
@@ -486,15 +510,51 @@ class ConcsPopup(moduleFrame.Popup):
 class GetTotalConcs(totalConcentrations):
     Popup = ConcsPopup
     popupAttributes = (
+        "unknownTotalConcsLinked",
         "concsUnit",
         "totalConcs",
         "freeNames",
     )
 
     def run(self, totalConcVars):
-        return self.totalConcs
+        totalConcs = np.copy(self.totalConcs)
 
-    variableNames = np.array([])
+        if self.unknownTotalConcsLinked:
+            # For each row (= species), all blank cells are assigned to a
+            # single unknown variable.
+            for columnIndex, totalConcVar in zip(
+                np.where(self.columnsWithBlanks)[0], totalConcVars
+            ):
+                totalConcs[
+                    np.isnan(totalConcs[:, columnIndex]), columnIndex
+                ] = totalConcVar
+        else:
+            totalConcs[np.isnan(totalConcs)] = totalConcVars
+
+        return totalConcs
+
+    @property
+    def columnsWithBlanks(self):
+        return np.any(ma.getmaskarray(self.totalConcs), axis=0)
+
+    @property
+    def variableNames(self):
+        if self.unknownTotalConcsLinked:
+            # return the number of columns (= species) with blank cells
+            concVarsNames = self.freeNames[self.columnsWithBlanks]
+            return np.array([f"[{name}]" for name in concVarsNames])
+        else:
+            concVarsNames = []
+            for freeName, concs in zip(self.freeNames, self.totalConcs.T):
+                concVarsNames.extend(
+                    [
+                        f"[{freeName}] in {additionTitle}"
+                        for additionTitle in self.titration.additionTitles[
+                            ma.getmaskarray(concs)
+                        ]
+                    ]
+                )
+            return np.array(concVarsNames)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

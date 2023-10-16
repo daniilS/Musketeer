@@ -223,6 +223,13 @@ class TitrationFrame(ttk.Frame):
                                     else:
                                         continue
                                     data = np.array(["Host", "Guest"][:freeCount])
+                            elif (
+                                fileVersion < packaging.version.parse("1.4.1")
+                                and moduleFrame.attributeName == "totalConcentrations"
+                                and popupAttributeName == "unknownTotalConcsLinked"
+                            ):
+                                data = True
+
                             else:
                                 continue
                         else:
@@ -1287,6 +1294,9 @@ class ResultsFrame(ttk.Frame):
         ) in zip(titration.equilibriumConstants.variableNames, ks):
             kTable.addRow(name, [self.formatK(value)])
         kTable.pack(side="top", pady=15)
+
+        # TODO: fix sheet becoming too small to be visible when there are a lot of
+        # variables shown above it.
 
         if titration.totalConcentrations.variableCount > 0:
             concsTable = Table(
