@@ -946,12 +946,26 @@ class FittedFrame(PlotFrame):
         xUnit = titration.totalConcentrations.concsUnit
         xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
 
+        if ma.is_masked(self.curves):
+            firstUnmaskedIndices = [np.where(~row)[0][0] for row in self.curves.mask]
+        else:
+            firstUnmaskedIndices = [0] * self.curves.shape[0]
+        firstUnmaskedElements = np.choose(firstUnmaskedIndices, self.curves.T)
+
+        # fitted Curves should always be masked
+        firstUnmaskedFittedIndices = [
+            np.where(~row)[0][0] for row in self.fittedCurves.mask
+        ]
+        firstUnmaskedFittedElements = np.choose(
+            firstUnmaskedFittedIndices, self.fittedCurves.T
+        )
+
         if self.plotType == "absolute":
             curves = self.curves
             fittedCurves = self.fittedCurves
             self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
         elif self.plotType == "relative":
-            fittedZeros = self.fittedCurves[:, [0]]
+            fittedZeros = np.atleast_2d(firstUnmaskedFittedElements).T
             curves = self.curves - fittedZeros
             fittedCurves = self.fittedCurves - fittedZeros
             self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
@@ -959,11 +973,11 @@ class FittedFrame(PlotFrame):
             curves = self.curves.T
             fittedCurves = self.fittedCurves.T
             # normalise so that all the fitted curves have the same amplitude
-            fittedDiff = self.fittedCurves.T - self.fittedCurves.T[0]
+            fittedDiff = self.fittedCurves.T - firstUnmaskedFittedElements
             maxFittedDiff = np.max(abs(fittedDiff), axis=0)
             curves = curves / maxFittedDiff
 
-            diff = curves - curves[0]
+            diff = curves - firstUnmaskedElements
             negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
             curves[:, negatives] *= -1
             curves = curves.T * 100
@@ -972,7 +986,9 @@ class FittedFrame(PlotFrame):
             fittedCurves[:, negatives] *= -1
             fittedCurves = fittedCurves.T * 100
 
-            fittedZeros = fittedCurves[:, [0]]
+            fittedZeros = np.atleast_2d(
+                np.choose(firstUnmaskedFittedIndices, fittedCurves.T)
+            ).T
             curves = curves - fittedZeros
             fittedCurves = fittedCurves - fittedZeros
             self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")

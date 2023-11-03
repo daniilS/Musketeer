@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 import numpy as np
+from numpy import ma
 
 from . import moduleFrame
 
@@ -28,7 +29,7 @@ class GetFraction(Proportionality):
                 for concs in concsPerMolecule
             ]
         )
-        return np.nan_to_num(proportionalConcs, nan=0.0, copy=False)
+        return ma.masked_invalid(proportionalConcs)
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):

@@ -97,6 +97,10 @@ class FitSignals(moduleFrame.Strategy):
                         ** 2
                     )
             fittedCurves = ma.dot(contributorConcs, fittedSpectra)
+
+            # Make the smooth curves ignore masked values, rather than treating them as
+            # zeros.
+            fittedCurves.data[fittedCurves.mask] = np.nan
         else:
             # can process all signals at once
             fittedSpectra, residuals = self.leastSquares(
