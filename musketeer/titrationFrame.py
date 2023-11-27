@@ -977,7 +977,7 @@ class FittedFrame(PlotFrame):
             maxFittedDiff = np.max(abs(fittedDiff), axis=0)
             curves = curves / maxFittedDiff
 
-            diff = curves - firstUnmaskedElements
+            diff = curves - np.choose(firstUnmaskedIndices, curves)
             negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
             curves[:, negatives] *= -1
             curves = curves.T * 100
