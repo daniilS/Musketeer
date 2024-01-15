@@ -114,6 +114,8 @@ class FitSignals(moduleFrame.Strategy):
 class FitSignalsUnconstrained(FitSignals):
     def leastSquares(self, x, y):
         b, residuals, _, _ = lstsq(x, y, rcond=None)
+        if residuals.size == 0:
+            residuals = np.linalg.norm(x @ b - y, ord=2, axis=0) ** 2
         return b, residuals
 
 
