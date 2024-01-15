@@ -145,6 +145,8 @@ class CustomKsTable(Table):
             == len(self.columnTitles) - 1
         ):
             statisticalFactors = self.titration.equilibriumConstants.statisticalFactors
+            if all(factor.is_integer() for factor in statisticalFactors):
+                statisticalFactors = statisticalFactors.astype(int)
         else:
             statisticalFactors = np.full(len(self.columnTitles) - 1, "1")
         # Value column doesn't have a statistical factor
@@ -254,7 +256,7 @@ class CustomKsPopup(moduleFrame.Popup):
         self.customKsTable.createLabels()
 
     def saveData(self):
-        self.statisticalFactors = self.customKsTable.data[0, :-1].astype(int)
+        self.statisticalFactors = self.customKsTable.data[0, :-1].astype(float)
         self.kNames = self.customKsTable.rowTitles[1:]
         self.ksMatrix = self.customKsTable.data[1:, :-1].astype(int)
 
