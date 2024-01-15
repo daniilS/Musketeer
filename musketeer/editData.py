@@ -28,7 +28,7 @@ class EditDataPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
-        self.title("Enter data")
+        self.title("Enter/edit spectroscopic data")
 
         frame = ttk.Frame(self, padding=15)
         frame.pack(expand=True, fill="both")
@@ -56,14 +56,17 @@ class EditDataPopup(moduleFrame.Popup):
             paramsFrameLeft, value=1, text="Rows are signals, columns are additions"
         )
 
-        self.additionTitlesCheckbutton.pack(pady=2.5)
-        self.signalTitlesCheckbutton.pack(pady=2.5)
-        self.additionsRowsRadiobutton.pack(pady=2.5)
-        self.additionsColumnsRadiobutton.pack(pady=2.5)
+        self.additionTitlesCheckbutton.pack(pady=2.5, fill="x")
+        self.signalTitlesCheckbutton.pack(pady=2.5, fill="x")
+        self.additionsRowsRadiobutton.pack(pady=2.5, fill="x")
+        self.additionsColumnsRadiobutton.pack(pady=2.5, fill="x")
 
         paramsFrameRight = ttk.Frame(paramsFrame)
         paramsFrameRight.grid(row=0, column=1, sticky="nw", padx=5, pady=5)
         paramsFrame.grid_columnconfigure(1, weight=1)
+
+        optionMenuLabel = ttk.Label(paramsFrameRight, text="Autofill quantities/units:")
+        optionMenuLabel.grid(row=0, column=0, sticky="w")
 
         self.optionMenuVar = tk.StringVar(self)
         optionMenu = ttk.OptionMenu(
@@ -72,10 +75,10 @@ class EditDataPopup(moduleFrame.Popup):
             None,
             *predefinedParams.keys(),
             style="Outline.TMenubutton",
-            command=self.setParams
+            command=self.setParams,
         )
         optionMenu.configure(width=max([len(s) for s in predefinedParams]) + 1)
-        optionMenu.grid(row=0, columnspan=2, pady=2.5)
+        optionMenu.grid(row=0, column=1, pady=2.5)
 
         self.yQuantityLabel = ttk.Label(paramsFrameRight, text="Measured quantity:")
         self.yQuantityLabel.grid(row=1, column=0, sticky="w")
@@ -117,7 +120,9 @@ class EditDataPopup(moduleFrame.Popup):
         buttonFrame = ButtonFrame(self, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
-        loadButton = ttk.Button(buttonFrame, text="Load from CSV", command=self.loadCSV)
+        loadButton = ttk.Button(
+            buttonFrame, text="Import from file", command=self.loadCSV
+        )
         loadButton.pack(side="left", padx=padding)
 
         self.populateDefault()
@@ -213,7 +218,7 @@ class EditDataPopup(moduleFrame.Popup):
         fileType = tk.StringVar(self)
         filePath = fd.askopenfilename(
             master=self,
-            title="Load from CSV",
+            title="Import spectroscopic data from file",
             filetypes=[("All files", "*.*"), ("CSV files", "*.csv")],
             typevariable=fileType,
         )

@@ -24,7 +24,7 @@ When starting Musketeer, you will see the option to either **Create a new fit fi
 - `.csv` files obtained using Cary UV/Vis spectrometers
 - `.csv` files exported from Mnova as "NMR 1D Peak List"
 
-For other data sources, select **Create a new fit file**, and click **Edit data**. This will open a spreadsheet interface where you can type or paste titration data. If you would like to request support for a new file format, please describe it by [submitting a feature request](https://github.com/daniilS/Musketeer/issues/new)!
+For other data sources, select **Create a new fit file**, and click **Enter/edit spectroscopic data**. This will open a spreadsheet interface where you can type or paste titration data. If you would like to request support for a new file format, please describe it by [submitting a feature request](https://github.com/daniilS/Musketeer/issues/new)!
 ### Model specification 
 Once a file is loaded, the left side of the window will show a series of dropdown menus. Going from top to bottom, each of these can be adjusted to describe some part of the model:
 

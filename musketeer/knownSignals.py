@@ -1,7 +1,6 @@
 import csv
 import tkinter as tk
 import tkinter.filedialog as fd
-import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 
 import numpy as np
@@ -120,7 +119,7 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.titration = titration
-        self.title("Enter the contributing states")
+        self.title("Enter any known spectra")
 
         height = int(self.master.winfo_height() * 0.4)
         self.frame = ttk.Frame(self, height=height)
@@ -168,6 +167,8 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
             if contributorsCount > 0:
                 sheet = Sheet(
                     self,
+                    empty_vertical=0,
+                    empty_horizontal=0,
                     data=list(knownSpectra[:, signalsFilter].astype(str).filled("")),
                     headers=list(
                         self.titration.processedSignalTitlesStrings[signalsFilter]
@@ -175,6 +176,11 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
                     row_index=list(spectraTitles),
                     set_all_heights_and_widths=True,
                 )
+                sheet.MT.configure(
+                    height=sheet.MT.row_positions[-1] + 1 + sheet.MT.empty_vertical
+                )
+                sheet.RI.configure(height=0)
+
                 sheet.enable_bindings()
                 sheet.set_width_of_index_to_text()
 

@@ -70,14 +70,14 @@ class TitrationFrame(ttk.Frame):
         )
 
         self.options.groupFrames = {}
-        experimentFrame = self.options.groupFrames["Experiment"] = GroupFrame(
-            self.options, "Experiment"
+        experimentFrame = self.options.groupFrames["Experimental Data"] = GroupFrame(
+            self.options, "Experimental Data"
         )
         experimentFrame.grid(sticky="nesw", pady=padding)
 
         editDataButton = ttk.Button(
             experimentFrame,
-            text="Edit data",
+            text="Enter/edit spectroscopic data",
             command=self.editData,
             style="Outline.TButton",
         )

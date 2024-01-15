@@ -396,9 +396,9 @@ class SpeciationPopup(moduleFrame.Popup):
             self.frame,
             padding=padding * 2,
             text=(
-                "Each column corresponds to a molecule, and each row to a complex.\n"
+                "Each column corresponds to a component, and each row to a species.\n"
                 "Define each complex by adding a row with the stoichiometry of each"
-                " molecule in the complex. For polymers, use 'n'. Leaving a cell blank"
+                " component in the complex. For polymers, use 'n'. Leaving a cell blank"
                 " is identical to entering '0'."
             ),
         )

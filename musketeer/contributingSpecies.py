@@ -4,6 +4,7 @@ import tkinter.ttk as ttk
 import numpy as np
 
 from . import moduleFrame
+from . import style
 from .scrolledFrame import ScrolledFrame
 from .style import padding
 from .table import ButtonFrame, WrappedLabel
@@ -126,7 +127,7 @@ class ContributorsPerSignalPopup(moduleFrame.Popup):
             self.frame,
             padding=padding * 2,
             text=(
-                "For each signal, specify which molecule (free and in complexes) it is"
+                "For each signal, specify which component (free and in complexes) it is"
                 " caused by."
             ),
         )
@@ -141,24 +142,30 @@ class ContributorsPerSignalPopup(moduleFrame.Popup):
         self.mapVars = []
 
         radioFrame = ttk.Frame(self.innerFrame)
-        radioFrame.pack(expand=True, fill="both")
+        radioFrame.pack(expand=True, fill="both", padx=padding * 2)
+
+        columnsLabel = ttk.Label(radioFrame, text="Components:", font=style.boldFont)
+        columnsLabel.grid(row=0, column=2, columnspan=titration.speciation.freeCount)
+
+        rowsLabel = ttk.Label(radioFrame, text="Signals:", font=style.boldFont)
+        rowsLabel.grid(row=2, column=0, rowspan=titration.numSignals)
 
         for i, freeName in enumerate(titration.speciation.freeNames):
             label = ttk.Label(radioFrame, text=freeName)
-            label.grid(row=0, column=i + 1, sticky="w")
-            radioFrame.columnconfigure(i + 1, uniform="map", pad=padding)
+            label.grid(row=1, column=i + 2, sticky="w")
+            radioFrame.columnconfigure(i + 2, uniform="map", pad=padding)
 
         for i, (title, index) in enumerate(
             zip(titration.processedSignalTitlesStrings, self.getDefaultMap())
         ):
             label = ttk.Label(radioFrame, text=title)
-            label.grid(row=i + 1, column=0, padx=(3 * padding, int(1.5 * padding)))
+            label.grid(row=i + 2, column=1, padx=int(1.5 * padding))
 
             mapVar = tk.IntVar(self, value=index)
             self.mapVars.append(mapVar)
             for j in range(len(titration.speciation.freeNames)):
                 radioButton = ttk.Radiobutton(radioFrame, variable=mapVar, value=j)
-                radioButton.grid(row=i + 1, column=j + 1, sticky="w")
+                radioButton.grid(row=i + 2, column=j + 2, sticky="w")
 
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")

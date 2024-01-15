@@ -8,6 +8,7 @@ import numpy as np
 from numpy import ma
 
 from . import moduleFrame
+from . import style
 from .scrolledFrame import ScrolledFrame
 from .table import ButtonFrame, Table, WrappedLabel
 
@@ -252,7 +253,7 @@ class VolumesPopup(moduleFrame.Popup):
             variable=self.unknownTotalConcsLinkedVar,
             text="Link unknown concentrations in the same row?",
         )
-        unknownTotalConcsCheckbutton.pack()
+        unknownTotalConcsCheckbutton.pack(fill="both", padx=style.padding)
 
         self.stockTable = StockTable(innerFrame, titration)
         self.stockTable.pack(expand=True, fill="both")
@@ -368,7 +369,7 @@ class ConcsTable(Table):
 
         super().__init__(
             master,
-            2,
+            1,
             2,
             freeNames,
             maskBlanks=True,
@@ -379,10 +380,9 @@ class ConcsTable(Table):
         self.populateDefault()
 
     def populateDefault(self):
-        self.label(0 - self.headerGridRows, 0, "Concentrations:", 4)
-        self.label(1 - self.headerGridRows, 2, "Unit:")
+        self.label(0 - self.headerGridRows, 2, "Unit:")
         _, self.concsUnit = self.dropdown(
-            1 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
+            0 - self.headerGridRows, 3, ("nM", "μM", "mM", "M"), "mM"
         )
 
         self.readonlyEntry(self.headerCells - 1, 1, "Addition title:", align="left")
@@ -480,7 +480,7 @@ class ConcsPopup(moduleFrame.Popup):
             variable=self.unknownTotalConcsLinkedVar,
             text="Link unknown concentrations in the same column?",
         )
-        unknownTotalConcsCheckbutton.pack()
+        unknownTotalConcsCheckbutton.pack(fill="both", padx=style.padding)
 
         self.concsTable = ConcsTable(innerFrame, titration)
         self.concsTable.pack(expand=True, fill="both")
@@ -499,7 +499,6 @@ class ConcsPopup(moduleFrame.Popup):
     def saveData(self):
         self.concsUnit = self.concsTable.concsUnit.get()
         self.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
-        print(self.unknownTotalConcsLinked)
         self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
         self.freeNames = self.concsTable.columnTitles
 
@@ -558,7 +557,7 @@ class GetTotalConcs(totalConcentrations):
 
 
 class ModuleFrame(moduleFrame.ModuleFrame):
-    group = "Experiment"
+    group = "Experimental Data"
     dropdownLabelText = "Enter concentrations or volumes:"
     dropdownOptions = {
         "Volumes": GetTotalConcsFromVolumes,
