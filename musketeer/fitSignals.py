@@ -1,4 +1,3 @@
-import itertools
 import tkinter.ttk as ttk
 from abc import abstractmethod
 
@@ -121,7 +120,7 @@ class FitSignalsUnconstrained(FitSignals):
 
 class SignalConstraintsTable(Table):
     def __init__(self, master, titration):
-        if hasattr(titration, "signalConstraints"):
+        if hasattr(titration.fitSignals, "signalConstraints"):
             signalConstraints = np.where(
                 np.isinf(titration.fitSignals.signalConstraints),
                 "",
