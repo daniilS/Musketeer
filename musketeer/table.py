@@ -305,7 +305,9 @@ class Table(ttk.Frame):
         self.initEmptyCells()
 
     def convertData(self, number):
-        if self.maskBlanks and number == "":
+        if self.maskBlanks and (
+            number == "" or (self.allowGuesses and number.startswith("~"))
+        ):
             return np.nan
         return float(number)
 
@@ -332,7 +334,7 @@ class Table(ttk.Frame):
         info = entry.grid_info()
         row, column = info["row"] - self.headerGridRows, info["column"]
         rows, columns = self.cells.shape
-        while not ((row == 0 and column == 0)):
+        while not (row == 0 and column == 0):
             column -= 1
             if column < 0:
                 column = columns - 1
@@ -374,7 +376,7 @@ class Table(ttk.Frame):
             # Handle as a regular paste. Copying a single cell or row from Excel should
             # still end the string with a newline.
             return
-        
+
         info = entry.grid_info()
         row, column = info["row"] - self.headerGridRows, info["column"]
         rows, columns = self.cells[row:, column:].shape
@@ -406,6 +408,28 @@ class Table(ttk.Frame):
             data[row, column] = self.convertData(cell.get())
         if self.maskBlanks:
             data = ma.masked_invalid(data)
+        if dtype is object:
+            data = data.astype(str)
+        return data
+
+    @property
+    def initialGuesses(self):
+        if not self.allowGuesses:
+            raise RuntimeError(
+                "initialGuesses() called on a Table instance that does not allow initial guesses"
+            )
+
+        dtype = type(self.convertData("0"))
+        if dtype is str:
+            dtype = object
+        data = ma.empty(self.dataCells.shape, dtype=dtype)
+        for (row, column), cell in np.ndenumerate(self.dataCells):
+            value = cell.get()
+            if value.startswith("~"):
+                data[row, column] = self.convertData(value[1:])
+            else:
+                data[row, column] = ma.masked
+
         if dtype is object:
             data = data.astype(str)
         return data

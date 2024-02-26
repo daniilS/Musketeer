@@ -109,6 +109,7 @@ class CustomKsTable(Table):
             0,
             0,
             columnTitles,
+            maskBlanks=True,
             allowGuesses=True,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("readonlyTitles",),
@@ -193,9 +194,6 @@ class CustomKsTable(Table):
             pass
         return True
 
-    def convertData(self, string):
-        return string
-
 
 class CustomKsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
@@ -214,7 +212,7 @@ class CustomKsPopup(moduleFrame.Popup):
                 " represents a complex. The global K for each complex is the product of"
                 " a statistical factor, and all the variables raised to the exponents"
                 " specified in that column.\n\nIn the final column, specify a value to"
-                " fix the variable, leave empty to optimise the variable, or write"
+                ' fix the variable, enter "?" to optimise the variable, or write'
                 " ~number to provide an initial guess for the optimisation.\n\nThe K"
                 " for each complex is the global equilibrium constant. For polymers, K₂"
                 " is the constant for the formation of the dimer, and Kₙ the constant"
@@ -260,19 +258,8 @@ class CustomKsPopup(moduleFrame.Popup):
         self.kNames = self.customKsTable.rowTitles[1:]
         self.ksMatrix = self.customKsTable.data[1:, :-1].astype(int)
 
-        kCells = self.customKsTable.data[1:, -1]
-        self.knownKs = ma.array(
-            [
-                ma.masked if kCell == "" or kCell.startswith("~") else float(kCell)
-                for kCell in kCells
-            ]
-        )
-        self.initialKs = ma.array(
-            [
-                float(kCell[1:]) if kCell.startswith("~") else ma.masked
-                for kCell in kCells
-            ]
-        )
+        self.knownKs = self.customKsTable.data[1:, -1]
+        self.initialKs = self.customKsTable.initialGuesses[1:, -1]
 
         self.saved = True
         self.destroy()
@@ -310,6 +297,7 @@ class KnownKsTable(Table):
             ["Value"],
             rowOptions=("readonlyTitles",),
             columnOptions=("readonlyTitles",),
+            maskBlanks=True,
             allowGuesses=True,
         )
         self.outputNames = self.titration.speciation.variableNames
@@ -336,9 +324,6 @@ class KnownKsTable(Table):
                 value = ""
             self.addRow(name, [value])
 
-    def convertData(self, string):
-        return string
-
 
 class KnownKsPopup(moduleFrame.Popup):
     def __init__(self, titration, *args, **kwargs):
@@ -356,7 +341,7 @@ class KnownKsPopup(moduleFrame.Popup):
         knownKsLabel = WrappedLabel(
             innerFrame,
             text=(
-                "Enter known K values, leave empty to optimise the value, or write"
+                'Enter known K values, enter "?" to optimise the value, or write'
                 " ~number to provide an initial guess for the optimisation.\n\nThe K"
                 " for each complex is the global equilibrium constant. For polymers, K₂"
                 " is the constant for the formation of the dimer, and Kₙ the constant"
@@ -378,20 +363,8 @@ class KnownKsPopup(moduleFrame.Popup):
         self.knownKsTable.populateDefault()
 
     def saveData(self):
-        kCells = self.knownKsTable.data[:, 0]
-
-        self.knownKs = ma.array(
-            [
-                ma.masked if kCell == "" or kCell.startswith("~") else float(kCell)
-                for kCell in kCells
-            ]
-        )
-        self.initialKs = ma.array(
-            [
-                float(kCell[1:]) if kCell.startswith("~") else ma.masked
-                for kCell in kCells
-            ]
-        )
+        self.knownKs = self.knownKsTable.data.flatten()
+        self.initialKs = self.knownKsTable.initialGuesses.flatten()
 
         self.saved = True
         self.destroy()
