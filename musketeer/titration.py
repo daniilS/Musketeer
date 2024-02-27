@@ -235,7 +235,7 @@ class Titration:
             proportionalSignalVars, knownSpectra
         )
 
-        combinedResiduals = self.combineResiduals.run(residuals)
+        combinedResiduals = np.sqrt(np.sum(residuals))
         self.lastResiduals = combinedResiduals
 
         return combinedResiduals

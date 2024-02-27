@@ -21,7 +21,6 @@ from ttkbootstrap.widgets import InteractiveNotebook
 
 from . import (
     __version__,
-    combineResiduals,
     contributingSpecies,
     contributors,
     editData,
@@ -52,7 +51,6 @@ titrationModules = [
     contributors,
     knownSignals,
     fitSignals,
-    combineResiduals,
 ]
 
 
