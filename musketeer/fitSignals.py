@@ -238,6 +238,6 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "No": FitSignalsUnconstrained,
         "Nonnegative": FitSignalsNonnegative,
         "Custom constraints": FitSignalsCustom,
-        "USE ODR": FitSignalsODR,
+        # "USE ODR": FitSignalsODR,
     }
     attributeName = "fitSignals"
