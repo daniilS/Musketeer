@@ -27,7 +27,7 @@ prefixes = dict([key, float(value)] for key, value in prefixesDecimal.items())
 
 def convertConc(conc, fromUnit, toUnit):
     if conc is ma.masked:
-        return ""
+        return "?"
     conc = Decimal(conc)
     convertedConc = float(
         conc * prefixesDecimal[fromUnit.strip("M")] / prefixesDecimal[toUnit.strip("M")]

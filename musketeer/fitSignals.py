@@ -141,6 +141,8 @@ class SignalConstraintsTable(Table):
             rowOptions=(),
             columnOptions="readonlyTitles",
             boldTitles=True,
+            # empty rather than "?", as it is not a variable to be optimised
+            blankValue="",
         )
         self.addRow(data=signalConstraints)
 

@@ -25,6 +25,7 @@ class Table(ttk.Frame):
         columnTitles=[],
         *,
         maskBlanks=False,
+        blankValue="?",
         rowOptions=[],
         columnOptions=[],
         boldTitles=False,
@@ -35,6 +36,7 @@ class Table(ttk.Frame):
         self.rowOptions = rowOptions
         self.columnOptions = columnOptions
         self.maskBlanks = maskBlanks
+        self.blankValue = blankValue
         self.allowGuesses = allowGuesses
         super().__init__(master, padding=padding, **kwargs)
         if callback is not None:
@@ -306,9 +308,16 @@ class Table(ttk.Frame):
 
     def convertData(self, number):
         if self.maskBlanks and (
-            number == "" or (self.allowGuesses and number.startswith("~"))
+            number == self.blankValue or (self.allowGuesses and number.startswith("~"))
         ):
             return np.nan
+        elif number == "":
+            if self.maskBlanks:
+                raise ValueError(
+                    "Please enter a value in each cell. To optimise a variable, enter"
+                    ' "?".'
+                )
+            raise ValueError("Please enter a value in each cell.")
         return float(number)
 
     def setFocus(self, widget):

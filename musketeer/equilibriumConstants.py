@@ -131,7 +131,7 @@ class CustomKsTable(Table):
             elif initialK is not ma.masked:
                 value = f"~{initialK:g}"
             else:
-                value = ""
+                value = self.blankValue
             self.addRow(name, np.append(contributions, value))
 
     def newRow(self):
@@ -160,6 +160,8 @@ class CustomKsTable(Table):
         # Value column doesn't have a statistical factor
         self.cells[-1, -1].configure(style="TLabel", takefocus=False)
         self.cells[-1, -1].state(["readonly"])
+        # Cell needs to appear empty, but return the placeholder value
+        self.cells[-1, -1].get = lambda: self.blankValue
 
     def createLabels(self, *args, **kwargs):
         try:
@@ -308,7 +310,7 @@ class KnownKsTable(Table):
         # still work if the required number of outputs changes
         if len(self.outputNames) != len(self.titration.equilibriumConstants.knownKs):
             for name in self.outputNames:
-                self.addRow(name, [""])
+                self.addRow(name, ["?"])
             return
 
         for name, knownK, initialK in zip(
@@ -321,7 +323,7 @@ class KnownKsTable(Table):
             elif initialK is not ma.masked:
                 value = f"~{initialK:g}"
             else:
-                value = ""
+                value = "?"
             self.addRow(name, [value])
 
 
