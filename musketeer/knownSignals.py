@@ -2,6 +2,7 @@ import csv
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.ttk as ttk
+import warnings
 
 import numpy as np
 from numpy import ma
@@ -25,15 +26,17 @@ class KnownSpectraPopup(moduleFrame.Popup):
         self.titration = titration
         self.title("Enter known spectra")
 
-        self.sheet = Sheet(
-            self,
-            empty_vertical=0,
-            empty_horizontal=0,
-            data=list(titration.knownSignals.knownSpectra.astype(str).filled("")),
-            headers=list(titration.processedSignalTitlesStrings),
-            row_index=list(titration.contributors.outputNames),
-            set_all_heights_and_widths=True,
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.sheet = Sheet(
+                self,
+                empty_vertical=0,
+                empty_horizontal=0,
+                data=list(titration.knownSignals.knownSpectra.astype(str).filled("")),
+                headers=list(titration.processedSignalTitlesStrings),
+                row_index=list(titration.contributors.outputNames),
+                set_all_heights_and_widths=True,
+            )
         self.sheet.MT.configure(
             height=self.sheet.MT.row_positions[-1] + 1 + self.sheet.MT.empty_vertical
         )
@@ -165,17 +168,21 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
             signalsFilterPerMolecule,
         ):
             if contributorsCount > 0:
-                sheet = Sheet(
-                    self,
-                    empty_vertical=0,
-                    empty_horizontal=0,
-                    data=list(knownSpectra[:, signalsFilter].astype(str).filled("")),
-                    headers=list(
-                        self.titration.processedSignalTitlesStrings[signalsFilter]
-                    ),
-                    row_index=list(spectraTitles),
-                    set_all_heights_and_widths=True,
-                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sheet = Sheet(
+                        self,
+                        empty_vertical=0,
+                        empty_horizontal=0,
+                        data=list(
+                            knownSpectra[:, signalsFilter].astype(str).filled("")
+                        ),
+                        headers=list(
+                            self.titration.processedSignalTitlesStrings[signalsFilter]
+                        ),
+                        row_index=list(spectraTitles),
+                        set_all_heights_and_widths=True,
+                    )
                 sheet.MT.configure(
                     height=sheet.MT.row_positions[-1] + 1 + sheet.MT.empty_vertical
                 )

@@ -2,6 +2,7 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
+import warnings
 from collections import namedtuple
 
 import numpy as np
@@ -109,11 +110,13 @@ class EditDataPopup(moduleFrame.Popup):
         )
         self.xUnitWidget.grid(row=4, column=1, sticky="w")
 
-        self.sheet = Sheet(
-            frame,
-            data=[[]],
-            expand_sheet_if_paste_too_big=True,
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.sheet = Sheet(
+                frame,
+                data=[[]],
+                expand_sheet_if_paste_too_big=True,
+            )
 
         self.sheet.pack(side="top", expand=True, fill="both")
         self.sheet.enable_bindings()

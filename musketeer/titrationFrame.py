@@ -3,6 +3,7 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
+import warnings
 from copy import deepcopy
 from pathlib import PurePath
 
@@ -1348,15 +1349,17 @@ class ResultsFrame(ttk.Frame):
                 )
             concsTable.pack(side="top", pady=15)
 
-        sheet = tksheet.Sheet(
-            self,
-            empty_vertical=0,
-            empty_horizontal=0,
-            data=list(np.around(titration.lastFittedSpectra, 2)),
-            headers=list(titration.processedSignalTitlesStrings),
-            row_index=list(titration.contributors.outputNames),
-            set_all_heights_and_widths=True,
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sheet = tksheet.Sheet(
+                self,
+                empty_vertical=0,
+                empty_horizontal=0,
+                data=list(np.around(titration.lastFittedSpectra, 2)),
+                headers=list(titration.processedSignalTitlesStrings),
+                row_index=list(titration.contributors.outputNames),
+                set_all_heights_and_widths=True,
+            )
         sheet.MT.configure(height=0)
         sheet.RI.configure(height=0)
 

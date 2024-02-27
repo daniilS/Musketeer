@@ -12,7 +12,6 @@ from matplotlib.backends._backend_tk import (
     ToolTip,
     cursord,
 )
-from tksheet import _tksheet, _tksheet_column_headers, _tksheet_main_table
 
 matplotlib.use("TkAgg")
 
@@ -266,8 +265,3 @@ def applyPatch():
     cursord[cursors.SELECT_REGION] = "crosshair"
 
     FigureCanvasTk.scroll_event_windows = scroll_event_windows
-
-    # remove calls to update() from tksheet
-    _tksheet.Sheet.update = nop
-    _tksheet_main_table.MainTable.update = nop
-    _tksheet_column_headers.ColumnHeaders.update = nop

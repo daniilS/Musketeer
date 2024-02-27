@@ -54,7 +54,7 @@ setuptools.setup(
         "scipy",
         "ttkbootstrap >=0.5.2, <1.0",
         "ttkwidgets",
-        "tksheet",
+        "tksheet >= 7.0.5",
     ],
     python_requires=">=3.8",
 )
