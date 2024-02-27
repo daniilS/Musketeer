@@ -8,6 +8,7 @@ from tkinter import font
 
 import ttkbootstrap
 
+from . import __version__
 from . import windowsHighDpiPatch
 from .style import padding
 
@@ -48,7 +49,7 @@ try:
 except tk.TclError:
     # X11
     root.attributes("-zoomed", True)
-root.title("Musketeer")
+root.title(f"Musketeer {__version__}")
 
 
 # notes on preferred icon size on Windows:
