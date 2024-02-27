@@ -1266,6 +1266,14 @@ class ResultsFrame(ttk.Frame):
         return f"{float(f'{k:.{self.sigfigs}g}'):.{max(self.sigfigs, 6)}g}"
 
     @property
+    def RMSE(self):
+        return np.sqrt(
+            np.mean(
+                (self.titration.lastFittedCurves - self.titration.processedData) ** 2
+            )
+        )
+
+    @property
     def bic(self):
         # Bayesian Information Criterion
         numParameters = (
@@ -1289,7 +1297,13 @@ class ResultsFrame(ttk.Frame):
             self,
             text=f"Bayesian information criterion (lower is better): {self.bic:.3g}",
         )
-        bicLabel.pack(side="top", pady=15)
+        # bicLabel.pack(side="top", pady=15)
+
+        rmselabel = ttk.Label(
+            self,
+            text=f"RMSE: {self.RMSE:.8g}",
+        )
+        rmselabel.pack(side="top", pady=15)
 
         kTable = Table(
             self,
