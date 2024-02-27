@@ -104,7 +104,7 @@ from pathlib import PurePath
 import numpy as np
 from ttkbootstrap.widgets import InteractiveNotebook
 
-from . import patchMatplotlib, titrationReader
+from . import patchMatplotlib
 from .style import defaultFigureParams, figureParams
 from .table import ButtonFrame
 from .titration import Titration
@@ -306,31 +306,27 @@ class TitrationsNotebook(InteractiveNotebook):
         self.nametowidget(self.select()).saveFile(saveAs=True)
 
     def openFile(self, *args):
-        fileType = tk.StringVar(self)
-        fileReaders = titrationReader.fileReaders
         filePath = fd.askopenfilename(
             title="Open file",
-            filetypes=fileReaders[:, :-1].tolist(),
-            typevariable=fileType,
+            filetypes=[("Musketeer files", "*.fit"), ("All files", "*.*")],
         )
         if filePath == "":
             return
-        fileReader = fileReaders[fileReaders[:, 0] == fileType.get(), -1].item()
+
         try:
-            titrations = fileReader(filePath)
+            titration = np.load(filePath, allow_pickle=False)
         except Exception as e:
             mb.showerror(title="Failed to read file", message=e, parent=self)
             return
 
         self.tk.eval("tk busy .")
         self.update()
-        # create a tab for each titration, and let the titration object handle
-        # its own I/O
-        for titration in titrations:
-            titrationFrame = TitrationFrame(self, filePath, padding=padding)
-            self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
-            self.select(str(titrationFrame))
-            titrationFrame.loadTitration(titration)
+
+        titrationFrame = TitrationFrame(self, filePath, padding=padding)
+        self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
+        self.select(str(titrationFrame))
+        titrationFrame.loadTitration(titration)
+
         self.tk.eval("tk busy forget .")
 
     def editDpi(self, *args):

@@ -1,6 +1,6 @@
-import csv
 import tkinter as tk
 import tkinter.filedialog as fd
+import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 from collections import namedtuple
 
@@ -9,6 +9,7 @@ from numpy import ma
 from tksheet import Sheet
 
 from . import moduleFrame
+from . import titrationReader
 from .style import padding
 from .table import ButtonFrame
 
@@ -216,16 +217,44 @@ class EditDataPopup(moduleFrame.Popup):
 
     def loadCSV(self):
         fileType = tk.StringVar(self)
+        fileReaders = titrationReader.fileReaders
         filePath = fd.askopenfilename(
-            master=self,
             title="Import spectroscopic data from file",
-            filetypes=[("All files", "*.*"), ("CSV files", "*.csv")],
+            filetypes=fileReaders[:, :-1].tolist(),
             typevariable=fileType,
         )
         if filePath == "":
             return
-        with open(filePath, encoding="utf-8-sig") as file:
-            d = csv.Sniffer().sniff(file.readline() + file.readline())
-            file.seek(0)
-            data = list(csv.reader(file, dialect=d))
-        self.sheet.set_sheet_data(data)
+        fileReader = fileReaders[fileReaders[:, 0] == fileType.get(), -1].item()
+        try:
+            data, additionTitles, signalTitles, defaultParams = fileReader(
+                filePath, self
+            )
+        except Exception as e:
+            mb.showerror(title="Failed to read file", message=e, parent=self)
+            return
+
+        if (additionTitles is not None) and (signalTitles is not None):
+            data = np.c_[additionTitles, data]
+            data = np.r_[[np.insert(signalTitles, 0, "")], data]
+            self.hasAdditionTitles.set(True)
+            self.hasSignalTitles.set(True)
+        elif additionTitles is not None:
+            data = np.c_[additionTitles, data]
+            self.hasAdditionTitles.set(True)
+            self.hasSignalTitles.set(False)
+        elif signalTitles is not None:
+            data = np.r_[[signalTitles], data]
+            self.hasAdditionTitles.set(False)
+            self.hasSignalTitles.set(True)
+        else:
+            self.hasAdditionTitles.set(False)
+            self.hasSignalTitles.set(False)
+
+        if defaultParams is not None:
+            self.optionMenuVar.set(defaultParams)
+            self.setParams(defaultParams)
+
+        self.additionsRowsRadiobutton.invoke()
+
+        self.sheet.set_sheet_data(data.tolist())

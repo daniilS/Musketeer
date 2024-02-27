@@ -1,5 +1,4 @@
 import csv
-import os
 import tkinter as tk
 import tkinter.ttk as ttk
 
@@ -10,9 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from numpy import ma
 
-from .editData import predefinedParams
 from .style import padding
-from .titration import Titration
 
 
 def fillPredefinedParams(titration, params):
@@ -27,11 +24,7 @@ def find_nearest(array, value):
 
 
 # TODO: convert to classes, register using ABC
-def readUV(filePath):
-    titration = Titration()
-    # set default parameters for UV-Vis titrations
-    fillPredefinedParams(titration, predefinedParams["UV-Vis"])
-
+def readUV(filePath, master):
     with open(filePath, "r", newline="", encoding="utf-8-sig") as inFile:
         reader = csv.reader(inFile)
 
@@ -50,13 +43,22 @@ def readUV(filePath):
             wavelengths.append(row[0])
             absorbances.append(row[1::2])
 
-    titration.additionTitles = np.array(titleRow)
-    titration.signalTitles = np.array(wavelengths)
+    additionTitles = np.array(titleRow)
+    signalTitles = np.array(wavelengths)
 
     # transpose data so that the column is the wavelength
-    titration.rawData = np.array(absorbances, dtype=float).T
+    data = np.array(absorbances, dtype=float).T
 
-    return [titration]
+    return data, additionTitles, signalTitles, "UV-Vis"
+
+
+def readGeneric(filePath, master):
+    with open(filePath, encoding="utf-8-sig") as file:
+        d = csv.Sniffer().sniff(file.readline() + file.readline())
+        file.seek(0)
+        data = np.array(list(csv.reader(file, dialect=d)))
+
+    return data, None, None, None
 
 
 class NavigationToolbarHorizontal(NavigationToolbar2Tk):
@@ -107,7 +109,7 @@ class NavigationToolbarHorizontal(NavigationToolbar2Tk):
         return super().draw_rubberband(event, x0, y0, x1, y1)
 
 
-def readNMR(filePath):
+def readNMR(filePath, master):
     # reads an MNova 1D peaks list
     additionTitles = []
     frequencies = []
@@ -167,12 +169,15 @@ def readNMR(filePath):
         plottedPoints = np.copy(currentSignal)
         cycler = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
 
-        titration = Titration()
-        titration.additionTitles = np.array(additionTitles)
-        fillPredefinedParams(titration, predefinedParams["NMR"])
+        data = None
+        additionTitles = np.array(additionTitles)
+        signalTitles = None
 
         popup = tk.Toplevel()
         popup.title("Pick signals")
+        popup.transient(master)
+        popup.geometry(f"+{master.winfo_x()+100}+{master.winfo_y()+100}")
+        popup.grab_set()
 
         frame = ttk.Frame(popup)
         frame.pack()
@@ -235,8 +240,9 @@ def readNMR(filePath):
             cycler.pop(0)
 
         def save():
-            titration.rawData = ma.masked_invalid(np.array(signals, dtype=float).T)
-            titration.signalTitles = np.array(titles)
+            nonlocal data, signalTitles
+            data = ma.masked_invalid(np.array(signals, dtype=float).T)
+            signalTitles = np.array(titles)
             popup.destroy()
 
         btn1 = ttk.Button(frame, text="Save signal", command=next)
@@ -261,17 +267,12 @@ def readNMR(filePath):
 
         popup.wait_window(popup)
 
-        return [titration]
-
-
-def readMusketeer(filePath):
-    serialised = np.load(filePath, allow_pickle=False)
-    return [serialised]
+        return data, additionTitles, signalTitles, "NMR"
 
 
 fileReaders = np.array(
     [
-        ["Musketeer file", "*.fit", readMusketeer],
+        ["Generic csv file", "*.csv", readGeneric],
         ["Cary UV-Vis csv file", "*.csv", readUV],
         ["Mnova NMR peak list", "*.csv", readNMR],
     ]
