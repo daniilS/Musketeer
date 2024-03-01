@@ -949,14 +949,19 @@ class FittedFrame(PlotFrame):
             firstUnmaskedIndices = [np.where(~row)[0][0] for row in self.curves.mask]
         else:
             firstUnmaskedIndices = [0] * self.curves.shape[0]
-        firstUnmaskedElements = np.choose(firstUnmaskedIndices, self.curves.T)
+        firstUnmaskedElements = np.array(
+            [curve[i] for curve, i in zip(self.curves, firstUnmaskedIndices)]
+        )
 
         # fitted Curves should always be masked
         firstUnmaskedFittedIndices = [
             np.where(~row)[0][0] for row in self.fittedCurves.mask
         ]
-        firstUnmaskedFittedElements = np.choose(
-            firstUnmaskedFittedIndices, self.fittedCurves.T
+        firstUnmaskedFittedElements = np.array(
+            [
+                fittedCurve[i]
+                for fittedCurve, i in zip(self.fittedCurves, firstUnmaskedFittedIndices)
+            ]
         )
 
         if self.plotType == "absolute":
@@ -976,7 +981,9 @@ class FittedFrame(PlotFrame):
             maxFittedDiff = np.max(abs(fittedDiff), axis=0)
             curves = curves / maxFittedDiff
 
-            diff = curves - np.choose(firstUnmaskedIndices, curves)
+            diff = curves - np.array(
+                [curve[i] for curve, i in zip(curves.T, firstUnmaskedIndices)]
+            )
             negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
             curves[:, negatives] *= -1
             curves = curves.T * 100
@@ -986,7 +993,10 @@ class FittedFrame(PlotFrame):
             fittedCurves = fittedCurves.T * 100
 
             fittedZeros = np.atleast_2d(
-                np.choose(firstUnmaskedFittedIndices, fittedCurves.T)
+                [
+                    fittedCurve[i]
+                    for fittedCurve, i in zip(fittedCurves, firstUnmaskedIndices)
+                ]
             ).T
             curves = curves - fittedZeros
             fittedCurves = fittedCurves - fittedZeros
