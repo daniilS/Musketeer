@@ -160,6 +160,7 @@ class Titration:
         numSignals = self.processedData.shape[1]
         if numSignals <= maxPeaks + maxShoulderPeaks:
             return np.arange(numSignals)
+
         # get the total movement for each signal
         movement = abs(np.diff(self.processedData, axis=0)).sum(axis=0)
         # get the range for each signal
@@ -167,8 +168,12 @@ class Titration:
             np.max(self.processedData, axis=0) - np.min(self.processedData, axis=0)
         )
         # find the signals with the largest total movement
-        peakIndices, peakProperties = find_peaks(movement, prominence=0)
+        peakIndices, peakProperties = find_peaks(
+            np.pad(movement, [1, 1], mode="minimum"), prominence=0
+        )
+        peakIndices -= 1
         prominences = peakProperties["prominences"]
+
         # select the four most prominent peaks
         largestFilter = prominences.argsort()[-maxPeaks:]
         largestPeakIndices = peakIndices[largestFilter]
@@ -176,26 +181,40 @@ class Titration:
         # Shoulder peaks can appear as inflection points rather than maxima.
         # We'll add the two most prominent inflection points from a first-order
         # approximation of the first derivative of the total movement:
-        inflectionIndices, inflectionProperties = find_peaks(
-            -abs(np.diff(movement)), prominence=0
+        leftShoulders, leftShoulderProperties = find_peaks(
+            -np.gradient(movement), height=[None, 0], prominence=0
         )
-        inflectionProminences = inflectionProperties["prominences"]
-        # remove peaks that got detected twice
-        duplicatesFilter = [
+        rightShoulders, rightShoulderProperties = find_peaks(
+            np.gradient(movement), height=[None, 0], prominence=0
+        )
+
+        # Filter out duplicates, which happens when the peak height is exactly 0
+        filter = np.isin(rightShoulders, leftShoulders, invert=True)
+        shoulderIndices = np.concatenate([leftShoulders, rightShoulders[filter]])
+        shoulderProminences = np.concatenate(
+            [
+                leftShoulderProperties["prominences"],
+                rightShoulderProperties["prominences"][filter],
+            ]
+        )
+
+        # filter out shoulder peaks that are too close to the main peaks
+        filter = [
             index not in peakIndices
             and index + 1 not in peakIndices
             and index - 1 not in peakIndices
-            for index in inflectionIndices
+            for index in shoulderIndices
         ]
-        inflectionIndices = inflectionIndices[duplicatesFilter]
-        inflectionProminences = inflectionProminences[duplicatesFilter]
+        shoulderIndices = shoulderIndices[filter]
+        shoulderProminences = shoulderProminences[filter]
+
         # select the two most prominent inflection points
-        inflectionFilter = inflectionProminences.argsort()[-maxShoulderPeaks:]
-        largestInflectionsIndices = inflectionIndices[inflectionFilter]
+        filter = shoulderProminences.argsort()[-maxShoulderPeaks:]
+        largestShoulderIndices = shoulderIndices[filter]
 
         # combine the two arrays, without duplicates, and sort them
         largestPeakIndices = np.sort(
-            np.unique(np.concatenate((largestPeakIndices, largestInflectionsIndices)))
+            np.unique(np.concatenate((largestPeakIndices, largestShoulderIndices)))
         )
         if len(largestPeakIndices) == 0:
             return np.array([np.argmax(movement)])
