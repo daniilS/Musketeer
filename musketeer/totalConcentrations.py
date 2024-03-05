@@ -12,7 +12,7 @@ from . import style
 from .scrolledFrame import ScrolledFrame
 from .table import ButtonFrame, Table, WrappedLabel
 
-DEFAULT_INITIAL_CONC = 1e-7
+DEFAULT_INITIAL_CONC = 1.0
 
 prefixesDecimal = {
     "": Decimal(1),
@@ -46,7 +46,10 @@ class totalConcentrations(moduleFrame.Strategy):
     # TODO: support entering initial guesses
     @property
     def variableInitialGuesses(self):
-        return np.full(len(self.variableNames), DEFAULT_INITIAL_CONC)
+        return np.full(
+            len(self.variableNames),
+            prefixes[self.concsUnit.strip("M")] * DEFAULT_INITIAL_CONC,
+        )
 
     @property
     def freeCount(self):
