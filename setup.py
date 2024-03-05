@@ -48,7 +48,7 @@ setuptools.setup(
     packages=["musketeer"],
     include_package_data=True,
     install_requires=[
-        "matplotlib >= 3.7.1",
+        "matplotlib >= 3.8.0",
         "numpy",
         "packaging",
         "scipy",
@@ -56,5 +56,5 @@ setuptools.setup(
         "ttkwidgets",
         "tksheet >= 7.0.5",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.9",
 )

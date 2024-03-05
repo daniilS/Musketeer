@@ -10,7 +10,6 @@ from matplotlib.backends._backend_tk import (
     FigureCanvasTk,
     NavigationToolbar2Tk,
     ToolTip,
-    cursord,
 )
 
 matplotlib.use("TkAgg")
@@ -231,7 +230,7 @@ original_scroll_event_windows = FigureCanvasTk.scroll_event_windows
 
 def scroll_event_windows(self, event):
     # gives an error when scrolling over "tk busy" otherwise
-    if type(event.widget) is not str:
+    if not isinstance(event.widget, str):
         original_scroll_event_windows(self, event)
 
 
@@ -250,18 +249,12 @@ def applyPatch():
     NavigationToolbar2Tk._Spacer = _Spacer
     NavigationToolbar2Tk._update_buttons_checked = _update_buttons_checked
 
-    # implements PR #25412, and #25442 below mpl version 3.7.2
+    # implements PR #25412
     offsetbox.DraggableBase.__init__ = __init__
-    offsetbox.DraggableBase.cids = property(
-        lambda self: [disconnect.args[0] for disconnect in self._disconnectors[:2]]
-    )
     offsetbox.DraggableBase.on_motion = on_motion
     offsetbox.DraggableBase.on_pick = on_pick
     offsetbox.DraggableBase.on_release = on_release
     offsetbox.DraggableBase.disconnect = disconnect
     _AxesBase.clear = clear
-
-    # implements PR #25413
-    cursord[cursors.SELECT_REGION] = "crosshair"
 
     FigureCanvasTk.scroll_event_windows = scroll_event_windows
