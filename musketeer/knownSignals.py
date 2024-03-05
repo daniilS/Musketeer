@@ -37,9 +37,7 @@ class KnownSpectraPopup(moduleFrame.Popup):
                 row_index=list(titration.contributors.outputNames),
                 set_all_heights_and_widths=True,
             )
-        self.sheet.MT.configure(
-            height=self.sheet.MT.row_positions[-1] + 1 + self.sheet.MT.empty_vertical
-        )
+        self.sheet.MT.configure(height=self.sheet.MT.row_positions[-1] + 1)
         self.sheet.RI.configure(height=0)
 
         self.sheet.enable_bindings()
@@ -183,9 +181,7 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
                         row_index=list(spectraTitles),
                         set_all_heights_and_widths=True,
                     )
-                sheet.MT.configure(
-                    height=sheet.MT.row_positions[-1] + 1 + sheet.MT.empty_vertical
-                )
+                sheet.MT.configure(height=sheet.MT.row_positions[-1] + 1)
                 sheet.RI.configure(height=0)
 
                 sheet.enable_bindings()
