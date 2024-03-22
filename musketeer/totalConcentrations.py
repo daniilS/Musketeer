@@ -12,8 +12,6 @@ from . import style
 from .scrolledFrame import ScrolledFrame
 from .table import ButtonFrame, Table, WrappedLabel
 
-DEFAULT_INITIAL_CONC = 1.0
-
 prefixesDecimal = {
     "": Decimal(1),
     "m": Decimal(1e-3),
@@ -47,9 +45,13 @@ class totalConcentrations(moduleFrame.Strategy):
     @property
     def variableInitialGuesses(self):
         return np.full(
-            len(self.variableNames),
-            prefixes[self.concsUnit.strip("M")] * DEFAULT_INITIAL_CONC,
+            self.variableCount,
+            self.defaultInitialGuess,
         )
+
+    @property
+    def defaultInitialGuess(self):
+        return prefixes[self.concsUnit.strip("M")] * 1.0
 
     @property
     def freeCount(self):
@@ -78,6 +80,7 @@ class StockTable(Table):
             0,
             stockTitles,
             maskBlanks=True,
+            allowGuesses=True,
             rowOptions=("titles", "new", "delete"),
             columnOptions=("titles", "new", "delete"),
         )
@@ -100,9 +103,20 @@ class StockTable(Table):
             self.populateDefault(freeNames)
 
     def populate(self, freeNames, stockConcs):
-        for name, row in zip(freeNames, stockConcs):
+        try:
+            stockConcsGuesses = self.titration.totalConcentrations.stockConcsGuesses
+            assert stockConcsGuesses.shape == stockConcs.shape
+        except (AttributeError, AssertionError):
+            stockConcsGuesses = ma.masked_all_like(stockConcs)
+        for name, row, rowGuesses in zip(freeNames, stockConcs, stockConcsGuesses):
             self.addRow(
-                name, [convertConc(conc, "M", self.concsUnit.get()) for conc in row]
+                name,
+                [
+                    convertConc(conc, "M", self.concsUnit.get())
+                    if guess is ma.masked
+                    else "~" + convertConc(guess, "M", self.concsUnit.get())
+                    for conc, guess in zip(row, rowGuesses)
+                ],
             )
 
     def populateDefault(self, freeNames):
@@ -241,7 +255,8 @@ class VolumesPopup(moduleFrame.Popup):
         unknownConcsFrame.pack(expand=True, fill="both")
         unknownConcsLabel = WrappedLabel(
             unknownConcsFrame,
-            text='Enter "?" to optimise that concentration as a variable.\n',
+            text='Enter "?" to optimise that concentration as a variable, or enter'
+            " ~number to provide an initial guess for the optimisation.\n",
         )
         unknownConcsLabel.pack(expand=False, fill="both")
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
@@ -293,6 +308,15 @@ class VolumesPopup(moduleFrame.Popup):
         self.concsUnit = self.stockTable.concsUnit.get()
         self.stockConcs = self.stockTable.data * prefixes[self.concsUnit.strip("M")]
 
+        if np.any(self.stockTable.initialGuesses == 0):
+            raise ValueError(
+                "Initial guesses for stock concentrations cannot be zero, as the "
+                "optimisation algorithm optimises the logarithm of the concentrations."
+            )
+        self.stockConcsGuesses = (
+            self.stockTable.initialGuesses * prefixes[self.concsUnit.strip("M")]
+        )
+
         self.volumesUnit = self.volumesTable.volumesUnit.get()
         self.volumes = self.volumesTable.data * prefixes[self.volumesUnit.strip("L")]
 
@@ -307,6 +331,7 @@ class GetTotalConcsFromVolumes(totalConcentrations):
         "unknownTotalConcsLinked",
         "concsUnit",
         "stockConcs",
+        "stockConcsGuesses",
         "volumesUnit",
         "volumes",
         "freeNames",
@@ -314,29 +339,57 @@ class GetTotalConcsFromVolumes(totalConcentrations):
 
     def run(self, totalConcVars):
         stockConcs = np.copy(self.stockConcs)
+        maskArray = ma.getmaskarray(self.stockConcs)
+
         if self.unknownTotalConcsLinked:
             # For each row (= species), all blank cells are assigned to a
             # single unknown variable.
             for rowIndex, totalConcVar in zip(
                 np.where(self.rowsWithBlanks)[0], totalConcVars
             ):
-                stockConcs[rowIndex, np.isnan(stockConcs[rowIndex])] = totalConcVar
+                stockConcs[rowIndex, maskArray[rowIndex, :]] = totalConcVar
         else:
-            stockConcs[np.isnan(stockConcs)] = totalConcVars
+            stockConcs[maskArray] = totalConcVars
 
-        moles = self.volumes @ stockConcs.T
-        totalVolumes = np.atleast_2d(np.sum(self.volumes, 1)).T
-        totalConcs = moles / totalVolumes
-
-        return totalConcs
+        return (self.volumes @ stockConcs.T) / np.sum(
+            self.volumes, axis=1, keepdims=True
+        )
 
     @property
     def totalConcs(self):
-        # If all total concentrations are known, they can be used by other strategies.
-        if len(self.variableNames) != 0:
-            return np.empty((0, 0))
+        # Known total concentrations can be used by other strategies.
+        return ma.dot(self.volumes, self.stockConcs.T) / np.sum(
+            self.volumes, axis=1, keepdims=True
+        )
+
+    @property
+    def totalConcsGuesses(self):
+        return ma.dot(self.volumes, self.stockConcsGuesses.T) / np.sum(
+            self.volumes, axis=1, keepdims=True
+        )
+
+    @property
+    def variableInitialGuesses(self):
+        if self.unknownTotalConcsLinked:
+            output = np.empty(self.variableCount)
+
+            for i, row in enumerate(self.stockConcsGuesses[self.rowsWithBlanks, :]):
+                rowGuesses = row[~ma.getmaskarray(row)]
+                if len(np.unique(rowGuesses)) > 1:
+                    raise ValueError(
+                        "Multiple different initial guesses entered for "
+                        f"{self.variableNames[i]}"
+                    )
+                elif len(rowGuesses) == 0:
+                    output[i] = self.defaultInitialGuess
+                else:
+                    output[i] = rowGuesses[0]
+
+            return output
         else:
-            return self.run(np.empty((0,)))
+            return self.stockConcsGuesses[ma.getmaskarray(self.stockConcs)].filled(
+                self.defaultInitialGuess
+            )
 
     @property
     def rowsWithBlanks(self):
@@ -376,6 +429,7 @@ class ConcsTable(Table):
             2,
             freeNames,
             maskBlanks=True,
+            allowGuesses=True,
             rowOptions=("readonlyTitles",),
             columnOptions=("titles", "new", "delete"),
         )
@@ -396,12 +450,31 @@ class ConcsTable(Table):
             == len(self.titration.additionTitles)
         ):
             self.concsUnit.set(self.titration.totalConcentrations.concsUnit)
-            for name, row in zip(
+
+            try:
+                totalConcsGuesses = self.titration.totalConcentrations.totalConcsGuesses
+                assert (
+                    totalConcsGuesses.shape
+                    == self.titration.totalConcentrations.totalConcs.shape
+                )
+            except (AttributeError, AssertionError):
+                totalConcsGuesses = ma.masked_all_like(
+                    self.titration.totalConcentrations.totalConcs
+                )
+
+            for name, row, rowGuesses in zip(
                 self.titration.additionTitles,
                 self.titration.totalConcentrations.totalConcs,
+                totalConcsGuesses,
             ):
                 self.addRow(
-                    name, [convertConc(conc, "M", self.concsUnit.get()) for conc in row]
+                    name,
+                    [
+                        convertConc(conc, "M", self.concsUnit.get())
+                        if guess is ma.masked
+                        else "~" + convertConc(guess, "M", self.concsUnit.get())
+                        for conc, guess in zip(row, rowGuesses)
+                    ],
                 )
         else:
             for name in self.titration.additionTitles:
@@ -468,7 +541,8 @@ class ConcsPopup(moduleFrame.Popup):
         unknownConcsFrame.pack(expand=True, fill="both")
         unknownConcsLabel = WrappedLabel(
             unknownConcsFrame,
-            text='Enter "?" to optimise that concentration as a variable.\n',
+            text='Enter "?" to optimise that concentration as a variable, or enter'
+            " ~number to provide an initial guess for the optimisation.\n",
         )
         unknownConcsLabel.pack(expand=False, fill="both")
         self.unknownTotalConcsLinkedVar = tk.BooleanVar()
@@ -505,6 +579,15 @@ class ConcsPopup(moduleFrame.Popup):
         self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
         self.freeNames = self.concsTable.columnTitles
 
+        if np.any(self.concsTable.initialGuesses == 0):
+            raise ValueError(
+                "Initial guesses for the concentrations cannot be zero, as the "
+                "optimisation algorithm optimises the logarithm of the concentrations."
+            )
+        self.totalConcsGuesses = (
+            self.concsTable.initialGuesses * prefixes[self.concsUnit.strip("M")]
+        )
+
         self.saved = True
         self.destroy()
 
@@ -515,25 +598,50 @@ class GetTotalConcs(totalConcentrations):
         "unknownTotalConcsLinked",
         "concsUnit",
         "totalConcs",
+        "totalConcsGuesses",
         "freeNames",
     )
 
     def run(self, totalConcVars):
         totalConcs = np.copy(self.totalConcs)
+        maskArray = ma.getmaskarray(self.totalConcs)
 
         if self.unknownTotalConcsLinked:
-            # For each row (= species), all blank cells are assigned to a
+            # For each row (= component), all blank cells are assigned to a
             # single unknown variable.
             for columnIndex, totalConcVar in zip(
                 np.where(self.columnsWithBlanks)[0], totalConcVars
             ):
-                totalConcs[
-                    np.isnan(totalConcs[:, columnIndex]), columnIndex
-                ] = totalConcVar
+                totalConcs[maskArray[:, columnIndex], columnIndex] = totalConcVar
         else:
-            totalConcs[np.isnan(totalConcs)] = totalConcVars
+            totalConcs[maskArray] = totalConcVars
 
         return totalConcs
+
+    @property
+    def variableInitialGuesses(self):
+        if self.unknownTotalConcsLinked:
+            output = np.empty(self.variableCount)
+
+            for i, column in enumerate(
+                self.totalConcsGuesses[:, self.columnsWithBlanks].T
+            ):
+                columnGuesses = column[~ma.getmaskarray(column)]
+                if len(np.unique(columnGuesses)) > 1:
+                    raise ValueError(
+                        "Multiple different initial guesses entered for "
+                        f"{self.variableNames[i]}"
+                    )
+                elif len(columnGuesses) == 0:
+                    output[i] = self.defaultInitialGuess
+                else:
+                    output[i] = columnGuesses[0]
+
+            return output
+        else:
+            return self.totalConcsGuesses[ma.getmaskarray(self.totalConcs)].filled(
+                self.defaultInitialGuess
+            )
 
     @property
     def columnsWithBlanks(self):
@@ -542,7 +650,7 @@ class GetTotalConcs(totalConcentrations):
     @property
     def variableNames(self):
         if self.unknownTotalConcsLinked:
-            # return the number of columns (= species) with blank cells
+            # return the number of columns (= component) with blank cells
             concVarsNames = self.freeNames[self.columnsWithBlanks]
             return np.array([f"[{name}]" for name in concVarsNames])
         else:

@@ -312,12 +312,16 @@ class Table(ttk.Frame):
         ):
             return np.nan
         elif number == "":
+            message = "Please enter a value in each cell."
             if self.maskBlanks:
-                raise ValueError(
-                    "Please enter a value in each cell. To optimise a variable, enter"
-                    ' "?".'
-                )
-            raise ValueError("Please enter a value in each cell.")
+                message += ' To optimise the value of a cell as a variable, enter "?".'
+                if self.allowGuesses:
+                    message = message[:-1] + (
+                        ", or enter ~number to provide an initial guess for the "
+                        "optimisation."
+                    )
+            raise ValueError(message)
+
         return float(number)
 
     def setFocus(self, widget):

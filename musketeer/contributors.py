@@ -66,10 +66,6 @@ class ContributorsTable(Table):
         defaultEntries = np.full(self.dataCells.shape[1], "0")
         self.addRow("New state", defaultEntries)
 
-    def convertData(self, number):
-        # if all entries happen to be integers, this is handled by processData()
-        return float(number)
-
     def processData(self):
         matrix = np.zeros([self.data.shape[0], len(self.speciesFilter)])
         matrix[:, self.speciesFilter] = self.data

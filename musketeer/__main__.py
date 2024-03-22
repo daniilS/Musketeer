@@ -28,8 +28,26 @@ def newshowerror(title, message, *args, **kwargs):
     import traceback
 
     if fullErrorMessages and isinstance(message, Exception):
-        message = traceback.format_exc()
-    return olderror(title, message, *args, **kwargs)
+        if root._windowingsystem == "aqua":
+            # MacOS alert windows don't have a title, and "-icon warning" maps to a
+            # higher priority alert than "-icon error".
+            return mb.showwarning(
+                title,
+                f"{title}:\n\n{traceback.format_exception(message)[-1]}",
+                detail="".join(traceback.format_exception(message, limit=-8)[:-1]),
+                *args,
+                **kwargs,
+            )
+        else:
+            return olderror(
+                title,
+                traceback.format_exception(message)[-1],
+                detail="".join(traceback.format_exception(message, limit=-8)[:-1]),
+                *args,
+                **kwargs,
+            )
+    else:
+        return olderror(title, message, *args, **kwargs)
 
 
 mb.showerror = newshowerror

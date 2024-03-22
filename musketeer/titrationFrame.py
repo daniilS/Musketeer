@@ -222,12 +222,32 @@ class TitrationFrame(ttk.Frame):
                                     else:
                                         continue
                                     data = np.array(["Host", "Guest"][:freeCount])
+                            # 1.4.1 added unknown total concentrations without volumes
                             elif (
                                 fileVersion < packaging.version.parse("1.4.1")
                                 and moduleFrame.attributeName == "totalConcentrations"
                                 and popupAttributeName == "unknownTotalConcsLinked"
                             ):
                                 data = True
+                            # 1.6.0 added initial guesses for unknown concentrations
+                            elif (
+                                fileVersion < packaging.version.parse("1.6.0")
+                                and moduleFrame.attributeName == "totalConcentrations"
+                                and popupAttributeName == "stockConcsGuesses"
+                            ):
+                                if (
+                                    key := f"{name}.totalConcentrations.stockConcs"
+                                ) in titration:
+                                    data = ma.masked_all_like(titration[key])
+                            elif (
+                                fileVersion < packaging.version.parse("1.6.0")
+                                and moduleFrame.attributeName == "totalConcentrations"
+                                and popupAttributeName == "totalConcsGuesses"
+                            ):
+                                if (
+                                    key := f"{name}.totalConcentrations.totalConcs"
+                                ) in titration:
+                                    data = ma.masked_all_like(titration[key])
 
                             else:
                                 continue
