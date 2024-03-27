@@ -24,6 +24,7 @@ titrationAttributes = (
     "lastSignalVars",
     "lastFittedSpectra",
     "lastFittedCurves",
+    "_selectedSignalTitles",
 )
 
 
@@ -156,7 +157,32 @@ class Titration:
         self.hasAdditionTitles = True
         self._additionTitles = additionTitles
 
-    def getPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
+    @property
+    def peakIndices(self):
+        if (
+            hasattr(self, "_selectedSignalTitles")
+            and self._selectedSignalTitles is not None
+            and len(
+                peakIndices := [
+                    list(self.processedSignalTitles).index(title)
+                    for title in self._selectedSignalTitles
+                    if title in self.processedSignalTitles
+                ]
+            )
+            != 0
+        ):
+            return peakIndices
+        else:
+            return self.getDefaultPeakIndices()
+
+    @peakIndices.setter
+    def peakIndices(self, peakIndices):
+        if peakIndices is None:
+            self._selectedSignalTitles = None
+        else:
+            self._selectedSignalTitles = self.processedSignalTitles[peakIndices]
+
+    def getDefaultPeakIndices(self, maxPeaks=4, maxShoulderPeaks=2, threshold=0.1):
         numSignals = self.processedData.shape[1]
         if numSignals <= maxPeaks + maxShoulderPeaks:
             return np.arange(numSignals)

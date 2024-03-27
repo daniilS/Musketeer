@@ -19,6 +19,7 @@ from matplotlib.figure import Figure
 from numpy import ma
 from scipy.interpolate import make_interp_spline
 from ttkbootstrap.widgets import InteractiveNotebook
+from ttkwidgets.autohidescrollbar import AutoHideScrollbar
 
 from . import (
     __version__,
@@ -36,7 +37,7 @@ from .moduleFrame import GroupFrame
 from .patchMatplotlib import NavigationToolbarVertical
 from .scrolledFrame import ScrolledFrame
 from .style import defaultFigureParams, figureParams, padding
-from .table import Table
+from .table import Table, ButtonFrame
 from .titration import Titration, titrationAttributes
 
 # Magic value indicating that the data in a .fit file should be copied from the original
@@ -1071,15 +1072,199 @@ class DiscreteFittedFrame(FittedFrame):
         self.plot()
 
 
+class ChoosePeakIndicesPopup(tk.Toplevel):
+    def __init__(self, master, titration, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.withdraw()
+
+        self.titration = titration
+        self.saved = False
+        self.modified = False
+        self.resetToDefaults = False
+        self.peakIndices = None
+
+    def show(self):
+        self.geometry(f"+{self.master.winfo_x()+100}+{self.master.winfo_y()+100}")
+        self.populate()
+
+        self.deiconify()
+        self.grab_set()
+        self.transient(self.master)
+        self.wait_window()
+        return (
+            self.saved and self.modified,
+            None if self.resetToDefaults else self.peakIndices,
+        )
+
+    def populate(self):
+        self.title(f"Select {self.titration.xQuantity} to display")
+        self.signalsTreeview = ttk.Treeview(self, selectmode="extended")
+        self.signalsTreeview.grid(row=0, column=0, rowspan=2, sticky="nsew")
+        self.signalsTreeview.heading(
+            "#0",
+            text=(
+                f"Available signals ({self.titration.xQuantity} / "
+                f"{self.titration.xUnit})"
+            ),
+        )
+
+        signalsScrollbar = AutoHideScrollbar(self, orient="vertical")
+        signalsScrollbar.grid(row=0, column=1, rowspan=2, sticky="ns")
+        self.signalsTreeview.configure(yscrollcommand=signalsScrollbar.set)
+        signalsScrollbar.configure(command=self.signalsTreeview.yview)
+
+        rightButton = ttk.Button(self, text="▶", command=self.moveRight)
+        rightButton.grid(row=0, column=2, sticky="s", padx=5 * padding, pady=padding)
+        leftButton = ttk.Button(self, text="◀", command=self.moveLeft)
+        leftButton.grid(row=1, column=2, sticky="n", padx=5 * padding, pady=padding)
+
+        self.selectedTreeview = ttk.Treeview(self, selectmode="extended")
+        self.selectedTreeview.grid(row=0, column=3, rowspan=2, sticky="nsew")
+        self.selectedTreeview.heading("#0", text="Selected signals")
+
+        selectedScrollbar = AutoHideScrollbar(self, orient="vertical")
+        selectedScrollbar.grid(row=0, column=4, rowspan=2, sticky="ns")
+        self.selectedTreeview.configure(yscrollcommand=selectedScrollbar.set)
+        selectedScrollbar.configure(command=self.selectedTreeview.yview)
+
+        buttonFrame = ButtonFrame(self, self.reset, self.save, self.destroy)
+        buttonFrame.resetButton.configure(text="Reset to default")
+        buttonFrame.grid(row=2, column=0, columnspan=5, sticky="esw")
+
+        self.fillTreeviews()
+
+    def save(self):
+        if len(self.selectedTreeview.get_children()) == 0:
+            raise RuntimeError("Please select at least one signal.")
+        self.saved = True
+        self.peakIndices = [
+            self.signalIds.index(selectedId)
+            for selectedId in self.selectedTreeview.get_children()
+        ]
+        self.destroy()
+
+    def reset(self):
+        self.clearTreeviews()
+        self.fillTreeviews(self.titration.getDefaultPeakIndices())
+        self.resetToDefaults = True
+        self.modified = True
+
+    def clearTreeviews(self):
+        self.signalsTreeview.delete(*self.signalIds)
+        self.selectedTreeview.delete(*self.selectedIds)
+
+    def fillTreeviews(self, peakIndices=None):
+        if peakIndices is None:
+            peakIndices = self.titration.peakIndices
+        self.signalIds, self.selectedIds = [], []
+
+        for i, signal in enumerate(self.titration.processedSignalTitlesStrings):
+            self.signalIds.append(
+                signalId := self.signalsTreeview.insert("", "end", text=signal)
+            )
+            self.selectedIds.append(
+                selectedId := self.selectedTreeview.insert("", "end", text=signal)
+            )
+
+            if i in peakIndices:
+                self.signalsTreeview.detach(signalId)
+            else:
+                self.selectedTreeview.detach(selectedId)
+
+    def moveRight(self):
+        if len(self.signalsTreeview.selection()) == 0:
+            return
+
+        self.selectedTreeview.selection_set("")
+
+        for signalId in self.signalsTreeview.selection():
+            self.signalsTreeview.detach(signalId)
+
+            index = self.signalIds.index(signalId)
+            selectedId = self.selectedIds[index]
+
+            for existingId in self.selectedTreeview.get_children()[::-1]:
+                if self.selectedIds.index(existingId) < index:
+                    self.selectedTreeview.move(
+                        selectedId, "", self.selectedTreeview.index(existingId) + 1
+                    )
+                    break
+            else:
+                self.selectedTreeview.move(selectedId, "", 0)
+
+            self.selectedTreeview.selection_add(selectedId)
+            self.selectedTreeview.see(selectedId)
+
+        self.signalsTreeview.selection_set("")
+        self.resetToDefaults = False
+        self.modified = True
+
+    def moveLeft(self):
+        if len(self.selectedTreeview.selection()) == 0:
+            return
+
+        self.signalsTreeview.selection_set("")
+
+        for signalId in self.selectedTreeview.selection():
+            self.selectedTreeview.detach(signalId)
+
+            index = self.selectedIds.index(signalId)
+            signalId = self.signalIds[index]
+
+            for existingId in self.signalsTreeview.get_children()[::-1]:
+                if self.signalIds.index(existingId) < index:
+                    self.signalsTreeview.move(
+                        signalId, "", self.signalsTreeview.index(existingId) + 1
+                    )
+                    break
+            else:
+                self.signalsTreeview.move(signalId, "", 0)
+
+            self.signalsTreeview.selection_add(signalId)
+            self.signalsTreeview.see(signalId)
+
+        self.selectedTreeview.selection_set("")
+        self.resetToDefaults = False
+        self.modified = True
+
+
 class DiscreteFromContinuousFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        peakIndices = self.titration.getPeakIndices()
+        self.setCurves()
+        self.populate()
+        self.plot()
+
+    def setCurves(self):
+        peakIndices = self.titration.peakIndices
         self.curves = self.titration.processedData.T[peakIndices].copy()
         self.fittedCurves = self.titration.lastFittedCurves.T[peakIndices].copy()
         peakTitles = self.titration.processedSignalTitlesStrings[peakIndices]
         self.names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
-        self.populate()
+
+    def populate(self):
+        super().populate()
+
+        self.choosePeakIndicesButton = ttk.Button(
+            self.toggleButtonsFrame,
+            text=f"Select {self.titration.xQuantity} to display",
+            command=self.choosePeakIndices,
+            style="Outline.TButton",
+        )
+        self.choosePeakIndicesButton.pack(
+            before=self.saveCurvesButton, pady=padding, fill="x"
+        )
+
+        separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
+        separator.pack(before=self.saveCurvesButton, pady=padding, fill="x")
+
+    def choosePeakIndices(self):
+        popup = ChoosePeakIndicesPopup(self, self.titration)
+        saved, peakIndices = popup.show()
+        if not saved:
+            return
+        self.titration.peakIndices = peakIndices
+        self.setCurves()
         self.plot()
 
 
