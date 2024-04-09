@@ -1,4 +1,6 @@
+import importlib
 import os
+import sys
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
@@ -338,8 +340,10 @@ class TitrationFrame(ttk.Frame):
 
     def updateDpi(self):
         for tab in self.notebook.tabs():
-            if isinstance(fitNotebook := self.nametowidget(tab), FitNotebook):
-                fitNotebook.updateDpi()
+            try:
+                self.nametowidget(tab).updateDpi()
+            except AttributeError:
+                pass
 
     @property
     def currentTab(self):
@@ -506,6 +510,16 @@ class FitNotebook(ttk.Notebook):
         finally:
             self.tk.eval("tk busy forget .")
             self.update()
+
+        importlib.reload(sys.modules[self.__module__])
+        for widget in [self.master, self] + [
+            self.nametowidget(tab) for tab in self.tabs()
+        ]:
+            widget.__class__ = sys.modules[self.__module__].__dict__[
+                widget.__class__.__name__
+            ]
+        print(f"reloaded {self.__module__}")
+
         self.showFit()
 
     def fitCallback(self, *args):
