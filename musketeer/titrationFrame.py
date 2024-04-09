@@ -1,4 +1,6 @@
+import importlib
 import os
+import sys
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.ttk as ttk
@@ -360,8 +362,10 @@ class TitrationFrame(ttk.Frame):
 
     def updateDpi(self):
         for tab in self.notebook.tabs():
-            if isinstance(fitNotebook := self.nametowidget(tab), FitNotebook):
-                fitNotebook.updateDpi()
+            try:
+                self.nametowidget(tab).updateDpi()
+            except AttributeError:
+                pass
 
     @property
     def currentTab(self):
@@ -525,6 +529,16 @@ class FitNotebook(ttk.Notebook):
     def fitData(self):
         with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
             self.titration.fitData(progressDialog.callback)
+
+            importlib.reload(sys.modules[self.__module__])
+            for widget in [self.master, self] + [
+                self.nametowidget(tab) for tab in self.tabs()
+            ]:
+                widget.__class__ = sys.modules[self.__module__].__dict__[
+                    widget.__class__.__name__
+                ]
+            print(f"reloaded {self.__module__}")
+
             progressDialog.setLabelText("Loading results")
             self.showFit()
 

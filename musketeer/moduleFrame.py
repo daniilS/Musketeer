@@ -1,3 +1,5 @@
+import importlib
+import sys
 import tkinter as tk
 import tkinter.ttk as ttk
 from abc import ABC
@@ -135,13 +137,16 @@ class ModuleFrame(ttk.Frame):
             self.stringVar.set("")
             return
         self.lastValue = list(self.dropdownOptions.keys())[
-            list(self.dropdownOptions.values()).index(
-                type(getattr(self.titration, self.attributeName))
+            [x.__name__ for x in self.dropdownOptions.values()].index(
+                type(getattr(self.titration, self.attributeName)).__name__
             )
         ]
         self.stringVar.set(self.lastValue)
 
     def callback(self, value):
+        importlib.reload(sys.modules[self.__module__])
+        self.dropdownOptions = sys.modules[self.__module__].ModuleFrame.dropdownOptions
+        print(f"reloaded {self.__module__}")
         SelectedStrategy = self.dropdownOptions[value]
         selectedStrategy = SelectedStrategy(self.titration)
         if selectedStrategy.Popup is not None:
