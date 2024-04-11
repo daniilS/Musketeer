@@ -724,6 +724,7 @@ class ContinuousFittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.showLegend = True
         self.populate()
         self.plot()
 
@@ -742,10 +743,10 @@ class ContinuousFittedFrame(PlotFrame):
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
-        self.speciesLabel = ttk.Label(
-            self.optionsFrame, anchor="center", justify="center", text="Show:"
+        self.deconvolutionLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="Plot type:"
         )
-        self.speciesLabel.pack(pady=padding, fill="x")
+        self.deconvolutionLabel.pack(pady=0, fill="x")
 
         self.deconvolutionVar = tk.StringVar()
         deconvolutionOptions = (
@@ -761,7 +762,16 @@ class ContinuousFittedFrame(PlotFrame):
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.deconvolutionDropdown.pack()
+        self.deconvolutionDropdown.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         self.columnconfigure(
             0,
@@ -782,6 +792,11 @@ class ContinuousFittedFrame(PlotFrame):
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
+        self.canvas.draw()
 
     def plot(self):
         self.ax.clear()
@@ -827,7 +842,7 @@ class ContinuousFittedFrame(PlotFrame):
                 )
             self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
 
-        self.ax.legend(draggable=True)
+        self.ax.legend(draggable=True).set_visible(self.showLegend)
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         self.canvas.draw()
 
@@ -839,6 +854,7 @@ class FittedFrame(PlotFrame):
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.smooth = True
+        self.showLegend = True
         self.logScale = False
 
     def populate(self):
@@ -872,7 +888,7 @@ class FittedFrame(PlotFrame):
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.plotTypeDropdown.pack()
+        self.plotTypeDropdown.pack(pady=padding, fill="x")
 
         self.logScaleButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
@@ -881,6 +897,7 @@ class FittedFrame(PlotFrame):
             style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
+
         self.smoothButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
             text="Smooth curves",
@@ -889,6 +906,15 @@ class FittedFrame(PlotFrame):
         )
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.toggleButtonsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
         separator.pack(pady=padding, fill="x")
@@ -931,6 +957,11 @@ class FittedFrame(PlotFrame):
             self.ax.set_xscale("log")
         else:
             self.ax.set_xscale("linear")
+        self.canvas.draw()
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
         self.canvas.draw()
 
     def toggleSmooth(self):
@@ -1057,7 +1088,7 @@ class FittedFrame(PlotFrame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend(draggable=True)
+        self.ax.legend(draggable=True).set_visible(self.showLegend)
 
         self.canvas.draw()
 
@@ -1278,6 +1309,7 @@ class SpeciationFrame(PlotFrame):
         self.separatePolymers = False
         self.logScale = False
         self.smooth = True
+        self.showLegend = True
         self.populate()
         self.plot()
 
@@ -1298,10 +1330,11 @@ class SpeciationFrame(PlotFrame):
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
+
         self.speciesLabel = ttk.Label(
             self.optionsFrame, anchor="center", justify="center", text="Select species:"
         )
-        self.speciesLabel.pack(pady=padding, fill="x")
+        self.speciesLabel.pack(pady=0, fill="x")
 
         self.speciesDropdown = ttk.OptionMenu(
             self.optionsFrame,
@@ -1311,7 +1344,7 @@ class SpeciationFrame(PlotFrame):
             *titration.totalConcentrations.freeNames,
             style="primary.Outline.TMenubutton",
         )
-        self.speciesDropdown.pack()
+        self.speciesDropdown.pack(pady=padding, fill="x")
 
         self.separatePolymersButton = ttk.Checkbutton(
             self.optionsFrame,
@@ -1339,6 +1372,15 @@ class SpeciationFrame(PlotFrame):
         )
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         self.columnconfigure(
             0,
@@ -1375,6 +1417,11 @@ class SpeciationFrame(PlotFrame):
     def toggleSmooth(self):
         self.smooth = not self.smooth
         self.plot()
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
+        self.canvas.draw()
 
     @property
     def freeIndex(self):
@@ -1465,7 +1512,7 @@ class SpeciationFrame(PlotFrame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend(draggable=True)
+        self.ax.legend(draggable=True).set_visible(self.showLegend)
 
         self.canvas.draw()
 
