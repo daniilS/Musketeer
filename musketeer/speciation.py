@@ -1012,7 +1012,8 @@ class SpeciationSolver(Speciation):
                 filteredPolymerM,
             )
 
-            lb = self.getLowerBounds(*args)
+            # lb = self.getLowerBounds(*args)
+            lb = np.full_like(filteredTotal, -np.inf)
             ub = self.getUpperBounds(*args)
             if any(lb > ub):
                 # Correct for rounding errors. Unsure if this is necessary, as the only
@@ -1052,8 +1053,7 @@ class SpeciationSolver(Speciation):
                 jac=self.jacobianScaled,
                 args=args,
                 x0=x0 * self.scaling_factor,
-                bounds=np.vstack([np.array([-np.inf, -np.inf, -np.inf]), ub]).T
-                * self.scaling_factor,
+                bounds=np.vstack([lb, ub]).T * self.scaling_factor,
                 method="L-BFGS-B",
                 options={
                     "ftol": 0.0,
