@@ -17,7 +17,7 @@ LN_10 = np.log(10)
 
 
 def stoichiometriesToBoundNames(freeNames, stoichiometries):
-    trans = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+    trans = str.maketrans("0123456789-", "₀₁₂₃₄₅₆₇₈₉₋")
 
     boundNames = []
     for row in stoichiometries:
@@ -31,8 +31,6 @@ def stoichiometriesToBoundNames(freeNames, stoichiometries):
 
             if stoichiometry == 1:
                 boundName += freeName
-            elif stoichiometry == -1:
-                boundName += freeName + "ₙ"
             else:
                 boundName += freeName + str(stoichiometry).translate(trans)
 
@@ -50,6 +48,7 @@ def stoichiometriesToBoundNames(freeNames, stoichiometries):
 class ComplexSpeciationMixin:
     @property
     def complexIndices(self):
+        return np.full(self.stoichiometries.shape[0], True)
         return ~np.any(self.stoichiometries < 0, 1)
 
     @property
@@ -198,6 +197,8 @@ class ComplexSpeciationMixin:
         return M.T @ (M * np.outer(complexKs * np.prod(free**M, 1), 1 / free))
 
     def complexGetUpperBounds(self, complexKs, total, M):
+        if len(total) == 3:
+            return np.array([total[0], total[1] + total[0] * 3, total[2]])
         return total
 
 
@@ -208,6 +209,7 @@ class PolymerSpeciationMixin:
 
     @property
     def polymerIndices(self):
+        return np.full(self.stoichiometries.shape[0], False)
         return np.any(self.stoichiometries < 0, axis=1)
 
     @property
@@ -521,7 +523,7 @@ class SpeciationTable(Table):
                 titration.speciation.boundNames, titration.speciation.stoichiometries
             ):
                 stoichiometry = stoichiometry.astype(str)
-                stoichiometry[stoichiometry == "-1"] = "n"
+                # stoichiometry[stoichiometry == "-1"] = "n"
                 self.addRow(boundName, stoichiometry)
         else:
             if titration.totalConcentrations.freeCount == 1:
@@ -584,7 +586,9 @@ class SpeciationTable(Table):
 
     def convertData(self, number):
         if number == "n":
-            return -1
+            raise NotImplementedError(
+                "Polymers not supported in this special build of Musketeer"
+            )
         elif number == "":
             return 0
         else:
@@ -1017,10 +1021,10 @@ class SpeciationSolver(Speciation):
 
             # TODO: deal with cases where lb and ub are very close together!
             # self.scaling_factor = 1000 / min(ub - lb)
-            self.scaling_factor = 1000 / np.min(
-                np.abs(filteredTotal * np.log10(filteredTotal))
-            )
-            self.scaling_factor = 1
+            # self.scaling_factor = 1000 / np.min(
+            #     np.abs(filteredTotal * np.log10(filteredTotal))
+            # )
+            self.scaling_factor = 1_000_000
 
             if i == 0:
                 # Initial guess: all species 100% free, only polymers are formed
@@ -1046,7 +1050,8 @@ class SpeciationSolver(Speciation):
                 jac=self.jacobianScaled,
                 args=args,
                 x0=x0 * self.scaling_factor,
-                bounds=np.vstack([lb, ub]).T * self.scaling_factor,
+                bounds=np.vstack([np.array([-np.inf, -np.inf, -np.inf]), ub]).T
+                * self.scaling_factor,
                 method="L-BFGS-B",
                 options={
                     "ftol": 0.0,
