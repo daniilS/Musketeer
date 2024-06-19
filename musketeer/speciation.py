@@ -199,6 +199,8 @@ class ComplexSpeciationMixin:
     def complexGetUpperBounds(self, complexKs, total, M):
         if len(total) == 3:
             return np.array([total[0], total[1] + total[0] * 3, total[2]])
+        elif len(total) == 4:
+            return np.array([total[0], total[1], total[2] + total[1] * 3, total[3]])
         return total
 
 
