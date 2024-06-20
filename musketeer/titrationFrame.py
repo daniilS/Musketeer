@@ -13,7 +13,6 @@ import numpy as np
 import packaging.version
 import tksheet
 from cycler import cycler
-from matplotlib.backend_bases import ResizeEvent
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from numpy import ma
@@ -554,97 +553,121 @@ class FitNotebook(ttk.Notebook):
 
     def updateDpi(self):
         for tab in self.tabs():
-            if isinstance(plotFrame := self.nametowidget(tab), PlotFrame):
-                plotFrame.updateDpi()
+            frame = self.nametowidget(tab)
+            try:
+                frame.updateLegend()
+            except AttributeError:
+                try:
+                    frame.updateDpi()
+                except AttributeError:
+                    pass
 
 
 class PlotFrame(ttk.Frame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.legendWidth = 0
+
     @property
     def dpi(self):
-        return figureParams["x"] / self.figwidth
+        return self.desiredCanvasHeight / self.figHeight
 
     @property
-    def figwidth(self):
-        return defaultFigureParams["x"] * 80 / figureParams["scale"] / 100
+    def figWidth(self):
+        return (
+            self.legendWidth / self.dpi
+            + defaultFigureParams["x"] * 80 / figureParams["scale"] / 100
+        )
 
     @property
-    def figheight(self):
+    def figHeight(self):
         return defaultFigureParams["y"] * 80 / figureParams["scale"] / 100
 
     @property
-    def canvaswidth(self):
-        return figureParams["x"]
+    def desiredCanvasWidth(self):
+        return self.legendWidth + figureParams["x"]
 
     @property
-    def canvasheight(self):
+    def desiredCanvasHeight(self):
         return figureParams["y"]
 
     def updateDpi(self):
-        self.fig.set_size_inches(self.figwidth, self.figheight)
+        # Called when a new size in px and/or scale is set through figureParams.
+        # Recalculates and sets the required figure size, canvas size, and DPI.
+        self.fig.set_size_inches(self.figWidth, self.figHeight)
         mpl.rcParams["savefig.dpi"] = self.dpi
-        self.fig.canvas.get_tk_widget().configure(
-            width=self.canvaswidth, height=self.canvasheight
-        )
-        self.fig.canvas.updateDpi(
+
+        lastCanvasWidth, lastCanvasHeight = (
             self.fig.canvas.get_tk_widget().winfo_width(),
             self.fig.canvas.get_tk_widget().winfo_height(),
         )
-        self.fig.canvas.draw_idle()
+        self.fig.canvas.get_tk_widget().configure(
+            width=self.desiredCanvasWidth, height=self.desiredCanvasHeight
+        )
+        currentCanvasWidth, currentCanvasHeight = (
+            self.fig.canvas.get_tk_widget().winfo_width(),
+            self.fig.canvas.get_tk_widget().winfo_height(),
+        )
+        if (
+            currentCanvasWidth == lastCanvasWidth
+            and currentCanvasHeight == lastCanvasHeight
+        ):
+            # Generate an event to clear and redraw the figure with the new DPI
+            self.canvas.get_tk_widget().event_generate(
+                "<Configure>",
+                x=self.fig.canvas.get_tk_widget().winfo_x(),
+                y=self.fig.canvas.get_tk_widget().winfo_y(),
+                width=currentCanvasWidth,
+                height=currentCanvasHeight,
+            )
+        else:
+            pass
 
 
 class FigureCanvasTkAggFixedRatio(FigureCanvasTkAgg):
-    @property
-    def dpi(self):
-        return figureParams["x"] / self.figwidth
+    def recalculateDpiAndCanvasSize(self, actualCanvasWidth, actualCanvasHeight):
+        # Detects if the canvas width and/or height is compressed, calculates the
+        # new canvas size to preserve the aspect ratio, and sets the figure DPI to
+        # preserve its scale.
+        master = self.get_tk_widget().master
 
-    @property
-    def figwidth(self):
-        return defaultFigureParams["x"] / 100 * 80 / figureParams["scale"]
+        if actualCanvasWidth == 1 and actualCanvasHeight == 1:
+            # Canvas not initialised yet, don't change anything
+            return self.figure.dpi, actualCanvasWidth, actualCanvasHeight
 
-    @property
-    def figheight(self):
-        return defaultFigureParams["y"] / 100 * 80 / figureParams["scale"]
-
-    @property
-    def desiredCanvaswidth(self):
-        return figureParams["x"]
-
-    @property
-    def desiredCanvasheight(self):
-        return figureParams["y"]
-
-    def updateDpi(self, width, height):
-        if width == 1 and height == 1:
-            return width, height
-
-        if width == self.desiredCanvaswidth and height == self.desiredCanvasheight:
-            self.figure.set_dpi(self.dpi)
+        elif (
+            actualCanvasWidth == master.desiredCanvasWidth
+            and actualCanvasHeight == master.desiredCanvasHeight
+        ):
+            # Canvas not compressed
+            return master.dpi, actualCanvasWidth, actualCanvasHeight
         else:
-            desiredRatio = self.desiredCanvasheight / self.desiredCanvaswidth
-            actualRatio = height / width
+            # Canvas width and/or height compressed.
+            # Update width or height to preserve aspect ratio, and recalculate dpi
+            desiredRatio = master.desiredCanvasHeight / master.desiredCanvasWidth
+            actualRatio = actualCanvasHeight / actualCanvasWidth
             if actualRatio > desiredRatio:
-                height = width * desiredRatio
-                self.figure.set_dpi(height / self.figheight)
-            elif actualRatio < desiredRatio:
-                width = height / desiredRatio
-                self.figure.set_dpi(width / self.figwidth)
+                actualCanvasHeight = actualCanvasWidth * desiredRatio
+                newDpi = actualCanvasHeight / master.figHeight
+            else:
+                actualCanvasWidth = actualCanvasHeight / desiredRatio
+                newDpi = actualCanvasWidth / master.figWidth
 
-        return width, height
+            return newDpi, actualCanvasWidth, actualCanvasHeight
 
     def resize(self, event):
-        width, height = event.width, event.height
-
-        width, height = self.updateDpi(width, height)
-
-        self.get_tk_widget().delete(self._tkphoto)
-        self._tkphoto = tk.PhotoImage(
-            master=self.get_tk_widget(), width=int(width), height=int(height)
+        print("resize called")
+        # Overrides the resize event handler, which resizes the canvas based on
+        # figure.dpi, event.width, and event.height.
+        # If the canvas width and/or height is compressed, edits these values to
+        # preserve the figure's scale and aspect ratio.
+        newDpi, newWidth, newHeight = self.recalculateDpiAndCanvasSize(
+            event.width, event.height
         )
-        self.get_tk_widget().create_image(
-            int(width / 2), int(height / 2), image=self._tkphoto
-        )
-        ResizeEvent("resize_event", self)._process()
-        self.draw_idle()
+        self.figure.set_dpi(newDpi)
+        event.width, event.height = newWidth, newHeight
+
+        super().resize(event)
 
 
 class InputSpectraFrame(PlotFrame):
@@ -682,7 +705,7 @@ class InputSpectraFrame(PlotFrame):
         self.toSpinbox.pack(padx=padding, side="left")
 
         self.fig = Figure(
-            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+            layout="constrained", figsize=(self.figWidth, self.figHeight), dpi=self.dpi
         )
         self.ax = self.fig.add_subplot()
 
@@ -765,12 +788,13 @@ class ContinuousFittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
+        self.showLegend = True
         self.populate()
         self.plot()
 
     def populate(self):
         self.fig = Figure(
-            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+            layout="constrained", figsize=(self.figWidth, self.figHeight), dpi=self.dpi
         )
         self.ax = self.fig.add_subplot()
         self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
@@ -783,10 +807,10 @@ class ContinuousFittedFrame(PlotFrame):
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
-        self.speciesLabel = ttk.Label(
-            self.optionsFrame, anchor="center", justify="center", text="Show:"
+        self.deconvolutionLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="Plot type:"
         )
-        self.speciesLabel.pack(pady=padding, fill="x")
+        self.deconvolutionLabel.pack(pady=0, fill="x")
 
         self.deconvolutionVar = tk.StringVar()
         deconvolutionOptions = (
@@ -802,7 +826,16 @@ class ContinuousFittedFrame(PlotFrame):
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.deconvolutionDropdown.pack()
+        self.deconvolutionDropdown.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         self.columnconfigure(
             0,
@@ -823,6 +856,11 @@ class ContinuousFittedFrame(PlotFrame):
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1000, uniform="row")
         self.grid_anchor("center")
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
+        self.canvas.draw()
 
     def plot(self):
         self.ax.clear()
@@ -868,7 +906,7 @@ class ContinuousFittedFrame(PlotFrame):
                 )
             self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
 
-        self.ax.legend(draggable=True)
+        self.ax.legend(draggable=True).set_visible(self.showLegend)
         self.ax.set_xlabel(f"{titration.xQuantity} / {titration.xUnit}")
         self.canvas.draw()
 
@@ -880,11 +918,12 @@ class FittedFrame(PlotFrame):
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.smooth = True
+        self.showLegend = True
         self.logScale = False
 
     def populate(self):
         self.fig = Figure(
-            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+            layout="constrained", figsize=(self.figWidth, self.figHeight), dpi=self.dpi
         )
         self.ax = self.fig.add_subplot()
 
@@ -913,7 +952,7 @@ class FittedFrame(PlotFrame):
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.plotTypeDropdown.pack()
+        self.plotTypeDropdown.pack(pady=padding, fill="x")
 
         self.logScaleButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
@@ -922,6 +961,7 @@ class FittedFrame(PlotFrame):
             style="Outline.Toolbutton",
         )
         self.logScaleButton.pack(pady=padding, fill="x")
+
         self.smoothButton = ttk.Checkbutton(
             self.toggleButtonsFrame,
             text="Smooth curves",
@@ -930,6 +970,15 @@ class FittedFrame(PlotFrame):
         )
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.toggleButtonsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
         separator.pack(pady=padding, fill="x")
@@ -972,6 +1021,11 @@ class FittedFrame(PlotFrame):
             self.ax.set_xscale("log")
         else:
             self.ax.set_xscale("linear")
+        self.canvas.draw()
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
         self.canvas.draw()
 
     def toggleSmooth(self):
@@ -1098,7 +1152,7 @@ class FittedFrame(PlotFrame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend(draggable=True)
+        self.ax.legend(draggable=True).set_visible(self.showLegend)
 
         self.canvas.draw()
 
@@ -1316,16 +1370,18 @@ class SpeciationFrame(PlotFrame):
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
         self.speciesVar = tk.StringVar(self)
+        self.legendVar = tk.StringVar(self)
         self.separatePolymers = False
         self.logScale = False
         self.smooth = True
+        self.showLegend = True
         self.populate()
         self.plot()
 
     def populate(self):
         titration = self.titration
         self.fig = Figure(
-            layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
+            layout="constrained", figsize=(self.figWidth, self.figHeight), dpi=self.dpi
         )
         self.ax = self.fig.add_subplot()
 
@@ -1339,10 +1395,11 @@ class SpeciationFrame(PlotFrame):
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
+
         self.speciesLabel = ttk.Label(
             self.optionsFrame, anchor="center", justify="center", text="Select species:"
         )
-        self.speciesLabel.pack(pady=padding, fill="x")
+        self.speciesLabel.pack(pady=0, fill="x")
 
         self.speciesDropdown = ttk.OptionMenu(
             self.optionsFrame,
@@ -1352,7 +1409,23 @@ class SpeciationFrame(PlotFrame):
             *titration.totalConcentrations.freeNames,
             style="primary.Outline.TMenubutton",
         )
-        self.speciesDropdown.pack()
+        self.speciesDropdown.pack(pady=padding, fill="x")
+
+        self.legendLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="Show legend?"
+        )
+        self.legendLabel.pack(pady=0, fill="x")
+
+        legendOptions = ["Inside plot", "Outside plot", "No"]
+        self.legendDropdown = ttk.OptionMenu(
+            self.optionsFrame,
+            self.legendVar,
+            legendOptions[1],
+            command=lambda *args: self.updateLegend(),
+            *legendOptions,
+            style="primary.Outline.TMenubutton",
+        )
+        self.legendDropdown.pack(pady=padding, fill="x")
 
         self.separatePolymersButton = ttk.Checkbutton(
             self.optionsFrame,
@@ -1380,6 +1453,15 @@ class SpeciationFrame(PlotFrame):
         )
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
+
+        self.legendButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Show legend",
+            command=self.toggleLegend,
+            style="Outline.Toolbutton",
+        )
+        self.legendButton.state(("selected",))
+        self.legendButton.pack(pady=padding, fill="x")
 
         self.columnconfigure(
             0,
@@ -1416,6 +1498,49 @@ class SpeciationFrame(PlotFrame):
     def toggleSmooth(self):
         self.smooth = not self.smooth
         self.plot()
+
+    def toggleLegend(self):
+        self.showLegend = not self.showLegend
+        self.ax.get_legend().set_visible(self.showLegend)
+        self.canvas.draw()
+
+    def updateLegend(self):
+        legendPosition = self.legendVar.get()
+        lastLegendWidth = self.legendWidth
+
+        if legendPosition == "Inside plot":
+            self.legendWidth = 0
+            self.legend.set_visible(True)
+            self.legend.set_draggable(True)
+            self.legend.set_bbox_to_anchor(None)
+            self.legend.set_loc("best")
+        elif legendPosition == "Outside plot":
+            self.legendWidth = 0  # self.figWidth uses self.legendWidth
+            self.legend.set_visible(False)
+            self.fig.set_size_inches([self.figWidth, self.figHeight])
+            self.fig.set_dpi(self.dpi)
+            self.canvas.draw()
+            widthBeforeLegend, _ = self.ax.bbox.size
+
+            self.legend.set_visible(True)
+            self.legend.set_draggable(False)
+            self.legend.set_bbox_to_anchor([1, 1])
+            self.legend.set_loc("upper left")
+            self.canvas.draw()
+            widthAfterLegend, _ = self.ax.bbox.size
+
+            self.legendWidth = widthBeforeLegend - widthAfterLegend
+        else:
+            self.legendWidth = 0
+            self.legend.set_visible(False)
+
+        if lastLegendWidth != self.legendWidth:
+            self.updateDpi()
+        else:
+            self.canvas.draw()
+
+        # TODO: add to all frames, change to updateLegendAndDpi() so that it just calls
+        # updateDpi() if self.legend does not exist.
 
     @property
     def freeIndex(self):
@@ -1506,9 +1631,9 @@ class SpeciationFrame(PlotFrame):
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
-        self.ax.legend(draggable=True)
 
-        self.canvas.draw()
+        self.legend = self.ax.legend()
+        self.updateLegend()
 
 
 class ResultsFrame(ttk.Frame):
