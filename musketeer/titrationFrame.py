@@ -109,7 +109,48 @@ class TitrationFrame(ttk.Frame):
             newtab=self.newFit,
             style="Flat.Interactive.TNotebook",
         )
+
+        self.notebook.bind("<Button-3>", self.renameTab, True)
+
         self.notebook.grid(column=1, row=0, sticky="nesw")
+
+    def renameTab(self, event):
+        if self.notebook.identify(event.x, event.y) not in ("label", "padding"):
+            return
+
+        index = self.notebook.index(f"@{event.x},{event.y}")
+        if index == self.notebook._last_tab and self.notebook._has_newtab_button:
+            return
+
+        entry = ttk.Entry(self)
+        entry.insert(
+            0, self.notebook.tab(index, "text")[: -self.notebook._padding_spaces]
+        )
+        entry.place(
+            x=event.x,
+            y=event.y,
+            anchor="nw",
+            in_=self.notebook,
+        )
+        entry.focus_set()
+        entry.grab_set()
+
+        def onEnter(event):
+            self.notebook.tab(
+                index, text=entry.get() + " " * self.notebook._padding_spaces
+            )
+            entry.destroy()
+
+        def onClick(event):
+            if entry.identify(event.x, event.y) == "":
+                entry.destroy()
+                return "break"
+
+        entry.bind("<Return>", onEnter)
+        entry.bind("<Button-1>", onClick)
+        entry.bind("<Escape>", lambda event: entry.destroy())
+
+        return "break"
 
     def loadTitration(self, titration):
         if type(titration) is Titration:
