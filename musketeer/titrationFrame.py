@@ -34,7 +34,7 @@ from . import (
     totalConcentrations,
 )
 from .moduleFrame import GroupFrame
-from .patchMatplotlib import NavigationToolbarVertical
+from .patchMatplotlib import NavigationToolbarVertical, VerticalToolbarAxes
 from .scrolledFrame import ScrolledFrame
 from .style import defaultFigureParams, figureParams, padding
 from .table import Table, ButtonFrame
@@ -684,7 +684,7 @@ class InputSpectraFrame(PlotFrame):
         self.fig = Figure(
             layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
         )
-        self.ax = self.fig.add_subplot()
+        self.ax = self.fig.add_subplot(axes_class=VerticalToolbarAxes)
 
         ttk.Button(rangeSelection, text="Update", command=self.updateWLRange).pack(
             side="left"
@@ -772,7 +772,7 @@ class ContinuousFittedFrame(PlotFrame):
         self.fig = Figure(
             layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
         )
-        self.ax = self.fig.add_subplot()
+        self.ax = self.fig.add_subplot(axes_class=VerticalToolbarAxes)
         self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().grid(row=1, column=1, sticky="nw")
@@ -886,7 +886,7 @@ class FittedFrame(PlotFrame):
         self.fig = Figure(
             layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
         )
-        self.ax = self.fig.add_subplot()
+        self.ax = self.fig.add_subplot(axes_class=VerticalToolbarAxes)
 
         self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()
@@ -1327,7 +1327,7 @@ class SpeciationFrame(PlotFrame):
         self.fig = Figure(
             layout="constrained", figsize=(self.figwidth, self.figheight), dpi=self.dpi
         )
-        self.ax = self.fig.add_subplot()
+        self.ax = self.fig.add_subplot(axes_class=VerticalToolbarAxes)
 
         self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self)
         self.canvas.draw()

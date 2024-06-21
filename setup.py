@@ -48,7 +48,7 @@ setuptools.setup(
     packages=["musketeer"],
     include_package_data=True,
     install_requires=[
-        "matplotlib >= 3.8.0",
+        "matplotlib >= 3.9.0",
         "numpy",
         "packaging",
         "scipy",
