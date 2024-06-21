@@ -4,12 +4,13 @@ import tkinter.ttk as ttk
 
 import matplotlib
 from matplotlib import cbook, offsetbox
+from matplotlib.axes import Axes
 from matplotlib.axes._base import _AxesBase
 from matplotlib.backend_bases import NavigationToolbar2, _Mode, cursors
 from matplotlib.backends._backend_tk import (
     FigureCanvasTk,
     NavigationToolbar2Tk,
-    ToolTip,
+    add_tooltip,
 )
 
 matplotlib.use("TkAgg")
@@ -57,7 +58,7 @@ class NavigationToolbarVertical(NavigationToolbar2Tk):
                     command=getattr(self, callback),
                 )
                 if tooltip_text is not None:
-                    ToolTip.createToolTip(button, tooltip_text)
+                    add_tooltip(button, tooltip_text)
 
         self.message = tk.StringVar(master=self)
         self.message.set("\N{NO-BREAK SPACE}\n\N{NO-BREAK SPACE}")
@@ -74,8 +75,13 @@ class NavigationToolbarVertical(NavigationToolbar2Tk):
 
         NavigationToolbar2.__init__(self, canvas)
 
-    def set_message(self, s):
-        self.message.set(s.replace(" ", "\n"))
+
+class VerticalToolbarAxes(Axes):
+    def format_coord(self, x, y):
+        return (
+            f"x={'???' if x is None else self.format_xdata(x)}\n"
+            f"y={'???' if y is None else self.format_ydata(y)}"
+        )
 
 
 # updates the navigation toolbar to use ttk, and the correct ttkbootstrap style
