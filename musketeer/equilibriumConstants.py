@@ -289,6 +289,21 @@ class GetKsCustom(EquilibriumConstants):
         return globalKs
 
 
+class GetKsIndependentNoCooperativity(GetKsCustom):
+    Popup = None
+    popupAttributes = ()
+    requiredAttributes = tuple(
+        set(EquilibriumConstants.requiredAttributes) | set(GetKsCustom.popupAttributes)
+    )
+
+    @property
+    def ksMatrix(self):
+        for host, guest in np.argwhere(
+            np.triu(self.titration.speciation.formsBinaryComplex)
+        ):
+            pass
+
+
 class KnownKsTable(Table):
     def __init__(self, master, titration):
         self.titration = titration
