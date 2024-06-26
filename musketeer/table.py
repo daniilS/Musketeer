@@ -233,6 +233,11 @@ class Table(ttk.Frame):
                 cell.grid(row=self.headerGridRows + row, column=column)
 
     def addRow(self, firstEntry="", data=None):
+        """
+        If provided, each element of `data` must either be a string, or a (func, kwargs)
+        pair, where `func` is a method of this class that creates a widget, and `kwargs`
+        are the keyword arguments to pass to that method.
+        """
         row = self.cells.shape[0]
         newRow = np.full(self.cells.shape[1], None)
         rowTitleWidth = self.rowTitleWidth or self.width
@@ -247,14 +252,26 @@ class Table(ttk.Frame):
                 row, 1, firstEntry, font=self.titleFont, width=rowTitleWidth
             )
         for column in range(self.cells.shape[1] - 2):
-            entry = self.entry(row, 2 + column, align="right")
-            if data is not None:
-                entry.set(data[column])
-            newRow[2 + column] = entry
+            if data is not None and isinstance(
+                value := data[column], (list, tuple, np.ndarray)
+            ):
+                func = getattr(self, value[0])
+                cell = func(row, 2 + column, **value[1])
+            else:
+                cell = self.entry(row, 2 + column, align="right")
+                if data is not None:
+                    cell.set(data[column])
+
+            newRow[2 + column] = cell
 
         self.cells = np.vstack((self.cells, newRow))
 
     def addColumn(self, firstEntry="", data=None):
+        """
+        If provided, each element of `data` must either be a string, or a (func, kwargs)
+        pair, where `func` is a method of this class that creates a widget, and `kwargs`
+        are the keyword arguments to pass to that method.
+        """
         column = self.cells.shape[1]
         newColumn = np.full(self.cells.shape[0], None)
         if "delete" in self.columnOptions:
@@ -270,10 +287,17 @@ class Table(ttk.Frame):
         elif "titles" in self.columnOptions:
             newColumn[1] = self.entry(1, column, firstEntry, font=self.titleFont)
         for row in range(self.headerCells, self.cells.shape[0]):
-            entry = self.entry(row, column, align="right")
-            if data is not None:
-                entry.set(data[row - self.headerCells])
-            newColumn[row] = entry
+            if data is not None and isinstance(
+                value := data[row - self.headerCells], (list, tuple, np.ndarray)
+            ):
+                func = getattr(self, value[0])
+                cell = func(row, column, **value[1])
+            else:
+                cell = self.entry(row, column, align="right")
+                if data is not None:
+                    cell.set(data[row - self.headerCells])
+
+            newColumn[row] = cell
 
         self.cells = np.hstack((self.cells, newColumn[:, None]))
 
