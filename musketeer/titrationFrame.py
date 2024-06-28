@@ -96,6 +96,14 @@ class TitrationFrame(ttk.Frame):
         )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
+        reloadButton = ttk.Button(
+            self.options,
+            style="danger.TButton",
+            text="Reload",
+            command=self.reloadObjects,
+        )
+        reloadButton.grid(sticky="nesw", pady=padding, ipady=padding)
+
         separator = ttk.Separator(self.options, orient="horizontal")
         separator.grid(sticky="nesw", pady=padding)
 
@@ -376,6 +384,19 @@ class TitrationFrame(ttk.Frame):
     def fitData(self):
         self.currentTab.fitData()
 
+    def reloadObjects(self):
+        importlib.reload(sys.modules[self.__module__])
+        for widget in [self] + [
+            self.nametowidget(tab)
+            for fitNotebook in self.notebook.tabs()
+            if isinstance(self.nametowidget(fitNotebook), ttk.Notebook)
+            for tab in self.nametowidget(fitNotebook).tabs()
+        ]:
+            widget.__class__ = sys.modules[self.__module__].__dict__[
+                widget.__class__.__name__
+            ]
+        print(f"reloaded {self.__module__}")
+
     def saveFile(self, saveAs=False):
         options = {}
         options[".version"] = __version__
@@ -510,15 +531,6 @@ class FitNotebook(ttk.Notebook):
         finally:
             self.tk.eval("tk busy forget .")
             self.update()
-
-        importlib.reload(sys.modules[self.__module__])
-        for widget in [self.master, self] + [
-            self.nametowidget(tab) for tab in self.tabs()
-        ]:
-            widget.__class__ = sys.modules[self.__module__].__dict__[
-                widget.__class__.__name__
-            ]
-        print(f"reloaded {self.__module__}")
 
         self.showFit()
 
