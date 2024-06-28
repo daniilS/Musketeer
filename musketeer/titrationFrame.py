@@ -1612,6 +1612,74 @@ class ResultsFrame(ttk.Frame):
             chiSquared / numDataPoints
         ) + numParameters * np.log(numDataPoints)
 
+    def fitCallback(self, *args):
+        self.update()
+
+    def RMSEPlot(self, index):
+        ordersOfMagnitude = 2
+        points = 30  # TODO: CURRENTLY **MUST** BE EVEN!!!
+        midpoint = points // 2
+        precision = 100
+
+        fixedTitration = deepcopy(self.titration)
+        initialGuess = ma.array(fixedTitration.lastVars)
+
+        fixedVars = ma.masked_all_like(fixedTitration.lastVars)
+
+        bestValue = fixedTitration.lastVars[index]
+        logBestValue = np.log10(bestValue)
+        values = np.logspace(
+            logBestValue - ordersOfMagnitude,
+            logBestValue + ordersOfMagnitude,
+            points + 1,
+        )
+
+        RMSEs = np.empty_like(values)
+        optimisationResults = [None] * len(values)
+
+        fixedVars[index] = values[0]
+        optimisationResults[0] = 10 ** fixedTitration.optimiseFixed(
+            fixedVars, initialGuess, self.fitCallback
+        )
+        RMSEs[0] = fixedTitration.RMSE
+
+        fixedVars[index] = values[-1]
+        optimisationResults[-1] = 10 ** fixedTitration.optimiseFixed(
+            fixedVars, initialGuess, self.fitCallback
+        )
+        RMSEs[-1] = fixedTitration.RMSE
+
+        RMSEs[midpoint] = self.titration.RMSE
+        optimisationResults[midpoint] = self.titration.lastVars[fixedVars.mask]
+
+        difference = max(RMSEs[0], RMSEs[-1]) - RMSEs[midpoint]
+        step = difference / precision
+
+        for i, value in enumerate(values):
+            print(i)
+            if i in [0, midpoint, points]:
+                continue
+
+            fixedVars[index] = value
+
+            initialGuess = ma.masked_all_like(fixedVars)
+            initialGuess[fixedVars.mask] = optimisationResults[i - 1]
+
+            optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
+                fixedVars,
+                initialGuess,
+                self.fitCallback,
+                {"xatol": 1, "fatol": step},
+            )
+            RMSEs[i] = fixedTitration.RMSE
+
+        import matplotlib.pyplot as plt
+
+        plt.plot(values, RMSEs)
+        plt.xscale("log")
+        plt.show(block=False)
+        breakpoint()
+
     def showResults(self):
         titration = self.titration
         bicLabel = ttk.Label(
@@ -1622,7 +1690,7 @@ class ResultsFrame(ttk.Frame):
 
         rmselabel = ttk.Label(
             self,
-            text=f"RMSE: {self.RMSE:.8g}",
+            text=f"RMSE: {titration.RMSE:.8g}",
         )
         rmselabel.pack(side="top", pady=15)
 
@@ -1630,18 +1698,30 @@ class ResultsFrame(ttk.Frame):
             self,
             0,
             0,
-            ["K (M⁻ⁿ)"],
+            ["K (M⁻ⁿ)", ""],
             rowOptions=("readonlyTitles",),
             columnOptions=("readonlyTitles",),
         )
 
         ks = titration.lastKVars
 
-        for (
+        for index, (
             name,
             value,
-        ) in zip(titration.equilibriumConstants.variableNames, ks):
-            kTable.addRow(name, [self.formatK(value)])
+        ) in enumerate(zip(titration.equilibriumConstants.variableNames, ks)):
+            kTable.addRow(
+                name,
+                [
+                    self.formatK(value),
+                    [
+                        "button",
+                        {
+                            "text": "RMSE plot",
+                            "command": lambda index=index: self.RMSEPlot(index),
+                        },
+                    ],
+                ],
+            )
         kTable.pack(side="top", pady=15)
 
         # TODO: fix sheet becoming too small to be visible when there are a lot of
