@@ -815,7 +815,7 @@ class SpeciationSolver(Speciation):
         return np.hstack([free, bound])
 
 
-class SpeciationHG2(SpeciationSolver):
+class SpeciationHG2(Speciation):
     @property
     def stoichiometries(self):
         if self.freeCount < 2:
@@ -827,6 +827,35 @@ class SpeciationHG2(SpeciationSolver):
                 mode="constant",
                 constant_values=0,
             )
+
+    def run(self, variables, totalConcs):
+        K1, K2 = variables
+        output = np.empty([totalConcs.shape[0], 4])
+
+        for i, (Htot, Gtot) in enumerate(totalConcs):
+            # Calculate reduced cubic coefficients (for cubic in [G])
+            a = 1
+            b = 2 * Htot - Gtot + K1 / K2
+            c = (K1 * (Htot - Gtot) + 1) / K2
+            d = -Gtot / K2
+
+            polynomial = np.array([a, b, c, d])
+
+            # Find cubic roots (solve for [G])
+            roots = np.roots(polynomial)
+
+            # Find smallest real positive root:
+            select = np.all([np.imag(roots) == 0, np.real(roots) >= 0], axis=0)
+            G = roots[select].min()
+            G = float(np.real(G))
+
+            HG = Htot * (G * K1) / (1 + K1 * G + K2 * (G**2))
+            HG2 = Htot * (K2 * (G**2)) / (1 + K1 * G + K2 * (G**2))
+            H = Htot - HG - HG2
+
+            output[i] = [H, G, HG, HG2]
+
+        return output
 
 
 class SpeciationCustom(SpeciationSolver):
