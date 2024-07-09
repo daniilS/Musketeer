@@ -49,6 +49,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "matplotlib >= 3.9.0",
+        "cycler",
         "numpy",
         "packaging",
         "scipy",

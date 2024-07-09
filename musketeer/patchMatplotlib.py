@@ -2,6 +2,7 @@ import functools
 import tkinter as tk
 import tkinter.ttk as ttk
 
+from cycler import cycler
 import matplotlib
 from matplotlib import cbook, offsetbox
 from matplotlib.axes import Axes
@@ -250,6 +251,11 @@ def clear(self, *args, **kwargs):
 
 
 def applyPatch():
+    # cycles through line styles when colours start repeating
+    colourCycler = matplotlib.rcParams["axes.prop_cycle"]
+    lineCycler = cycler(linestyle=["-", "--", ":", "-."])
+    matplotlib.rcParams["axes.prop_cycle"] = lineCycler * colourCycler
+
     # makes buttons use ttk widgets
     NavigationToolbar2Tk._Button = _Button
     NavigationToolbar2Tk._Spacer = _Spacer
