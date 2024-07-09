@@ -1315,6 +1315,7 @@ class SpeciationFrame(PlotFrame):
         self.titration = titration
         self.xQuantity = titration.totalConcentrations.freeNames[-1]
         self.xConcs = titration.lastTotalConcs.T[-1]
+        self.xUnit = titration.totalConcentrations.concsUnit
         self.speciesVar = tk.StringVar(self)
         self.separatePolymers = False
         self.logScale = False
@@ -1381,6 +1382,22 @@ class SpeciationFrame(PlotFrame):
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
+        self.saveCurvesButton = ttk.Button(
+            self.optionsFrame,
+            text="Save speciation curves",
+            command=self.saveSpeciationCurves,
+            style="success.Outline.TButton",
+        )
+        self.saveCurvesButton.pack(pady=padding, fill="x")
+
+        self.saveCurvesButton = ttk.Button(
+            self.optionsFrame,
+            text="Save raw speciation",
+            command=self.saveSpeciationRaw,
+            style="success.Outline.TButton",
+        )
+        self.saveCurvesButton.pack(pady=padding, fill="x")
+
         self.columnconfigure(
             0,
             weight=1000,
@@ -1417,15 +1434,57 @@ class SpeciationFrame(PlotFrame):
         self.smooth = not self.smooth
         self.plot()
 
+    def saveSpeciationCurves(self):
+        freeName = self.speciesVar.get()
+
+        initialfile = (
+            os.path.splitext(self.titration.title)[0] + f"_{freeName}_speciation_curves"
+        )
+        fileName = fd.asksaveasfilename(
+            title="Save speciation curves",
+            initialfile=initialfile,
+            filetypes=[("CSV file", "*.csv")],
+            defaultextension=".csv",
+        )
+        xConcs, curves, names = self.getData()
+
+        rowTitles = np.atleast_2d(xConcs).T
+        columnTitles = np.append(
+            f"Total [{self.xQuantity}] / {self.xUnit}",
+            [f"% of {freeName} in {name}" for name in names],
+        )
+        output = np.vstack((columnTitles, np.hstack((rowTitles, curves.T))))
+        try:
+            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
+        except Exception as e:
+            mb.showerror(title="Could not save file", message=e, parent=self)
+
+    def saveSpeciationRaw(self):
+        initialfile = os.path.splitext(self.titration.title)[0] + "_raw_speciation"
+        fileName = fd.asksaveasfilename(
+            title="Save raw speciation",
+            initialfile=initialfile,
+            filetypes=[("CSV file", "*.csv")],
+            defaultextension=".csv",
+        )
+        data = self.titration.lastSpeciesConcs
+        rowTitles = np.atleast_2d(self.titration.additionTitles).T
+        columnTitles = np.append(
+            "", [f"[{name}]" for name in self.titration.speciation.outputNames]
+        )
+        output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
+        try:
+            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
+        except Exception as e:
+            mb.showerror(title="Could not save file", message=e, parent=self)
+
     @property
     def freeIndex(self):
         return np.where(
             self.titration.totalConcentrations.freeNames == self.speciesVar.get()
         )[0][0]
 
-    def plot(self):
-        self.ax.clear()
-
+    def getData(self):
         titration = self.titration
 
         # xQuantity and xUnit for the fitted plot. Different from the xQuantity
@@ -1435,26 +1494,19 @@ class SpeciationFrame(PlotFrame):
         additionsFilter = totalConcs != 0
         totalConcs = totalConcs[additionsFilter]
 
-        xQuantity = self.xQuantity
-        xUnit = titration.totalConcentrations.concsUnit
         xConcs = (
             self.xConcs[additionsFilter]
-            / totalConcentrations.prefixes[xUnit.strip("M")]
+            / totalConcentrations.prefixes[self.xUnit.strip("M")]
         )
-
-        freeName = self.speciesVar.get()
 
         factor = abs(titration.speciation.outputStoichiometries[:, self.freeIndex])
         mask = factor.astype(bool)
 
         concs = titration.lastSpeciesConcs * factor
         concs = concs[additionsFilter, :][:, mask]
-        names = titration.speciation.outputNames[mask]
-
         curves = 100 * concs.T / totalConcs
-        self.ax.set_ylabel(f"% of {freeName}")
-        self.ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100))
-        self.ax.set_ylim(bottom=-5, top=105)
+
+        names = titration.speciation.outputNames[mask]
 
         if not self.separatePolymers:
             # Find the indices of terminal species which are followed by matching
@@ -1475,6 +1527,13 @@ class SpeciationFrame(PlotFrame):
             names = [name.removesuffix(" terminal") for name in names[keepIndices]]
             # Merge the curves: add the concs of the internal elements to the terminal.
             curves = np.add.reduceat(curves, np.where(keepIndices)[0], axis=0)
+
+        return xConcs, curves, names
+
+    def plot(self):
+        self.ax.clear()
+
+        xConcs, curves, names = self.getData()
 
         for curve, name in zip(curves, names):
             # add step - 1 points between each data point
@@ -1501,11 +1560,16 @@ class SpeciationFrame(PlotFrame):
                 self.ax.plot(xConcs, curve, label=name)
                 continue
 
+        freeName = self.speciesVar.get()
+        self.ax.set_ylabel(f"% of {freeName}")
+        self.ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100))
+        self.ax.set_ylim(bottom=-5, top=105)
+
         if self.logScale:
             self.ax.set_xscale("log")
         else:
             self.ax.set_xscale("linear")
-        self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
+        self.ax.set_xlabel(f"[{self.xQuantity}] / {self.xUnit}")
         self.ax.legend(draggable=True)
 
         self.canvas.draw()
