@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 import numpy as np
 from numpy import ma
-from numpy.linalg import lstsq
+from scipy.linalg import lstsq
 from scipy.optimize import lsq_linear
 
 from . import moduleFrame
@@ -48,7 +48,6 @@ class FitSignals(moduleFrame.Strategy):
                     contributorsSlicePerMolecule[molecule]
                     for molecule in self.titration.contributingSpecies.signalToMoleculeMap
                 ]
-
             else:
                 contributorsSlicePerSignal = [
                     np.arange(contributorsCount)
@@ -74,27 +73,12 @@ class FitSignals(moduleFrame.Strategy):
                     :, unknownSpectraSlice
                 ]
 
-                try:
-                    (
-                        fittedSpectra[unknownSpectraSlice, index],
-                        residuals[index],
-                    ) = self.leastSquares(
-                        relevantContributorConcs, signalData.compressed()
+                fittedSpectra[unknownSpectraSlice, index], residuals[index] = (
+                    self.leastSquares(
+                        np.array(relevantContributorConcs), signalData.compressed()
                     )
-                except ValueError:
-                    # Should only happen with incorrect constraints
-                    (fittedSpectra[unknownSpectraSlice, index], _) = self.leastSquares(
-                        relevantContributorConcs, signalData.compressed()
-                    )
-                    residuals[index] = (
-                        np.linalg.norm(
-                            relevantContributorConcs
-                            @ fittedSpectra[unknownSpectraSlice, index]
-                            - signalData.compressed(),
-                            ord=2,
-                        )
-                        ** 2
-                    )
+                )
+
             fittedCurves = ma.dot(contributorConcs, fittedSpectra)
 
             # Make the smooth curves ignore masked values, rather than treating them as
@@ -103,7 +87,8 @@ class FitSignals(moduleFrame.Strategy):
         else:
             # can process all signals at once
             fittedSpectra, residuals = self.leastSquares(
-                contributorConcs, self.titration.processedData
+                np.array(contributorConcs),
+                np.array(self.titration.processedData),
             )
             fittedCurves = ma.dot(contributorConcs, fittedSpectra)
 
@@ -112,9 +97,12 @@ class FitSignals(moduleFrame.Strategy):
 
 class FitSignalsUnconstrained(FitSignals):
     def leastSquares(self, x, y):
-        b, residuals, _, _ = lstsq(x, y, rcond=None)
-        if residuals.size == 0:
-            residuals = np.linalg.norm(ma.dot(x, b) - y, ord=2, axis=0) ** 2
+        # For almost-singular matrices, the default "gelsd" driver can sometimes return
+        # the correct residuals, but an incorrect value of b, which gives much worse
+        # residuals when calculating x @ b - y. So instead, use "gelsy", and calculate
+        # the residuals manually.
+        b, _, _, _ = lstsq(x, y, cond=None, lapack_driver="gelsy")
+        residuals = np.linalg.norm(x @ b - y, ord=2, axis=0) ** 2
         return b, residuals
 
 
