@@ -1740,19 +1740,20 @@ class RMSEPopup(tk.Toplevel):
         )
 
         if self.hasMultipleVariables:
-            self.precisionLabel = WrappedLabel(
+            self.convergenceLabel = WrappedLabel(
                 self.frame,
                 padding=padding,
-                text="Vertical resolution – set to 0 to disable.\n\nIf enabled, will first estimate the vertical range of the plot by calculating the increase in RMSE at the leftmost and rightmost points, and then in subsequent calculations set the convergence criterium to the RMSE increase divided by this value. This can speed up the calculation when there are a lot of points, but the initial range estimation may take a long time.",
+                text=(
+                    "Use faster convergence criteria?\n\nThis can speed up the "
+                    "calculation, but may produce less accurate results."
+                ),
             )
-            self.precisionLabel.grid(row=3, column=1, columnspan=2, sticky="nesw")
+            self.convergenceLabel.grid(row=3, column=1, columnspan=2, sticky="nesw")
 
-            self.precisionSpinbox = ttk.Spinbox(
-                self.frame, from_=0, to=1e6, increment=50, width=6
-            )
-            self.precisionSpinbox.set(0)
-            self.precisionSpinbox.grid(
-                row=3, column=0, padx=padding, pady=padding, sticky="ne"
+            self.convergenceCheckbutton = ttk.Checkbutton(self.frame)
+            self.convergenceCheckbutton.state(["!alternate", "!selected"])
+            self.convergenceCheckbutton.grid(
+                row=3, column=0, padx=padding, pady=padding, sticky="e"
             )
 
         self.calculateButton = ttk.Button(
@@ -1782,8 +1783,6 @@ class RMSEPopup(tk.Toplevel):
         ordersOfMagnitude = float(self.ordersOfMagnitudeSpinbox.get())
         points = 2 * int(self.pointsSpinbox.get())
         midpoint = points // 2
-        if self.hasMultipleVariables:
-            precision = float(self.precisionSpinbox.get())
 
         fixedTitration = deepcopy(self.titration)
         initialGuess = ma.array(self.titration.lastVars)
@@ -1806,7 +1805,11 @@ class RMSEPopup(tk.Toplevel):
         optimisationResults[midpoint] = self.titration.lastVars[fixedVars.mask]
 
         with RMSEProgressDialog(self, points) as progressDialog:
-            if self.hasMultipleVariables and precision != 0:
+            if self.hasMultipleVariables and self.convergenceCheckbutton.instate(
+                ["selected"]
+            ):
+                precision = 100
+
                 progressDialog.label.configure(text="Estimating range... (1/2)")
                 progressDialog.callback()
 
