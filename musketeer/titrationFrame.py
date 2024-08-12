@@ -1631,7 +1631,6 @@ class RMSEProgressDialog(tk.Toplevel):
         self.teardown()
 
         if exc_type is self.CancelError:
-            print("cancelled")
             return True
 
 
@@ -1872,16 +1871,13 @@ class RMSEPopup(tk.Toplevel):
                 initialGuess = ma.masked_all_like(fixedVars)
                 initialGuess[fixedVars.mask] = optimisationResults[i - 1]
 
-                try:
-                    optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
-                        fixedVars,
-                        initialGuess,
-                        progressDialog.callback,
-                        {"xatol": xatol, "fatol": fatol},
-                    )
-                    RMSEs[i] = fixedTitration.RMSE
-                except ValueError:
-                    breakpoint()
+                optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
+                    fixedVars,
+                    initialGuess,
+                    progressDialog.callback,
+                    {"xatol": xatol, "fatol": fatol},
+                )
+                RMSEs[i] = fixedTitration.RMSE
 
                 if i == points:
                     # step() wraps around to 0 when reaching maximum
@@ -1902,7 +1898,7 @@ class ResultsFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.sigfigs = 7
+        self.sigfigs = 3
         self.showResults()
 
     # TODO: add spinbox for sigfigs
@@ -1938,113 +1934,6 @@ class ResultsFrame(ttk.Frame):
     def showRMSEPlot(self, index):
         popup = RMSEPopup(self, self.titration, index)
         popup.show()
-
-    def RMSEPlot(self, index):
-        ordersOfMagnitude = 2
-        points = 200  # TODO: CURRENTLY **MUST** BE EVEN!!!
-        midpoint = points // 2
-        precision = 1000
-
-        fixedTitration = deepcopy(self.titration)
-        initialGuess = ma.array(self.titration.lastVars)
-
-        fixedVars = ma.masked_all_like(fixedTitration.lastVars)
-
-        bestValue = fixedTitration.lastVars[index]
-        logBestValue = np.log10(bestValue)
-        values = np.logspace(
-            logBestValue - ordersOfMagnitude,
-            logBestValue + ordersOfMagnitude,
-            points + 1,
-        )
-
-        RMSEs = np.empty_like(values)
-        optimisationResults = [None] * len(values)
-
-        fixedVars[index] = values[0]
-        optimisationResults[0] = 10 ** fixedTitration.optimiseFixed(
-            fixedVars, initialGuess, self.fitCallback, {"xatol": 1e-3, "fatol": np.inf}
-        )
-        RMSEs[0] = fixedTitration.RMSE
-        residualsFirst = fixedTitration.lastResiduals
-
-        fixedVars[index] = values[-1]
-        optimisationResults[-1] = 10 ** fixedTitration.optimiseFixed(
-            fixedVars, initialGuess, self.fitCallback, {"xatol": 1e-3, "fatol": np.inf}
-        )
-        RMSEs[-1] = fixedTitration.RMSE
-        residualsLast = fixedTitration.lastResiduals
-
-        RMSEs[midpoint] = self.titration.RMSE
-
-        fixedVars[index] = values[midpoint]
-        fixedTitration.optimiseFixed(fixedVars, initialGuess, self.fitCallback)
-        residualsMidpoint = fixedTitration.lastResiduals
-        optimisationResults[midpoint] = self.titration.lastVars[fixedVars.mask]
-
-        difference = max(residualsFirst, residualsLast) - residualsMidpoint
-        step = difference / precision
-
-        for i in range(midpoint - 1, -1, -1):
-            print(i)
-            fixedVars[index] = values[i]
-
-            initialGuess = ma.masked_all_like(fixedVars)
-            initialGuess[fixedVars.mask] = optimisationResults[i + 1]
-
-            optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
-                fixedVars,
-                initialGuess,
-                self.fitCallback,
-                {"xatol": np.inf, "fatol": step},
-            )
-            RMSEs[i] = fixedTitration.RMSE
-
-        for i in range(midpoint + 1, points + 1, 1):
-            print(i)
-            fixedVars[index] = values[i]
-
-            initialGuess = ma.masked_all_like(fixedVars)
-            initialGuess[fixedVars.mask] = optimisationResults[i - 1]
-
-            optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
-                fixedVars,
-                initialGuess,
-                self.fitCallback,
-                {"xatol": np.inf, "fatol": step},
-            )
-            RMSEs[i] = fixedTitration.RMSE
-
-        import matplotlib.pyplot as plt
-
-        # plt.legend(["1:1 + Guest absorbance", "1:2 + Guest absorbance"])
-        # return
-
-        RMSEPlotFrame = PlotFrame(self)
-        fig = plt.figure(
-            layout="constrained",
-            figsize=(RMSEPlotFrame.figwidth, RMSEPlotFrame.figheight),
-            dpi=RMSEPlotFrame.dpi,
-        )
-        RMSEPlotFrame.fig = fig
-        fig.canvas.__class__ = FigureCanvasTkAggFixedRatio
-
-        plt.xscale("log")
-        plt.xlabel(
-            R"$K_{"
-            # + fixedTitration.equilibriumConstants.variableNames[index]
-            + "1"
-            + R"}\ (\mathrm{M^{-n}})$"
-        )
-        plt.ylabel(f"RMSE ({fixedTitration.yUnit})")
-        plt.plot(values, RMSEs)
-        plt.ylim((0.0, 0.00760508672305036))
-
-        RMSEPlotFrame.updateDpi()
-
-        plt.show(block=False)
-
-        # breakpoint()
 
     def showResults(self):
         titration = self.titration
