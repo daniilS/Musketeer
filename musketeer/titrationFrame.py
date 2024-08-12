@@ -36,7 +36,7 @@ from .moduleFrame import GroupFrame
 from .patchMatplotlib import NavigationToolbarVertical, VerticalToolbarAxes
 from .scrolledFrame import ScrolledFrame
 from .style import defaultFigureParams, figureParams, padding
-from .table import Table, ButtonFrame
+from .table import Table, ButtonFrame, WrappedLabel
 from .titration import Titration, titrationAttributes
 
 # Magic value indicating that the data in a .fit file should be copied from the original
@@ -1558,11 +1558,348 @@ class SpeciationFrame(PlotFrame):
         self.canvas.draw()
 
 
+class RMSEProgressDialog(tk.Toplevel):
+    def __init__(self, master, progressbarSteps, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.withdraw()
+
+        class CancelError(Exception):
+            pass
+
+        self.CancelError = CancelError
+
+        self.cancelled = False
+
+        self.title("Calculating RMSE plot")
+        self.protocol("WM_DELETE_WINDOW", self.bell)
+
+        self.label = ttk.Label(self, text=" ")
+        self.label.pack(padx=padding, pady=padding)
+
+        self.progressbar = ttk.Progressbar(self, max=progressbarSteps)
+        self.progressbar.pack(padx=padding, pady=padding, fill="x")
+
+        self.button = ttk.Button(self, text="Cancel", command=self.cancel)
+        self.button.pack(padx=padding, pady=padding)
+
+    def cancel(self):
+        self.cancelled = True
+
+    def callback(self, *args, **kwargs):
+        self.update()
+        if self.cancelled:
+            raise self.CancelError
+
+    def __enter__(self):
+        parentWindow = self.master.winfo_toplevel()
+        self.update()
+        width = max(self.winfo_reqwidth(), 250)
+        height = self.winfo_reqheight()
+        x = int(parentWindow.winfo_x() + parentWindow.winfo_width() / 2 - width / 2)
+        y = int(parentWindow.winfo_y() + parentWindow.winfo_height() / 2 - height / 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
+        self.transient(self.master)
+
+        if self._windowingsystem == "aqua":
+            self.oldParentCursor = parentWindow.cget("cursor")
+            parentWindow.configure(cursor="wait")
+        else:
+            self.tk.eval(f"tk busy {parentWindow._w}")
+
+        self.oldGrab = parentWindow.grab_current()
+
+        self.update()
+        return self
+
+    def teardown(self):
+        parentWindow = self.master.winfo_toplevel()
+
+        if self._windowingsystem == "aqua":
+            parentWindow.configure(cursor=self.oldParentCursor)
+        elif self.tk.eval(f"tk busy status {parentWindow._w}") == "1":
+            self.tk.eval(f"tk busy forget {parentWindow._w}")
+
+        if self.oldGrab is not None and self.oldGrab.winfo_exists():
+            self.oldGrab.grab_set()
+
+        self.destroy()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.teardown()
+
+        if exc_type is self.CancelError:
+            print("cancelled")
+            return True
+
+
+class RMSEPopup(tk.Toplevel):
+    def __init__(self, master, titration, variableIndex, *args, **kwargs):
+        self.titration = titration
+        self.variableIndex = variableIndex
+        super().__init__(master, width=1, height=1, *args, **kwargs)
+        self.withdraw()
+
+    def callback(self, *args):
+        self.update()
+        print("updated!")
+
+    def show(self):
+        self.populate()
+        self.update()
+
+        root = self.master.winfo_toplevel()
+        width = int(
+            min(
+                self.canvas.get_tk_widget().winfo_reqwidth()
+                + 2 * self.toolbar.winfo_reqwidth(),
+                root.winfo_width() * 0.6,
+            )
+        )
+        height = int(min(self.frame.winfo_reqheight(), root.winfo_height() * 0.9))
+        x = int(root.winfo_x() + root.winfo_width() / 2 - width / 2)
+        y = int(root.winfo_y() + root.winfo_height() / 2 - height / 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
+        self.deiconify()
+        self.grab_set()
+        self.transient(self.master)
+        self.wait_window()
+
+    @property
+    def hasMultipleVariables(self):
+        return (
+            self.titration.equilibriumConstants.variableCount
+            + self.titration.totalConcentrations.variableCount
+            > 1
+        )
+
+    def resetAxes(self):
+        self.ax.clear()
+        self.ax.set_xscale("log")
+        self.ax.set_xlabel(
+            R"$K_{"
+            + self.titration.equilibriumConstants.variableNames[self.variableIndex]
+            + R"}\ (\mathrm{M^{-n}})$"
+        )
+        self.ax.set_ylabel(f"RMSE ({self.titration.yUnit})")
+
+    def populate(self):
+        self.frame = PlotFrame(self)
+        self.frame.pack(fill="both", expand=True)
+
+        self.fig = Figure(
+            layout="constrained",
+            figsize=(self.frame.figwidth, self.frame.figheight),
+            dpi=self.frame.dpi,
+        )
+        self.ax = self.fig.add_subplot(axes_class=VerticalToolbarAxes)
+
+        self.resetAxes()
+
+        self.canvas = FigureCanvasTkAggFixedRatio(self.fig, master=self.frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nw")
+
+        self.toolbar = NavigationToolbarVertical(
+            self.canvas, self.frame, pack_toolbar=False
+        )
+        self.toolbar.update()
+        self.toolbar.grid(row=0, column=0, sticky="ne")
+
+        self.ordersOfMagnitudeLabel = WrappedLabel(
+            self.frame,
+            padding=padding,
+            text="Orders of magnitude over which to explore the RMSE in each direction",
+        )
+        self.ordersOfMagnitudeLabel.grid(row=1, column=1, columnspan=2, sticky="nesw")
+
+        self.ordersOfMagnitudeSpinbox = ttk.Spinbox(
+            self.frame, from_=1, to=1000, increment=1, width=6
+        )
+        self.ordersOfMagnitudeSpinbox.set(2)
+        self.ordersOfMagnitudeSpinbox.grid(
+            row=1, column=0, padx=padding, pady=padding, sticky="ne"
+        )
+
+        self.pointsLabel = WrappedLabel(
+            self.frame,
+            padding=padding,
+            text="Number of points to calculate RMSE at in each direction",
+        )
+        self.pointsLabel.grid(row=2, column=1, columnspan=2, sticky="nesw")
+
+        self.pointsSpinbox = ttk.Spinbox(
+            self.frame, from_=1, to=1000, increment=5, width=6
+        )
+        self.pointsSpinbox.set(10)
+        self.pointsSpinbox.grid(
+            row=2, column=0, padx=padding, pady=padding, sticky="ne"
+        )
+
+        if self.hasMultipleVariables:
+            self.precisionLabel = WrappedLabel(
+                self.frame,
+                padding=padding,
+                text="Vertical resolution – set to 0 to disable.\n\nIf enabled, will first estimate the vertical range of the plot by calculating the increase in RMSE at the leftmost and rightmost points, and then in subsequent calculations set the convergence criterium to the RMSE increase divided by this value. This can speed up the calculation when there are a lot of points, but the initial range estimation may take a long time.",
+            )
+            self.precisionLabel.grid(row=3, column=1, columnspan=2, sticky="nesw")
+
+            self.precisionSpinbox = ttk.Spinbox(
+                self.frame, from_=0, to=1e6, increment=50, width=6
+            )
+            self.precisionSpinbox.set(0)
+            self.precisionSpinbox.grid(
+                row=3, column=0, padx=padding, pady=padding, sticky="ne"
+            )
+
+        self.calculateButton = ttk.Button(
+            self.frame,
+            text="Calculate plot",
+            command=self.calculate,
+            style="success.TButton",
+        )
+        self.calculateButton.grid(
+            row=4, column=0, columnspan=3, padx=padding, pady=3 * padding, sticky="n"
+        )
+
+        self.frame.columnconfigure(
+            0,
+            weight=1000,
+            uniform="column",
+            minsize=max(
+                [self.pointsSpinbox.winfo_reqwidth()]
+                + [w.winfo_reqwidth() for w in self.toolbar.children.values()]
+            ),
+        )
+        self.frame.columnconfigure(1, weight=1, minsize=0)
+        self.frame.columnconfigure(2, weight=1000, uniform="column", minsize=0)
+        self.frame.rowconfigure(0, weight=1)
+
+    def calculate(self):
+        ordersOfMagnitude = float(self.ordersOfMagnitudeSpinbox.get())
+        points = 2 * int(self.pointsSpinbox.get())
+        midpoint = points // 2
+        if self.hasMultipleVariables:
+            precision = float(self.precisionSpinbox.get())
+
+        fixedTitration = deepcopy(self.titration)
+        initialGuess = ma.array(self.titration.lastVars)
+
+        fixedVars = ma.masked_all_like(fixedTitration.lastVars)
+        fixedVars[self.variableIndex] = fixedTitration.lastVars[self.variableIndex]
+
+        bestValue = fixedTitration.lastVars[self.variableIndex]
+        logBestValue = np.log10(bestValue)
+        values = np.logspace(
+            logBestValue - ordersOfMagnitude,
+            logBestValue + ordersOfMagnitude,
+            points + 1,
+        )
+
+        RMSEs = np.empty_like(values)
+        RMSEs[midpoint] = self.titration.RMSE
+
+        optimisationResults = [None] * len(values)
+        optimisationResults[midpoint] = self.titration.lastVars[fixedVars.mask]
+
+        with RMSEProgressDialog(self, points) as progressDialog:
+            if self.hasMultipleVariables and precision != 0:
+                progressDialog.label.configure(text="Estimating range... (1/2)")
+                progressDialog.callback()
+
+                fixedVars[self.variableIndex] = values[0]
+                optimisationResults[0] = 10 ** fixedTitration.optimiseFixed(
+                    fixedVars,
+                    initialGuess,
+                    progressDialog.callback,
+                    {"xatol": 1e-3, "fatol": np.inf},
+                )
+                RMSEs[0] = fixedTitration.RMSE
+                residualsFirst = fixedTitration.lastResiduals
+
+                progressDialog.label.configure(text="Estimating range... (2/2)")
+                progressDialog.callback()
+                fixedVars[self.variableIndex] = values[-1]
+                optimisationResults[-1] = 10 ** fixedTitration.optimiseFixed(
+                    fixedVars,
+                    initialGuess,
+                    progressDialog.callback,
+                    {"xatol": 1e-3, "fatol": np.inf},
+                )
+                RMSEs[-1] = fixedTitration.RMSE
+                residualsLast = fixedTitration.lastResiduals
+
+                fixedVars[self.variableIndex] = values[midpoint]
+                fixedTitration.optimiseFixed(
+                    fixedVars, initialGuess, progressDialog.callback
+                )
+                residualsMidpoint = fixedTitration.lastResiduals
+
+                difference = max(residualsFirst, residualsLast) - residualsMidpoint
+                fatol = difference / precision
+                xatol = 1e-2
+            else:
+                fatol = np.inf
+                xatol = 1e-3
+
+            progressDialog.label.configure(text="Calculating RMSE values...")
+            progressDialog.callback()
+            for i in range(midpoint - 1, -1, -1):
+                fixedVars[self.variableIndex] = values[i]
+
+                initialGuess = ma.masked_all_like(fixedVars)
+                initialGuess[fixedVars.mask] = optimisationResults[i + 1]
+
+                optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
+                    fixedVars,
+                    initialGuess,
+                    progressDialog.callback,
+                    {"xatol": xatol, "fatol": fatol},
+                )
+                RMSEs[i] = fixedTitration.RMSE
+                progressDialog.progressbar.step()
+                progressDialog.callback()
+
+            for i in range(midpoint + 1, points + 1, 1):
+                fixedVars[self.variableIndex] = values[i]
+
+                initialGuess = ma.masked_all_like(fixedVars)
+                initialGuess[fixedVars.mask] = optimisationResults[i - 1]
+
+                try:
+                    optimisationResults[i] = 10 ** fixedTitration.optimiseFixed(
+                        fixedVars,
+                        initialGuess,
+                        progressDialog.callback,
+                        {"xatol": xatol, "fatol": fatol},
+                    )
+                    RMSEs[i] = fixedTitration.RMSE
+                except ValueError:
+                    breakpoint()
+
+                if i == points:
+                    # step() wraps around to 0 when reaching maximum
+                    progressDialog.progressbar.configure(value=points)
+                else:
+                    progressDialog.progressbar.step()
+                progressDialog.callback()
+
+            progressDialog.label.configure(text="Plotting...")
+            progressDialog.callback()
+
+            self.resetAxes()
+            self.ax.plot(values, RMSEs)
+            self.canvas.draw()
+
+
 class ResultsFrame(ttk.Frame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.sigfigs = 3
+        self.sigfigs = 7
         self.showResults()
 
     # TODO: add spinbox for sigfigs
@@ -1595,8 +1932,9 @@ class ResultsFrame(ttk.Frame):
             chiSquared / numDataPoints
         ) + numParameters * np.log(numDataPoints)
 
-    def fitCallback(self, *args):
-        self.update()
+    def showRMSEPlot(self, index):
+        popup = RMSEPopup(self, self.titration, index)
+        popup.show()
 
     def RMSEPlot(self, index):
         ordersOfMagnitude = 2
@@ -1742,7 +2080,7 @@ class ResultsFrame(ttk.Frame):
                         "button",
                         {
                             "text": "RMSE plot",
-                            "command": lambda index=index: self.RMSEPlot(index),
+                            "command": lambda index=index: self.showRMSEPlot(index),
                         },
                     ],
                 ],
