@@ -33,6 +33,14 @@ def stoichiometriesToBoundNames(freeNames, stoichiometries):
                 boundName += freeName + "ₙ"
             else:
                 boundName += freeName + str(stoichiometry).translate(trans)
+
+        allNames = set(freeNames) | set(boundNames)
+        if boundName in allNames:
+            copyIndex = 2
+            while boundName + f" ({copyIndex})" in allNames:
+                copyIndex += 1
+            boundName += f" ({copyIndex})"
+
         boundNames.append(boundName)
     return np.array(boundNames)
 
