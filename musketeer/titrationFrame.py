@@ -1635,9 +1635,10 @@ class RMSEProgressDialog(tk.Toplevel):
 
 
 class RMSEPopup(tk.Toplevel):
-    def __init__(self, master, titration, variableIndex, *args, **kwargs):
+    def __init__(self, master, titration, variableIndex, xLabel, *args, **kwargs):
         self.titration = titration
         self.variableIndex = variableIndex
+        self.xLabel = xLabel
         super().__init__(master, width=1, height=1, *args, **kwargs)
         self.withdraw()
 
@@ -1678,11 +1679,7 @@ class RMSEPopup(tk.Toplevel):
     def resetAxes(self):
         self.ax.clear()
         self.ax.set_xscale("log")
-        self.ax.set_xlabel(
-            R"$K_{"
-            + self.titration.equilibriumConstants.variableNames[self.variableIndex]
-            + R"}\ (\mathrm{M^{-n}})$"
-        )
+        self.ax.set_xlabel(self.xLabel)
         self.ax.set_ylabel(f"RMSE ({self.titration.yUnit})")
 
     def populate(self):
@@ -1931,8 +1928,29 @@ class ResultsFrame(ttk.Frame):
             chiSquared / numDataPoints
         ) + numParameters * np.log(numDataPoints)
 
-    def showRMSEPlot(self, index):
-        popup = RMSEPopup(self, self.titration, index)
+    def showRMSEPlot(self, variableIndex, variableType):
+        if variableType == "equilibriumConstants":
+            xLabel = (
+                R"$K_{"
+                + self.titration.equilibriumConstants.variableNames[variableIndex]
+                + R"}\ (\mathrm{M^{-n}})$"
+            )
+            absoluteVariableIndex = variableIndex
+        elif variableType == "totalConcentrations":
+            xLabel = (
+                "$"
+                + self.titration.totalConcentrations.variableNames[variableIndex]
+                + R"\ (\mathrm{M})$"
+            )
+            absoluteVariableIndex = (
+                self.titration.equilibriumConstants.variableCount + variableIndex
+            )
+        else:
+            raise ValueError(
+                "variableType must be 'equilibriumConstants' or 'totalConcentrations'"
+            )
+
+        popup = RMSEPopup(self, self.titration, absoluteVariableIndex, xLabel)
         popup.show()
 
     def showResults(self):
@@ -1958,12 +1976,10 @@ class ResultsFrame(ttk.Frame):
             columnOptions=("readonlyTitles",),
         )
 
+        kNames = titration.equilibriumConstants.variableNames
         ks = titration.lastKVars
 
-        for index, (
-            name,
-            value,
-        ) in enumerate(zip(titration.equilibriumConstants.variableNames, ks)):
+        for index, (name, value) in enumerate(zip(kNames, ks)):
             kTable.addRow(
                 name,
                 [
@@ -1972,7 +1988,9 @@ class ResultsFrame(ttk.Frame):
                         "button",
                         {
                             "text": "RMSE plot",
-                            "command": lambda index=index: self.showRMSEPlot(index),
+                            "command": lambda index=index: self.showRMSEPlot(
+                                index, "equilibriumConstants"
+                            ),
                         },
                     ],
                 ],
@@ -1987,19 +2005,30 @@ class ResultsFrame(ttk.Frame):
                 self,
                 0,
                 0,
-                [f"c ({titration.totalConcentrations.concsUnit})"],
+                [f"c ({titration.totalConcentrations.concsUnit})", ""],
                 rowOptions=["readonlyTitles"],
                 columnOptions=["readonlyTitles"],
             )
+
             concNames = self.titration.totalConcentrations.variableNames
             concs = titration.lastTotalConcVars
-            for concName, conc in zip(concNames, concs):
+
+            for index, (concName, conc) in enumerate(zip(concNames, concs)):
                 concsTable.addRow(
                     concName,
                     [
                         totalConcentrations.convertConc(
                             conc, "M", titration.totalConcentrations.concsUnit
-                        )
+                        ),
+                        [
+                            "button",
+                            {
+                                "text": "RMSE plot",
+                                "command": lambda index=index: self.showRMSEPlot(
+                                    index, "totalConcentrations"
+                                ),
+                            },
+                        ],
                     ],
                 )
             concsTable.pack(side="top", pady=15)
