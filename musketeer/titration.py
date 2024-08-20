@@ -249,6 +249,14 @@ class Titration:
         peaksRange = totalRange[largestPeakIndices]
         return largestPeakIndices[peaksRange >= np.max(peaksRange) * threshold]
 
+    @property
+    def lastVars(self):
+        return np.concatenate([self.lastKVars, self.lastTotalConcVars])
+
+    @property
+    def RMSE(self):
+        return np.sqrt(np.mean((self.lastFittedCurves - self.processedData) ** 2))
+
     def optimisationFunc(self, ksAndTotalConcs):
         # scipy.optimize optimizes everything as a single array, so split it
         kVars = ksAndTotalConcs[: self.equilibriumConstants.variableCount]
@@ -302,6 +310,35 @@ class Titration:
         )
         # to make sure the last fit is the optimal one
         self.optimisationFuncLog(result.x)
+        return result.x
+
+    # Run the optimisation with one or more of the variables at a fixed value
+    def optimiseFixed(
+        self, fixedVars, initialGuess=None, callback=None, minimizeOptions={}
+    ):
+        initialGuessKs = np.log10(self.equilibriumConstants.variableInitialGuesses)
+        initialGuessConcs = np.log10(self.totalConcentrations.variableInitialGuesses)
+        _initialGuess = np.concatenate((initialGuessKs, initialGuessConcs))
+        if initialGuess is not None:
+            _initialGuess = initialGuess.filled(_initialGuess)
+
+        initialGuessFiltered = _initialGuess[fixedVars.mask]
+
+        def optimisationFuncLogFixed(logKsAndTotalConcs):
+            ksAndTotalConcs = 10**logKsAndTotalConcs
+            allKsAndTotalConcs = fixedVars.copy()
+            allKsAndTotalConcs[fixedVars.mask] = ksAndTotalConcs
+            return self.optimisationFunc(allKsAndTotalConcs.data)
+
+        result = minimize(
+            optimisationFuncLogFixed,
+            x0=np.log10(initialGuessFiltered),
+            method="nelder-mead",
+            callback=callback,
+            options=minimizeOptions,
+        )
+        # to make sure the last fit is the optimal one
+        optimisationFuncLogFixed(result.x)
         return result.x
 
     def fitData(self, callback=None):
