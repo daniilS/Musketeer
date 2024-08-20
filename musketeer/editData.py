@@ -1,6 +1,5 @@
 import tkinter as tk
 import tkinter.filedialog as fd
-import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 import warnings
 from collections import namedtuple
@@ -228,14 +227,9 @@ class EditDataPopup(moduleFrame.Popup):
         )
         if filePath == "":
             return
+
         fileReader = fileReaders[fileReaders[:, 0] == fileType.get(), -1].item()
-        try:
-            data, additionTitles, signalTitles, defaultParams = fileReader(
-                filePath, self
-            )
-        except Exception as e:
-            mb.showerror(title="Failed to read file", message=e, parent=self)
-            return
+        data, additionTitles, signalTitles, defaultParams = fileReader(filePath, self)
 
         if (additionTitles is not None) and (signalTitles is not None):
             data = np.c_[additionTitles, data]
