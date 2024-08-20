@@ -1,5 +1,6 @@
 import ctypes
 import importlib.resources as res
+import sys
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
@@ -11,7 +12,9 @@ import ttkbootstrap
 
 from . import __version__
 from . import windowsHighDpiPatch
+from .progressDialog import ProgressDialog
 from .style import padding
+from .table import WrappedLabel
 
 try:
     appId = "daniilS.musketeer"
@@ -25,7 +28,7 @@ class ErrorDialog(tk.Toplevel):
         super().__init__(root, *args, **kwargs)
         self.withdraw()
 
-        self.title("Error")
+        self.title("An error has occured")
 
         if self._windowingsystem == "aqua":
             try:
@@ -40,14 +43,14 @@ class ErrorDialog(tk.Toplevel):
         image = "::tk::icons::warning"
         if image not in self.image_names():
             image = None
-        label = ttk.Label(
+        self.wrappedLabel = WrappedLabel(
             self,
             text=traceback.format_exception_only(excType, excValue)[-1],
             image=image,
             compound="left",
             anchor="center",
         )
-        label.pack(padx=padding, pady=padding, fill="x")
+        self.wrappedLabel.pack(padx=padding, pady=padding, fill="both", expand=False)
 
         self.detailsToggle = ttk.Checkbutton(
             self,
@@ -75,6 +78,13 @@ class ErrorDialog(tk.Toplevel):
         self.detailsText.pack(fill="both", expand=True)
 
         self.update()
+
+        # A WrappedLabel only automatically updates its height when it receives a
+        # <Configure> event, so force it to request a height based on the detailFrame's
+        # width.
+        self.wrappedLabel.setHeightFromWidth(self.detailsFrame.winfo_reqwidth())
+        self.update()
+
         self.minWidth, self.minHeight = (
             self.winfo_reqwidth(),
             self.winfo_reqheight() - self.detailsText.winfo_reqheight(),
@@ -110,15 +120,15 @@ class App(tk.Tk):
         try:
             dialog = ErrorDialog(self, excType, excValue, tb)
             self.wait_window(dialog)
-        except Exception:
+        except Exception as e:
             title = "Fatal error"
             message = "While attempting to display an error message, another error occured. To resolve this issue, please report it on the Musketeer GitHub page."
             if self._windowingsystem == "aqua":
                 # MacOS alert windows don't have a title, and "-icon warning" maps to a
                 # higher priority alert than "-icon error".
-                mb.showwarning(title, f"{title}:\n\n{message}")
+                mb.showwarning(title, f"{title}:\n\n{message}", detail=str(e))
             else:
-                mb.showerror(title, message)
+                mb.showerror(title, message, detail=str(e))
 
 
 # need to keep a reference to the Style object so that image-based widgets
@@ -205,252 +215,273 @@ frame.pack(expand=True, fill="both")
 
 # Especially on the first startup, when matplotlib needs to build the font cache,
 # importing everything may take a while. So we defer all other imports until now.
-root.tk.eval("tk busy .")
-root.update()
+with ProgressDialog(
+    root,
+    title="Starting Musketeer",
+    labelText="Loading modules",
+    abortCallback=sys.exit,
+) as progressDialog:
+    from pathlib import PurePath
 
-from pathlib import PurePath
+    progressDialog.callback()
 
-import numpy as np
-from ttkbootstrap.widgets import InteractiveNotebook
+    import numpy as np
 
-from . import patchMatplotlib
-from .style import defaultFigureParams, figureParams
-from .table import ButtonFrame
-from .titration import Titration
-from .titrationFrame import TitrationFrame
+    progressDialog.callback()
+    from ttkbootstrap.widgets import InteractiveNotebook
 
-patchMatplotlib.applyPatch()
+    progressDialog.callback()
 
+    from . import patchMatplotlib
 
-class DpiPopup(tk.Toplevel):
-    def __init__(self, master, saveCallback, *args, **kwargs):
-        super().__init__(
-            master,
-            padx=padding,
-            pady=padding,
-            *args,
-            **kwargs,
-        )
-        self.title("Change figure DPI")
-        self.resizable(False, False)
-        self.saveCallback = saveCallback
+    progressDialog.callback()
+    from .style import defaultFigureParams, figureParams
 
-        scaleLabel = ttk.Label(self, text="Scale:", justify="left", state="normal")
-        scaleLabel.grid(row=0, column=0, sticky="ew")
+    progressDialog.callback()
+    from .table import ButtonFrame
 
-        self.scaleDropdown = ttk.Combobox(
-            self,
-            values=[f"{i}%" for i in [60, 80, 100, 125, 150, 200]],
-            justify="right",
-            width=5,
-        )
-        self.scaleDropdown.grid(row=0, column=2, sticky="ew")
+    progressDialog.callback()
+    from .titration import Titration
 
-        resLabel = ttk.Label(self, text="Resolution:", justify="left")
-        resLabel.grid(row=1, column=0, sticky="ew")
+    progressDialog.callback()
+    from .titrationFrame import TitrationFrame
 
-        self.resDropdown = ttk.Combobox(
-            self,
-            values=[
-                f"{int(y*4/3)} x {y}" for y in [240, 360, 480, 600, 960, 1200, 1440]
-            ],
-            justify="right",
-            width=10,
-            state="readonly",
-        )
-        self.resDropdown.grid(row=1, column=2, sticky="ew")
+    progressDialog.callback()
 
-        self.rowconfigure(0, pad=10)
-        self.rowconfigure(1, pad=10)
+    patchMatplotlib.applyPatch()
+    progressDialog.callback()
 
-        self.columnconfigure(0, pad=10)
-        self.columnconfigure(1, weight=1)
+    progressDialog.label.configure(text="Loading interface")
 
-        self.initValues()
+    class DpiPopup(tk.Toplevel):
+        def __init__(self, master, saveCallback, *args, **kwargs):
+            super().__init__(
+                master,
+                padx=padding,
+                pady=padding,
+                *args,
+                **kwargs,
+            )
+            self.title("Change figure DPI")
+            self.resizable(False, False)
+            self.saveCallback = saveCallback
 
-        buttonFrame = ButtonFrame(self, self.reset, self.save, self.destroy)
-        buttonFrame.saveButton.configure(text="Save")
+            scaleLabel = ttk.Label(self, text="Scale:", justify="left", state="normal")
+            scaleLabel.grid(row=0, column=0, sticky="ew")
 
-        buttonFrame.applyButton = ttk.Button(
-            buttonFrame, text="Apply", command=self.apply, style="success.TButton"
-        )
-        buttonFrame.applyButton.pack(
-            side="right", after=buttonFrame.saveButton, padx=padding
-        )
+            self.scaleDropdown = ttk.Combobox(
+                self,
+                values=[f"{i}%" for i in [60, 80, 100, 125, 150, 200]],
+                justify="right",
+                width=5,
+            )
+            self.scaleDropdown.grid(row=0, column=2, sticky="ew")
 
-        buttonFrame.grid(row=2, column=0, columnspan=3, sticky="esw")
+            resLabel = ttk.Label(self, text="Resolution:", justify="left")
+            resLabel.grid(row=1, column=0, sticky="ew")
 
-    def reset(self):
-        self.scaleDropdown.set(f"{defaultFigureParams['scale']}%")
-        self.resDropdown.set(f"{defaultFigureParams['x']} x {defaultFigureParams['y']}")
+            self.resDropdown = ttk.Combobox(
+                self,
+                values=[
+                    f"{int(y*4/3)} x {y}" for y in [240, 360, 480, 600, 960, 1200, 1440]
+                ],
+                justify="right",
+                width=10,
+                state="readonly",
+            )
+            self.resDropdown.grid(row=1, column=2, sticky="ew")
 
-    def initValues(self):
-        self.scaleDropdown.set(f"{figureParams['scale']}%")
-        self.resDropdown.set(f"{figureParams['x']} x {figureParams['y']}")
+            self.rowconfigure(0, pad=10)
+            self.rowconfigure(1, pad=10)
 
-    def save(self):
-        if self.apply():  # returns False if failed to apply
-            self.destroy()
+            self.columnconfigure(0, pad=10)
+            self.columnconfigure(1, weight=1)
 
-    def apply(self):
-        scale = int(self.scaleDropdown.get().strip("%"))
-        x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
-        figureParams.update(scale=scale, x=x, y=y)
-        self.saveCallback()
-        return True
+            self.initValues()
 
+            buttonFrame = ButtonFrame(self, self.reset, self.save, self.destroy)
+            buttonFrame.saveButton.configure(text="Save")
 
-class TitrationsNotebook(InteractiveNotebook):
-    def __init__(self, master, *args, **kwargs):
-        super().__init__(
-            master,
-            padding=padding,
-            newtab=self.newFile,
-            style="Flat.Interactive.TNotebook",
-            *args,
-            **kwargs,
-        )
-        self.createMenuBar()
-        self.createQuickStartMenu()
-        self.select(str(self._newtab_frame))
+            buttonFrame.applyButton = ttk.Button(
+                buttonFrame, text="Apply", command=self.apply, style="success.TButton"
+            )
+            buttonFrame.applyButton.pack(
+                side="right", after=buttonFrame.saveButton, padx=padding
+            )
 
-    def forget(self, index, *args, **kwargs):
-        # Manually change to a different tab before a tab is closed, to prevent the
-        # quickstart menu from appearing briefly right after a tab is closed but before
-        # the next tab has been selected
-        next_tab = index + 1
-        if (
-            self._has_newtab_button and next_tab == self._last_tab
-        ) or index == self._last_tab:
-            next_tab = index - 1
-        if 0 <= next_tab <= self._last_tab:
-            self.select(next_tab)
-        return super().forget(index, *args, **kwargs)
+            buttonFrame.grid(row=2, column=0, columnspan=3, sticky="esw")
 
-    def createQuickStartMenu(self):
-        self.quickStartFrame = ttk.Frame(self)
-        self.quickStartFrame.pack(expand=True, fill="none")
+        def reset(self):
+            self.scaleDropdown.set(f"{defaultFigureParams['scale']}%")
+            self.resDropdown.set(
+                f"{defaultFigureParams['x']} x {defaultFigureParams['y']}"
+            )
 
-        self.quickStartFont = font.nametofont("TkTextFont").copy()
-        self.quickStartFont["size"] = round(self.quickStartFont["size"] * 1.33)
-        root.ttkStyle.configure("large.success.TButton", font=self.quickStartFont)
-        root.ttkStyle.configure("large.TButton", font=self.quickStartFont)
+        def initValues(self):
+            self.scaleDropdown.set(f"{figureParams['scale']}%")
+            self.resDropdown.set(f"{figureParams['x']} x {figureParams['y']}")
 
-        self.newFileButton = ttk.Button(
-            self.quickStartFrame,
-            text="Create a new fit file",
-            command=self.newFile,
-            style="large.success.TButton",
-        )
-        self.newFileButton.pack(fill="x")
-        self.orLabel = ttk.Label(
-            self.quickStartFrame, text="or", font=self.quickStartFont
-        )
-        self.orLabel.pack(pady=5)
-        self.OpenFileButton = ttk.Button(
-            self.quickStartFrame,
-            text="Open an existing file",
-            command=self.openFile,
-            style="large.TButton",
-        )
-        self.OpenFileButton.pack(fill="x")
+        def save(self):
+            if self.apply():  # returns False if failed to apply
+                self.destroy()
 
-    def createMenuBar(self):
-        self.menuBar = tk.Menu(self, tearoff=False)
+        def apply(self):
+            scale = int(self.scaleDropdown.get().strip("%"))
+            x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
+            figureParams.update(scale=scale, x=x, y=y)
+            self.saveCallback()
+            return True
 
-        fileMenu = tk.Menu(self.menuBar, tearoff=False)
-        self.menuBar.add_cascade(label="File", menu=fileMenu, underline=0)
+    class TitrationsNotebook(InteractiveNotebook):
+        def __init__(self, master, *args, **kwargs):
+            super().__init__(
+                master,
+                padding=padding,
+                newtab=self.newFile,
+                style="Flat.Interactive.TNotebook",
+                *args,
+                **kwargs,
+            )
+            self.createMenuBar()
+            self.createQuickStartMenu()
+            self.select(str(self._newtab_frame))
 
-        self.addMenuCommand(fileMenu, "New", self.newFile)
-        self.addMenuCommand(fileMenu, "Open", self.openFile)
-        self.addMenuCommand(fileMenu, "Save", self.saveFile)
-        self.addMenuCommand(
-            fileMenu, "Save As", self.saveFileAs, keys=("Shift", "s"), underline=5
-        )
+        def forget(self, index, *args, **kwargs):
+            # Manually change to a different tab before a tab is closed, to prevent the
+            # quickstart menu from appearing briefly right after a tab is closed but before
+            # the next tab has been selected
+            next_tab = index + 1
+            if (
+                self._has_newtab_button and next_tab == self._last_tab
+            ) or index == self._last_tab:
+                next_tab = index - 1
+            if 0 <= next_tab <= self._last_tab:
+                self.select(next_tab)
+            return super().forget(index, *args, **kwargs)
 
-        editMenu = tk.Menu(self.menuBar, tearoff=False)
-        self.menuBar.add_cascade(label="Edit", menu=editMenu, underline=0)
-        editMenu.add_command(
-            label="Change figure DPI", command=self.editDpi, underline=0
-        )
+        def createQuickStartMenu(self):
+            self.quickStartFrame = ttk.Frame(self)
+            self.quickStartFrame.pack(expand=True, fill="none")
 
-        self.winfo_toplevel().config(menu=self.menuBar)
+            self.quickStartFont = font.nametofont("TkTextFont").copy()
+            self.quickStartFont["size"] = round(self.quickStartFont["size"] * 1.33)
+            root.ttkStyle.configure("large.success.TButton", font=self.quickStartFont)
+            root.ttkStyle.configure("large.TButton", font=self.quickStartFont)
 
-    def addMenuCommand(self, fileMenu, label, command, keys=None, underline=0):
-        if self._windowingsystem == "aqua":
-            accelerator = "Command"
-            key = accelerator
-        else:
-            accelerator = "Ctrl"
-            key = "Control"
+            self.newFileButton = ttk.Button(
+                self.quickStartFrame,
+                text="Create a new fit file",
+                command=self.newFile,
+                style="large.success.TButton",
+            )
+            self.newFileButton.pack(fill="x")
+            self.orLabel = ttk.Label(
+                self.quickStartFrame, text="or", font=self.quickStartFont
+            )
+            self.orLabel.pack(pady=5)
+            self.OpenFileButton = ttk.Button(
+                self.quickStartFrame,
+                text="Open an existing file",
+                command=self.openFile,
+                style="large.TButton",
+            )
+            self.OpenFileButton.pack(fill="x")
 
-        if keys is None:
-            keys = (label[0].lower(),)
+        def createMenuBar(self):
+            self.menuBar = tk.Menu(self, tearoff=False)
 
-        fileMenu.add_command(
-            label=label,
-            command=command,
-            accelerator=f"{accelerator}+{'+'.join(keys).title()}",
-            underline=underline,
-        )
-        self.winfo_toplevel().bind(f"<{key}-{'-'.join(keys)}>", command)
+            fileMenu = tk.Menu(self.menuBar, tearoff=False)
+            self.menuBar.add_cascade(label="File", menu=fileMenu, underline=0)
 
-    def newFile(self, *args):
-        titration = Titration("Fit 1")
-        titration.rawData = np.empty((0, 0))
+            self.addMenuCommand(fileMenu, "New", self.newFile)
+            self.addMenuCommand(fileMenu, "Open", self.openFile)
+            self.addMenuCommand(fileMenu, "Save", self.saveFile)
+            self.addMenuCommand(
+                fileMenu, "Save As", self.saveFileAs, keys=("Shift", "s"), underline=5
+            )
 
-        titrationFrame = TitrationFrame(self, padding=padding)
-        self.add(titrationFrame, text="New Titration", sticky="nesw")
-        self.select(str(titrationFrame))
-        titrationFrame.loadTitration(titration)
+            editMenu = tk.Menu(self.menuBar, tearoff=False)
+            self.menuBar.add_cascade(label="Edit", menu=editMenu, underline=0)
+            editMenu.add_command(
+                label="Change figure DPI", command=self.editDpi, underline=0
+            )
 
-    def saveFile(self, *args):
-        self.nametowidget(self.select()).saveFile()
+            self.winfo_toplevel().config(menu=self.menuBar)
 
-    def saveFileAs(self, *args):
-        self.nametowidget(self.select()).saveFile(saveAs=True)
+        def addMenuCommand(self, fileMenu, label, command, keys=None, underline=0):
+            if self._windowingsystem == "aqua":
+                accelerator = "Command"
+                key = accelerator
+            else:
+                accelerator = "Ctrl"
+                key = "Control"
 
-    def openFile(self, *args):
-        filePath = fd.askopenfilename(
-            title="Open file",
-            filetypes=[("Musketeer files", "*.fit"), ("All files", "*.*")],
-        )
-        if filePath == "":
-            return
-        titration = np.load(filePath, allow_pickle=False)
+            if keys is None:
+                keys = (label[0].lower(),)
 
-        self.tk.eval("tk busy .")
-        self.update()
+            fileMenu.add_command(
+                label=label,
+                command=command,
+                accelerator=f"{accelerator}+{'+'.join(keys).title()}",
+                underline=underline,
+            )
+            self.winfo_toplevel().bind(f"<{key}-{'-'.join(keys)}>", command)
 
-        titrationFrame = TitrationFrame(self, filePath, padding=padding)
-        self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
-        self.select(str(titrationFrame))
-        titrationFrame.loadTitration(titration)
+        def newFile(self, *args):
+            titration = Titration("Fit 1")
+            titration.rawData = np.empty((0, 0))
 
-        self.tk.eval("tk busy forget .")
+            titrationFrame = TitrationFrame(self, padding=padding)
+            self.add(titrationFrame, text="New Titration", sticky="nesw")
+            self.select(str(titrationFrame))
+            titrationFrame.loadTitration(titration)
 
-    def editDpi(self, *args):
-        popup = DpiPopup(self, self.updateDpi)
-        popup.withdraw()
-        self.update()
-        root = self.winfo_toplevel()
-        x = root.winfo_x() + root.winfo_width() / 2 - popup.winfo_width() / 2
-        y = root.winfo_y() + root.winfo_height() / 2 - popup.winfo_height() / 2
-        popup.geometry(f"+{int(x)}+{int(y)}")
-        popup.transient(self)
-        popup.grab_set()
-        popup.deiconify()
-        popup.wait_window()
+        def saveFile(self, *args):
+            self.nametowidget(self.select()).saveFile()
 
-    def updateDpi(self):
-        for tab in self.tabs():
-            if isinstance(titrationFrame := self.nametowidget(tab), TitrationFrame):
-                titrationFrame.updateDpi()
-        self.update()
+        def saveFileAs(self, *args):
+            self.nametowidget(self.select()).saveFile(saveAs=True)
 
+        def openFile(self, *args):
+            filePath = fd.askopenfilename(
+                title="Open file",
+                filetypes=[("Musketeer files", "*.fit"), ("All files", "*.*")],
+            )
+            if filePath == "":
+                return
+            titration = np.load(filePath, allow_pickle=False)
 
-notebook = TitrationsNotebook(frame)
-notebook.pack(expand=True, fill="both")
+            with ProgressDialog(
+                self,
+                title="Loading titration",
+                labelText=f"Loading {PurePath(filePath).name}",
+            ) as progressDialog:
+                titrationFrame = TitrationFrame(self, filePath, padding=padding)
+                self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
+                self.select(str(titrationFrame))
+                titrationFrame.loadTitration(titration, progressDialog.callback)
 
-root.tk.eval("tk busy forget .")
+        def editDpi(self, *args):
+            popup = DpiPopup(self, self.updateDpi)
+            popup.withdraw()
+            self.update()
+            root = self.winfo_toplevel()
+            x = root.winfo_x() + root.winfo_width() / 2 - popup.winfo_width() / 2
+            y = root.winfo_y() + root.winfo_height() / 2 - popup.winfo_height() / 2
+            popup.geometry(f"+{int(x)}+{int(y)}")
+            popup.transient(self)
+            popup.grab_set()
+            popup.deiconify()
+            popup.wait_window()
+
+        def updateDpi(self):
+            for tab in self.tabs():
+                if isinstance(titrationFrame := self.nametowidget(tab), TitrationFrame):
+                    titrationFrame.updateDpi()
+            self.update()
+
+    notebook = TitrationsNotebook(frame)
+    progressDialog.callback()
+    notebook.pack(expand=True, fill="both")
+
 root.mainloop()

@@ -540,9 +540,14 @@ class WrappedLabel(ttk.Frame):
         self.label.pack(expand=True, fill="both")
         self.label.bind("<Configure>", self.callback)
 
-    def callback(self, event):
-        self.label.configure(wraplength=event.width - 2 * self.labelPadding - 4)
+    def setHeightFromWidth(self, width):
+        self.label.configure(
+            wraplength=width - 2 * self.labelPadding - self.imageWidth - 4
+        )
         self.configure(height=self.label.winfo_reqheight())
+
+    def callback(self, event):
+        self.setHeightFromWidth(event.width)
 
     @property
     def labelPadding(self):
@@ -553,4 +558,13 @@ class WrappedLabel(ttk.Frame):
             return int(str(padding[0]))
         else:
             # no padding set
+            return 0
+
+    @property
+    def imageWidth(self):
+        image = self.label.cget("image")
+        if type(image) is tuple:
+            return int(self.tk.eval(f"image width {image[0]}"))
+        else:
+            # no image set
             return 0

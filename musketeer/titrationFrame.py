@@ -32,6 +32,7 @@ from . import (
     speciation,
     totalConcentrations,
 )
+from .progressDialog import ProgressDialog
 from .moduleFrame import GroupFrame
 from .patchMatplotlib import NavigationToolbarVertical, VerticalToolbarAxes
 from .scrolledFrame import ScrolledFrame
@@ -151,10 +152,10 @@ class TitrationFrame(ttk.Frame):
 
         return "break"
 
-    def loadTitration(self, titration):
+    def loadTitration(self, titration, callback=lambda *args: None):
         if type(titration) is Titration:
             self.originalTitration = titration
-            self.newFit()
+            self.newFit(callback=callback)
         elif type(titration) is np.lib.npyio.NpzFile:
             # TODO: move this to titrationReader.py
             self.originalTitration = Titration()
@@ -313,7 +314,7 @@ class TitrationFrame(ttk.Frame):
                         continue
                     setattr(fit, moduleFrame.attributeName, selectedStrategy)
 
-                self.newFit(fit, name, setDefault=False)
+                self.newFit(fit, name, setDefault=False, callback=callback)
 
             self.numFits = titration[".numFits"].item()
             titration.close()
@@ -344,7 +345,9 @@ class TitrationFrame(ttk.Frame):
     def currentTab(self):
         return self.notebook.nametowidget(self.notebook.select())
 
-    def newFit(self, titration=None, name=None, setDefault=True):
+    def newFit(
+        self, titration=None, name=None, setDefault=True, callback=lambda *args: None
+    ):
         if titration is None:
             titration = deepcopy(self.originalTitration)
         for moduleFrame in self.moduleFrames.values():
@@ -358,7 +361,7 @@ class TitrationFrame(ttk.Frame):
 
         self.notebook.add(fitNotebook, text=name)
         self.notebook.select(str(fitNotebook))
-        fitNotebook.loadTabs()
+        fitNotebook.loadTabs(callback)
 
     def copyFit(self):
         self.newFit(deepcopy(self.currentTab.titration), setDefault=False)
@@ -477,33 +480,32 @@ class FitNotebook(ttk.Notebook):
         super().add(tab, *args, **kwargs)
         if hidden:
             self.hide(tab)
-        self.update()
 
-    def loadTabs(self):
+    def loadTabs(self, callback=lambda *args: None):
         self.inputSpectraFrame = InputSpectraFrame(self, self.titration)
         self.add(self.inputSpectraFrame, text="Input Spectra", hidden=True)
         self.inputSpectraFrame.updateData()
+        callback()
 
         if hasattr(self.titration, "fitResult"):
             try:
-                self.showFit()
+                self.showFit(callback)
             except Exception as e:
-                print("Warning: failed to load previous fit result:", e)
+                raise RuntimeError(
+                    "Could not fully load the previous fit result. Please check all options are entered correctly, and then try to fit the data again."
+                ) from e
 
     def fitData(self):
-        self.tk.eval("tk busy .")
-        self.update()
-        try:
-            self.titration.fitData(self.fitCallback)
-        finally:
-            self.tk.eval("tk busy forget .")
-            self.update()
-        self.showFit()
+        with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
+            self.titration.fitData(progressDialog.callback)
+            progressDialog.label.configure(text="Loading results")
+            self.showFit()
 
     def fitCallback(self, *args):
         self.update()
 
-    def showFit(self):
+    def showFit(self, callback=lambda *args: None):
+        callback()
         if hasattr(self.titration, "fitResult"):
             lastTabClass = type(self.nametowidget(self.select()))
             for tab in self.tabs():
@@ -518,6 +520,7 @@ class FitNotebook(ttk.Notebook):
         if self.titration.continuous:
             self.continuousFittedFrame = ContinuousFittedFrame(self, self.titration)
             self.add(self.continuousFittedFrame, text="Fitted Spectra")
+            callback()
             self.discreteFittedFrame = DiscreteFromContinuousFittedFrame(
                 self, self.titration
             )
@@ -525,15 +528,19 @@ class FitNotebook(ttk.Notebook):
                 self.discreteFittedFrame,
                 text=f"Fit at select {self.titration.xQuantity}",
             )
+            callback()
         else:
             self.discreteFittedFrame = DiscreteFittedFrame(self, self.titration)
             self.add(self.discreteFittedFrame, text="Fitted signals")
+            callback()
 
         self.speciationFrame = SpeciationFrame(self, self.titration)
         self.add(self.speciationFrame, text="Speciation")
+        callback()
 
         self.resultsFrame = ResultsFrame(self, self.titration)
         self.add(self.resultsFrame, text="Results")
+        callback()
 
         if lastTabClass is not None:
             for tab in self.tabs():
@@ -543,6 +550,7 @@ class FitNotebook(ttk.Notebook):
                     break
         else:
             self.select(str(self.discreteFittedFrame))
+        callback()
 
     def updateDpi(self):
         for tab in self.tabs():
@@ -1558,82 +1566,6 @@ class SpeciationFrame(PlotFrame):
         self.canvas.draw()
 
 
-class RMSEProgressDialog(tk.Toplevel):
-    def __init__(self, master, progressbarSteps, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.withdraw()
-
-        class CancelError(Exception):
-            pass
-
-        self.CancelError = CancelError
-
-        self.cancelled = False
-
-        self.title("Calculating RMSE plot")
-        self.protocol("WM_DELETE_WINDOW", self.bell)
-
-        self.label = ttk.Label(self, text=" ")
-        self.label.pack(padx=padding, pady=padding)
-
-        self.progressbar = ttk.Progressbar(self, max=progressbarSteps)
-        self.progressbar.pack(padx=padding, pady=padding, fill="x")
-
-        self.button = ttk.Button(self, text="Cancel", command=self.cancel)
-        self.button.pack(padx=padding, pady=padding)
-
-    def cancel(self):
-        self.cancelled = True
-
-    def callback(self, *args, **kwargs):
-        self.update()
-        if self.cancelled:
-            raise self.CancelError
-
-    def __enter__(self):
-        parentWindow = self.master.winfo_toplevel()
-        self.update()
-        width = max(self.winfo_reqwidth(), 250)
-        height = self.winfo_reqheight()
-        x = int(parentWindow.winfo_x() + parentWindow.winfo_width() / 2 - width / 2)
-        y = int(parentWindow.winfo_y() + parentWindow.winfo_height() / 2 - height / 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
-        self.deiconify()
-        self.wait_visibility()
-        self.grab_set()
-        self.transient(self.master)
-
-        if self._windowingsystem == "aqua":
-            self.oldParentCursor = parentWindow.cget("cursor")
-            parentWindow.configure(cursor="wait")
-        else:
-            self.tk.eval(f"tk busy {parentWindow._w}")
-
-        self.oldGrab = parentWindow.grab_current()
-
-        self.update()
-        return self
-
-    def teardown(self):
-        parentWindow = self.master.winfo_toplevel()
-
-        if self._windowingsystem == "aqua":
-            parentWindow.configure(cursor=self.oldParentCursor)
-        elif self.tk.eval(f"tk busy status {parentWindow._w}") == "1":
-            self.tk.eval(f"tk busy forget {parentWindow._w}")
-
-        if self.oldGrab is not None and self.oldGrab.winfo_exists():
-            self.oldGrab.grab_set()
-
-        self.destroy()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.teardown()
-
-        if exc_type is self.CancelError:
-            return True
-
-
 class RMSEPopup(tk.Toplevel):
     def __init__(self, master, titration, variableIndex, xLabel, *args, **kwargs):
         self.titration = titration
@@ -1641,10 +1573,6 @@ class RMSEPopup(tk.Toplevel):
         self.xLabel = xLabel
         super().__init__(master, width=1, height=1, *args, **kwargs)
         self.withdraw()
-
-    def callback(self, *args):
-        self.update()
-        print("updated!")
 
     def show(self):
         self.populate()
@@ -1800,7 +1728,9 @@ class RMSEPopup(tk.Toplevel):
         optimisationResults = [None] * len(values)
         optimisationResults[midpoint] = self.titration.lastVars[fixedVars.mask]
 
-        with RMSEProgressDialog(self, points) as progressDialog:
+        with ProgressDialog(
+            self, "Calculating RMSE plot", progressbarSteps=points
+        ) as progressDialog:
             if self.hasMultipleVariables and self.convergenceCheckbutton.instate(
                 ["selected"]
             ):
