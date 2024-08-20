@@ -293,15 +293,11 @@ class DpiPopup(tk.Toplevel):
             self.destroy()
 
     def apply(self):
-        try:
-            scale = int(self.scaleDropdown.get().strip("%"))
-            x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
-            figureParams.update(scale=scale, x=x, y=y)
-            self.saveCallback()
-            return True
-        except Exception as e:
-            mb.showerror(title="Could not apply settings", message=e, parent=self)
-            return False
+        scale = int(self.scaleDropdown.get().strip("%"))
+        x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
+        figureParams.update(scale=scale, x=x, y=y)
+        self.saveCallback()
+        return True
 
 
 class TitrationsNotebook(InteractiveNotebook):
@@ -422,12 +418,7 @@ class TitrationsNotebook(InteractiveNotebook):
         )
         if filePath == "":
             return
-
-        try:
-            titration = np.load(filePath, allow_pickle=False)
-        except Exception as e:
-            mb.showerror(title="Failed to read file", message=e, parent=self)
-            return
+        titration = np.load(filePath, allow_pickle=False)
 
         self.tk.eval("tk busy .")
         self.update()
