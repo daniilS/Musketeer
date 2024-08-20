@@ -361,7 +361,6 @@ class TitrationsNotebook(InteractiveNotebook):
         fileMenu = tk.Menu(self.menuBar, tearoff=False)
         self.menuBar.add_cascade(label="File", menu=fileMenu, underline=0)
 
-        self.addMenuCommand(fileMenu, "Error", lambda *args: 1 / 0)
         self.addMenuCommand(fileMenu, "New", self.newFile)
         self.addMenuCommand(fileMenu, "Open", self.openFile)
         self.addMenuCommand(fileMenu, "Save", self.saveFile)
