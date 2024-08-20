@@ -2033,6 +2033,18 @@ class ResultsFrame(ttk.Frame):
                 )
             concsTable.pack(side="top", pady=15)
 
+        if titration.continuous:
+            sheetLabel = ttk.Label(
+                self,
+                text=f"Fitted spectra ({titration.yQuantity} / {titration.yUnit}) for each species and signal ({titration.xQuantity} / {titration.xUnit}):",
+            )
+        else:
+            sheetLabel = ttk.Label(
+                self,
+                text=f"Fitted spectra ({titration.yQuantity} / {titration.yUnit}) for each species and signal:",
+            )
+        sheetLabel.pack(fill="x", padx=padding)
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             sheet = tksheet.Sheet(
