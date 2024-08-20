@@ -32,7 +32,7 @@ class KnownSpectraPopup(moduleFrame.Popup):
                 self,
                 empty_vertical=0,
                 empty_horizontal=0,
-                data=list(titration.knownSignals.knownSpectra.astype(str).filled("")),
+                data=list(titration.knownSignals.knownSpectra.astype(str).filled("?")),
                 headers=list(titration.processedSignalTitlesStrings),
                 row_index=list(titration.contributors.outputNames),
                 set_all_heights_and_widths=True,
@@ -58,7 +58,11 @@ class KnownSpectraPopup(moduleFrame.Popup):
 
     def saveData(self):
         data = np.array(self.sheet.get_sheet_data(), dtype=object)
-        data[data == ""] = "nan"
+        data[data == "?"] = "nan"
+        if np.any(data == ""):
+            raise ValueError(
+                'Please enter a value in each cell. For unknown values, please enter "?".'
+            )
         data = data.astype(float)
 
         self.knownSpectra = ma.masked_invalid(data)
@@ -173,7 +177,7 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
                         empty_vertical=0,
                         empty_horizontal=0,
                         data=list(
-                            knownSpectra[:, signalsFilter].astype(str).filled("")
+                            knownSpectra[:, signalsFilter].astype(str).filled("?")
                         ),
                         headers=list(
                             self.titration.processedSignalTitlesStrings[signalsFilter]
@@ -224,7 +228,11 @@ class KnownSpectraPerMoleculePopup(moduleFrame.Popup):
             if sheet is None:
                 continue
             data = np.array(sheet.get_sheet_data(), dtype=object)
-            data[data == ""] = "nan"
+            data[data == "?"] = "nan"
+            if np.any(data == ""):
+                raise ValueError(
+                    'Please enter a value in each cell. For unknown values, please enter "?".'
+                )
             data = data.astype(float)
             knownSpectra[:, signalsFilter] = ma.masked_invalid(data)
 
@@ -264,9 +272,9 @@ class GetKnownSpectra(KnownSignals):
         output = ma.masked_all((len(currentContributors), len(currentSignals)))
         for spectrumTitle, spectrum in zip(lastContributors, relevantSignals):
             if spectrumTitle in currentContributors:
-                output[
-                    np.where(currentContributors == spectrumTitle)[0][0], :
-                ] = spectrum
+                output[np.where(currentContributors == spectrumTitle)[0][0], :] = (
+                    spectrum
+                )
         return output
 
     @knownSpectra.setter
