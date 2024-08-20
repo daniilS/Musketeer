@@ -1,5 +1,4 @@
 import tkinter as tk
-import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 
 import numpy as np
@@ -395,11 +394,11 @@ class Table(ttk.Frame):
         rows, columns = self.cells[row:, column:].shape
         lines = pasteContent.splitlines()
         if len(lines) > rows:
-            mb.showerror(
-                title="Paste error",
-                message=f"Cannot paste {len(lines)} lines into {rows} rows.",
-                parent=self,
-            )
+
+            def pasteError():
+                raise RuntimeError(f"Cannot paste {len(lines)} lines into {rows} rows.")
+
+            self.after(0, pasteError)
             return "break"
         for rowOffset, line in enumerate(lines):
             for columnOffset, value in enumerate(line.split("\t", columns - 1)):
@@ -497,7 +496,7 @@ class ButtonFrame(ttk.Frame):
         self.resetButton.pack(side="left", padx=padding)
 
         self.saveButton = ttk.Button(
-            self, text="OK", command=self.trySave, style="success.TButton"
+            self, text="OK", command=self.save, style="success.TButton"
         )
         self.saveButton.pack(side="right", padx=padding)
 
@@ -505,12 +504,6 @@ class ButtonFrame(ttk.Frame):
             self, text="Cancel", command=cancel, style="secondary.TButton"
         )
         self.cancelButton.pack(side="right", padx=padding)
-
-    def trySave(self):
-        try:
-            self.save()
-        except Exception as e:
-            mb.showerror(title="Could not save data", message=e, parent=self)
 
 
 class WrappedLabel(ttk.Frame):

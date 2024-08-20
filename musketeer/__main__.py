@@ -4,7 +4,8 @@ import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import tkinter.ttk as ttk
-from tkinter import font
+from tkinter import font, scrolledtext
+import traceback
 
 import ttkbootstrap
 
@@ -19,45 +20,134 @@ except Exception:
     pass
 
 
-fullErrorMessages = True
-olderror = mb.showerror
+class ErrorDialog(tk.Toplevel):
+    def __init__(self, root, excType, excValue, tb, *args, **kwargs):
+        super().__init__(root, *args, **kwargs)
+        self.withdraw()
 
+        self.title("Error")
 
-# TODO: convert to simple error message, with an option to expand to the full one
-def newshowerror(title, message, *args, **kwargs):
-    import traceback
+        if self._windowingsystem == "aqua":
+            try:
+                self.tk.call(
+                    "::tk::unsupported::MacWindowStyle", "style", self, "movableModal"
+                )
+            except Exception:
+                pass
+        elif self._windowingsystem == "x11":
+            self.attributes("-type", "dialog")
 
-    if fullErrorMessages and isinstance(message, Exception):
-        if root._windowingsystem == "aqua":
-            # MacOS alert windows don't have a title, and "-icon warning" maps to a
-            # higher priority alert than "-icon error".
-            return mb.showwarning(
-                title,
-                f"{title}:\n\n{traceback.format_exception(message)[-1]}",
-                detail="".join(traceback.format_exception(message, limit=-8)[:-1]),
-                *args,
-                **kwargs,
+        image = "::tk::icons::warning"
+        if image not in self.image_names():
+            image = None
+        label = ttk.Label(
+            self,
+            text=traceback.format_exception_only(excType, excValue)[-1],
+            image=image,
+            compound="left",
+            anchor="center",
+        )
+        label.pack(padx=padding, pady=padding, fill="x")
+
+        self.detailsToggle = ttk.Checkbutton(
+            self,
+            text="Show details ⮞",
+            style="textOnly.TCheckbutton",
+            command=self.toggleDetails,
+        )
+        self.detailsToggle.expanded = False
+        self.detailsToggle.state(["!alternate", "!selected"])
+
+        self.detailsFrame = ttk.LabelFrame(
+            self, labelwidget=self.detailsToggle, labelanchor="n"
+        )
+        self.detailsFrame.pack(padx=padding, pady=padding, fill="both", expand=True)
+
+        tracebackText = "".join(traceback.format_exception(excType, excValue, tb))
+        self.detailsText = scrolledtext.ScrolledText(
+            self.detailsFrame,
+            font=font.nametofont("TkFixedFont"),
+            width=40,
+            height=20,
+        )
+        self.detailsText.insert("end", tracebackText)
+        self.detailsText.configure(state="disabled")
+        self.detailsText.pack(fill="both", expand=True)
+
+        self.update()
+        self.minWidth, self.minHeight = (
+            self.winfo_reqwidth(),
+            self.winfo_reqheight() - self.detailsText.winfo_reqheight(),
+        )
+        x = int(root.winfo_x() + root.winfo_width() / 2 - self.minWidth / 2)
+        y = int(root.winfo_y() + root.winfo_height() / 2 - self.minHeight / 2)
+        self.detailsText.forget()
+        self.minsize(0, self.minHeight)
+        self.geometry(f"{self.minWidth}x{self.minHeight}+{x}+{y}")
+
+        self.deiconify()
+        self.bell()
+        self.wait_visibility()
+        self.grab_set()
+        self.transient(root)
+
+    def toggleDetails(self):
+        self.detailsToggle.expanded = not self.detailsToggle.expanded
+
+        if self.detailsToggle.expanded:
+            self.detailsToggle.configure(text="Show details ⮟")
+            self.detailsText.pack(padx=padding, pady=padding, fill="both", expand=True)
+            self.geometry(
+                f"{self.winfo_width()}x{self.winfo_height() + self.detailsFrame.winfo_reqheight()-self.detailsFrame.winfo_height()}"
             )
         else:
-            return olderror(
-                title,
-                traceback.format_exception(message)[-1],
-                detail="".join(traceback.format_exception(message, limit=-8)[:-1]),
-                *args,
-                **kwargs,
-            )
-    else:
-        return olderror(title, message, *args, **kwargs)
+            self.detailsToggle.configure(text="Show details ⮞")
+            self.detailsText.forget()
 
 
-mb.showerror = newshowerror
+class App(tk.Tk):
+    def report_callback_exception(self, excType, excValue, tb):
+        try:
+            dialog = ErrorDialog(self, excType, excValue, tb)
+            self.wait_window(dialog)
+        except Exception:
+            title = "Fatal error"
+            message = "While attempting to display an error message, another error occured. To resolve this issue, please report it on the Musketeer GitHub page."
+            if self._windowingsystem == "aqua":
+                # MacOS alert windows don't have a title, and "-icon warning" maps to a
+                # higher priority alert than "-icon error".
+                mb.showwarning(title, f"{title}:\n\n{message}")
+            else:
+                mb.showerror(title, message)
 
 
 # need to keep a reference to the Style object so that image-based widgets
 # appear correctly
-ttkStyle = ttkbootstrap.Style(theme="lumen")
-root = ttkStyle.master
+root = App()
+root.ttkStyle = ttkbootstrap.Style(master=root, theme="lumen")
 root.geometry("1000x600")
+
+root.ttkStyle.layout(
+    "textOnly.TCheckbutton",
+    [
+        (
+            "Checkbutton.padding",
+            {
+                "children": [
+                    (
+                        "Checkbutton.focus",
+                        {
+                            "children": [("Checkbutton.label", {"sticky": "nswe"})],
+                            "side": "left",
+                            "sticky": "",
+                        },
+                    )
+                ],
+                "sticky": "nswe",
+            },
+        )
+    ],
+)
 
 windowsHighDpiPatch.setEnhancedDpiScaling(root)
 
@@ -203,15 +293,11 @@ class DpiPopup(tk.Toplevel):
             self.destroy()
 
     def apply(self):
-        try:
-            scale = int(self.scaleDropdown.get().strip("%"))
-            x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
-            figureParams.update(scale=scale, x=x, y=y)
-            self.saveCallback()
-            return True
-        except Exception as e:
-            mb.showerror(title="Could not apply settings", message=e, parent=self)
-            return False
+        scale = int(self.scaleDropdown.get().strip("%"))
+        x, y = [int(i) for i in self.resDropdown.get().split(" x ")]
+        figureParams.update(scale=scale, x=x, y=y)
+        self.saveCallback()
+        return True
 
 
 class TitrationsNotebook(InteractiveNotebook):
@@ -247,8 +333,8 @@ class TitrationsNotebook(InteractiveNotebook):
 
         self.quickStartFont = font.nametofont("TkTextFont").copy()
         self.quickStartFont["size"] = round(self.quickStartFont["size"] * 1.33)
-        ttkStyle.configure("large.success.TButton", font=self.quickStartFont)
-        ttkStyle.configure("large.TButton", font=self.quickStartFont)
+        root.ttkStyle.configure("large.success.TButton", font=self.quickStartFont)
+        root.ttkStyle.configure("large.TButton", font=self.quickStartFont)
 
         self.newFileButton = ttk.Button(
             self.quickStartFrame,
@@ -331,12 +417,7 @@ class TitrationsNotebook(InteractiveNotebook):
         )
         if filePath == "":
             return
-
-        try:
-            titration = np.load(filePath, allow_pickle=False)
-        except Exception as e:
-            mb.showerror(title="Failed to read file", message=e, parent=self)
-            return
+        titration = np.load(filePath, allow_pickle=False)
 
         self.tk.eval("tk busy .")
         self.update()

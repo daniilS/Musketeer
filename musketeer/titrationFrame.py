@@ -1,7 +1,6 @@
 import os
 import tkinter as tk
 import tkinter.filedialog as fd
-import tkinter.messagebox as mb
 import tkinter.ttk as ttk
 import warnings
 from copy import deepcopy
@@ -462,15 +461,11 @@ class TitrationFrame(ttk.Frame):
             filePath = self.filePath
 
         if filePath != "":
-            try:
-                with open(filePath, "wb") as f:
-                    np.savez_compressed(f, **options)
-            except Exception as e:
-                mb.showerror(title="Failed to save file", message=e, parent=self)
-            else:
-                if filePath != self.filePath:
-                    self.filePath = filePath
-                    self.master.tab(self, text=PurePath(self.filePath).name)
+            with open(filePath, "wb") as f:
+                np.savez_compressed(f, **options)
+            if filePath != self.filePath:
+                self.filePath = filePath
+                self.master.tab(self, text=PurePath(self.filePath).name)
 
 
 class FitNotebook(ttk.Notebook):
@@ -500,9 +495,6 @@ class FitNotebook(ttk.Notebook):
         self.update()
         try:
             self.titration.fitData(self.fitCallback)
-        except Exception as e:
-            mb.showerror(title="Failed to fit data", message=e, parent=self)
-            return
         finally:
             self.tk.eval("tk busy forget .")
             self.update()
@@ -990,10 +982,7 @@ class FittedFrame(PlotFrame):
         rowTitles = np.atleast_2d(self.titration.additionTitles).T
         columnTitles = np.append("", self.titration.processedSignalTitles)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
-        except Exception as e:
-            mb.showerror(title="Could not save file", message=e, parent=self)
+        np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
 
     def plot(self):
         self.ax.clear()
@@ -1454,10 +1443,7 @@ class SpeciationFrame(PlotFrame):
             [f"% of {freeName} in {name}" for name in names],
         )
         output = np.vstack((columnTitles, np.hstack((rowTitles, curves.T))))
-        try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
-        except Exception as e:
-            mb.showerror(title="Could not save file", message=e, parent=self)
+        np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
 
     def saveSpeciationRaw(self):
         initialfile = os.path.splitext(self.titration.title)[0] + "_raw_speciation"
@@ -1473,10 +1459,7 @@ class SpeciationFrame(PlotFrame):
             "", [f"[{name}]" for name in self.titration.speciation.outputNames]
         )
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
-        except Exception as e:
-            mb.showerror(title="Could not save file", message=e, parent=self)
+        np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
 
     @property
     def freeIndex(self):
@@ -1707,7 +1690,4 @@ class ResultsFrame(ttk.Frame):
         rowTitles = np.atleast_2d(self.titration.contributors.outputNames).T
         columnTitles = np.append("", self.titration.processedSignalTitlesStrings)
         output = np.vstack((columnTitles, np.hstack((rowTitles, data))))
-        try:
-            np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
-        except Exception as e:
-            mb.showerror(title="Could not save file", message=e, parent=self)
+        np.savetxt(fileName, output, fmt="%s", delimiter=",", encoding="utf-8-sig")
