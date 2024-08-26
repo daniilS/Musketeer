@@ -498,7 +498,7 @@ class FitNotebook(ttk.Notebook):
     def fitData(self):
         with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
             self.titration.fitData(progressDialog.callback)
-            progressDialog.label.configure(text="Loading results")
+            progressDialog.setLabelText("Loading results")
             self.showFit()
 
     def fitCallback(self, *args):
@@ -1736,7 +1736,7 @@ class RMSEPopup(tk.Toplevel):
             ):
                 precision = 100
 
-                progressDialog.label.configure(text="Estimating range... (1/2)")
+                progressDialog.setLabelText("Estimating range... (1/2)")
                 progressDialog.callback()
 
                 fixedVars[self.variableIndex] = values[0]
@@ -1749,7 +1749,7 @@ class RMSEPopup(tk.Toplevel):
                 RMSEs[0] = fixedTitration.RMSE
                 residualsFirst = fixedTitration.lastResiduals
 
-                progressDialog.label.configure(text="Estimating range... (2/2)")
+                progressDialog.setLabelText("Estimating range... (2/2)")
                 progressDialog.callback()
                 fixedVars[self.variableIndex] = values[-1]
                 optimisationResults[-1] = 10 ** fixedTitration.optimiseFixed(
@@ -1774,7 +1774,7 @@ class RMSEPopup(tk.Toplevel):
                 fatol = np.inf
                 xatol = 1e-3
 
-            progressDialog.label.configure(text="Calculating RMSE values...")
+            progressDialog.setLabelText("Calculating RMSE values...")
             progressDialog.callback()
             for i in range(midpoint - 1, -1, -1):
                 fixedVars[self.variableIndex] = values[i]
@@ -1813,7 +1813,7 @@ class RMSEPopup(tk.Toplevel):
                     progressDialog.progressbar.step()
                 progressDialog.callback()
 
-            progressDialog.label.configure(text="Plotting...")
+            progressDialog.setLabelText("Plotting...")
             progressDialog.callback()
 
             self.resetAxes()

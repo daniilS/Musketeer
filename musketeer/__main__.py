@@ -33,12 +33,17 @@ class ErrorDialog(tk.Toplevel):
         if self._windowingsystem == "aqua":
             try:
                 self.tk.call(
-                    "::tk::unsupported::MacWindowStyle", "style", self, "movableModal"
+                    "::tk::unsupported::MacWindowStyle", "style", self, "moveableModal"
                 )
             except Exception:
                 pass
         elif self._windowingsystem == "x11":
             self.attributes("-type", "dialog")
+
+        self.button = ttk.Button(
+            self, text="OK", command=self.close, style="Outline.TButton"
+        )
+        self.button.pack(side="bottom", padx=padding, pady=padding)
 
         image = "::tk::icons::warning"
         if image not in self.image_names():
@@ -69,7 +74,7 @@ class ErrorDialog(tk.Toplevel):
         tracebackText = "".join(traceback.format_exception(excType, excValue, tb))
         self.detailsText = scrolledtext.ScrolledText(
             self.detailsFrame,
-            font=font.nametofont("TkFixedFont"),
+            font="TkFixedFont",
             width=40,
             height=20,
         )
@@ -77,20 +82,23 @@ class ErrorDialog(tk.Toplevel):
         self.detailsText.configure(state="disabled")
         self.detailsText.pack(fill="both", expand=True)
 
-        self.update()
+        self.update_idletasks()
 
         # A WrappedLabel only automatically updates its height when it receives a
         # <Configure> event, so force it to request a height based on the detailFrame's
         # width.
         self.wrappedLabel.setHeightFromWidth(self.detailsFrame.winfo_reqwidth())
-        self.update()
+        self.update_idletasks()
 
+        self.collapsedFrameHeight = (
+            self.detailsFrame.winfo_reqheight() - self.detailsText.winfo_reqheight()
+        )
         self.minWidth, self.minHeight = (
             self.winfo_reqwidth(),
             self.winfo_reqheight() - self.detailsText.winfo_reqheight(),
         )
         x = int(root.winfo_x() + root.winfo_width() / 2 - self.minWidth / 2)
-        y = int(root.winfo_y() + root.winfo_height() / 2 - self.minHeight / 2)
+        y = int((root.winfo_y() + root.winfo_height()) * (1 / 3) - self.minHeight / 2)
         self.detailsText.forget()
         self.minsize(0, self.minHeight)
         self.geometry(f"{self.minWidth}x{self.minHeight}+{x}+{y}")
@@ -98,8 +106,17 @@ class ErrorDialog(tk.Toplevel):
         self.deiconify()
         self.bell()
         self.wait_visibility()
+
+        self.oldGrab = root.grab_current()
         self.grab_set()
+        self.wm_protocol("WM_DELETE_WINDOW", self.close)
+
         self.transient(root)
+
+    def close(self):
+        if self.oldGrab is not None and self.oldGrab.winfo_exists():
+            self.oldGrab.grab_set()
+        self.destroy()
 
     def toggleDetails(self):
         self.detailsToggle.expanded = not self.detailsToggle.expanded
@@ -107,12 +124,17 @@ class ErrorDialog(tk.Toplevel):
         if self.detailsToggle.expanded:
             self.detailsToggle.configure(text="Show details ⮟")
             self.detailsText.pack(padx=padding, pady=padding, fill="both", expand=True)
-            self.geometry(
-                f"{self.winfo_width()}x{self.winfo_height() + self.detailsFrame.winfo_reqheight()-self.detailsFrame.winfo_height()}"
-            )
+            if self.detailsFrame.winfo_reqheight() > self.detailsFrame.winfo_height():
+                self.geometry(
+                    f"{self.winfo_width()}x{self.winfo_height() + self.detailsFrame.winfo_reqheight()-self.detailsFrame.winfo_height()}"
+                )
         else:
+            newHeight = self.winfo_height() - (
+                self.detailsFrame.winfo_height() - self.collapsedFrameHeight
+            )
             self.detailsToggle.configure(text="Show details ⮞")
             self.detailsText.forget()
+            self.geometry(f"{self.winfo_width()}x{newHeight}")
 
 
 class App(tk.Tk):
@@ -251,7 +273,7 @@ with ProgressDialog(
     patchMatplotlib.applyPatch()
     progressDialog.callback()
 
-    progressDialog.label.configure(text="Loading interface")
+    progressDialog.setLabelText("Loading interface")
 
     class DpiPopup(tk.Toplevel):
         def __init__(self, master, saveCallback, *args, **kwargs):
@@ -443,19 +465,22 @@ with ProgressDialog(
             self.nametowidget(self.select()).saveFile(saveAs=True)
 
         def openFile(self, *args):
-            filePath = fd.askopenfilename(
-                title="Open file",
-                filetypes=[("Musketeer files", "*.fit"), ("All files", "*.*")],
-            )
-            if filePath == "":
-                return
-            titration = np.load(filePath, allow_pickle=False)
-
             with ProgressDialog(
                 self,
                 title="Loading titration",
-                labelText=f"Loading {PurePath(filePath).name}",
+                labelText="Waiting for filename",
             ) as progressDialog:
+                filePath = fd.askopenfilename(
+                    title="Open file",
+                    filetypes=[("Musketeer files", "*.fit"), ("All files", "*.*")],
+                )
+                if filePath == "":
+                    return
+
+                progressDialog.setLabelText(f"Loading {PurePath(filePath).name}")
+
+                titration = np.load(filePath, allow_pickle=False)
+
                 titrationFrame = TitrationFrame(self, filePath, padding=padding)
                 self.add(titrationFrame, text=PurePath(filePath).name, sticky="nesw")
                 self.select(str(titrationFrame))
