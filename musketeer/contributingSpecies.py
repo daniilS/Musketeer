@@ -72,12 +72,9 @@ class ContributingSpeciesCustomPopup(moduleFrame.Popup):
         self.checkbuttonsFrame.pack(expand=False, fill="none")
 
         self.checkbuttonVars = []
-        currentFilter = self.titration.contributingSpecies.filter
-        if len(currentFilter.shape) == 2:
-            currentFilter = currentFilter.any(axis=0)
         for name, state in zip(
             self.titration.speciation.outputNames,
-            self.titration.contributingSpecies.filter,
+            self.getLastFilter(),
         ):
             var = tk.BooleanVar(self, value=bool(state))
             self.checkbuttonVars.append(var)
@@ -89,10 +86,19 @@ class ContributingSpeciesCustomPopup(moduleFrame.Popup):
         buttonFrame = ButtonFrame(self.frame, self.reset, self.saveData, self.destroy)
         buttonFrame.pack(expand=False, fill="both", side="bottom")
 
+    def getLastFilter(self):
+        lastFilter = self.titration.contributingSpecies.filter
+        if len(lastFilter.shape) == 2:
+            lastFilter = lastFilter.any(axis=0)
+        if len(lastFilter) != self.titration.speciation.outputCount:
+            lastFilter = np.full(self.titration.speciation.outputCount, False)
+
+        return lastFilter
+
     def reset(self):
         for var, state in zip(
             self.checkbuttonVars,
-            self.titration.contributingSpecies.filter,
+            self.getLastFilter(),
         ):
             var.set(bool(state))
 
