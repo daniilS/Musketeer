@@ -13,6 +13,7 @@ from matplotlib.backends._backend_tk import (
     NavigationToolbar2Tk,
     add_tooltip,
 )
+from ttkbootstrap.widgets import InteractiveNotebook
 
 matplotlib.use("TkAgg")
 
@@ -250,6 +251,81 @@ def clear(self, *args, **kwargs):
     original_clear(self, *args, **kwargs)
 
 
+def InteractiveNotebook__init__(self, *args, **kwargs):
+    """Arguments different from ttk.Notebook:
+        style (str): should be in the form [color.][Flat.]Interactive.Tnotebook. Set to Interactive.TNotebook by default.
+        newtab (function): if provided, the notebook will include a 'new tab' button, which calls this function when pressed.
+    For the other arguments, see https://docs.python.org/3/library/tkinter.ttk.html#ttk-notebook
+    """
+    if "style" not in kwargs:
+        kwargs["style"] = "Interactive.TNotebook"
+
+    self._has_newtab_button = "newtab" in kwargs
+    if self._has_newtab_button:
+        self._newtab_callback = kwargs.pop("newtab")
+
+    super(InteractiveNotebook, self).__init__(*args, **kwargs)
+
+    self._last_pressed = None
+
+    self._middle_button_index = 3 if self._windowingsystem == "aqua" else 2
+
+    self.bind("<ButtonPress-1>", self._on_close_press, True)
+    self.bind("<ButtonRelease-1>", self._on_close_release)
+    self.bind(f"<ButtonPress-{self._middle_button_index}>", self._on_close_press, True)
+    self.bind(f"<ButtonRelease-{self._middle_button_index}>", self._on_close_release)
+
+    if self._has_newtab_button:
+        self._create_newtab()
+
+
+def _on_close_press(self, event):
+    element = self.identify(event.x, event.y)
+    if element == "":
+        # click happened outside of any tabs
+        self._last_pressed = None
+        return
+
+    index = self.index(f"@{event.x},{event.y}")
+
+    newtab_hit = index == self._last_tab and self._has_newtab_button
+
+    if (event.num == 1 and (("closebutton" in element) or newtab_hit)) or (
+        event.num == self._middle_button_index and not newtab_hit
+    ):
+        self.state(["pressed"])
+        self._last_pressed = index
+        return "break"  # to prevent selecting the tab
+
+
+def _on_close_release(self, event):
+    if not self.instate(["pressed"]):
+        return
+
+    self.state(["!pressed"])
+
+    element = self.identify(event.x, event.y)
+    if element == "":
+        # mouse was released outside of any tabs
+        self._last_pressed = None
+        return
+
+    index = self.index(f"@{event.x},{event.y}")
+
+    newtab_hit = index == self._last_tab and self._has_newtab_button
+
+    if self._last_pressed == index:
+        if event.num == 1 and newtab_hit:
+            # new tab button was pressed
+            self._newtab_callback()
+        # for the close button, the click position has to be more accurate
+        elif (event.num == 1 and "closebutton" in element) or (
+            event.num == self._middle_button_index and not newtab_hit
+        ):
+            # a close tab button was pressed
+            self.forget(index)
+
+
 def applyPatch():
     # cycles through line styles when colours start repeating
     colourCycler = matplotlib.rcParams["axes.prop_cycle"]
@@ -269,4 +345,10 @@ def applyPatch():
     offsetbox.DraggableBase.disconnect = disconnect
     _AxesBase.clear = clear
 
+    # makes scrolling work with "tk busy"
     FigureCanvasTk.scroll_event_windows = scroll_event_windows
+
+    # fixes incorrect detection of middle click on MacOS
+    InteractiveNotebook.__init__ = InteractiveNotebook__init__
+    InteractiveNotebook._on_close_press = _on_close_press
+    InteractiveNotebook._on_close_release = _on_close_release
