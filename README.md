@@ -1,7 +1,7 @@
 # Musketeer
 A software tool for fitting data from titration experiments.
 ## Installation
-### Windows & MacOS (Apple Silicon):
+### Windows & MacOS:
 You can install the latest .msi or .dmg installer [here](https://github.com/daniilS/Musketeer/releases/latest).
 ### Any platform (requires Python)
 Install the latest release of python from [the official website](https://www.python.org/downloads/). Then, in a terminal window or command prompt, type:
