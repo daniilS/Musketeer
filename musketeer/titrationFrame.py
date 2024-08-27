@@ -110,7 +110,8 @@ class TitrationFrame(ttk.Frame):
             style="Flat.Interactive.TNotebook",
         )
 
-        self.notebook.bind("<Button-3>", self.renameTab, True)
+        rightButtonIndex = 2 if self._windowingsystem == "aqua" else 3
+        self.notebook.bind(f"<Button-{rightButtonIndex}>", self.renameTab, True)
 
         self.notebook.grid(column=1, row=0, sticky="nesw")
 

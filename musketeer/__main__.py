@@ -30,6 +30,11 @@ class ErrorDialog(tk.Toplevel):
 
         self.title("An error has occured")
 
+        arrowRight = "⮞" if self._windowingsystem == "win32" else "▶"
+        arrowDown = "⮟" if self._windowingsystem == "win32" else "▼"
+        self.closedLabel = f"Show details {arrowRight}"
+        self.openLabel = f"Show details {arrowDown}"
+
         if self._windowingsystem == "aqua":
             try:
                 self.tk.call(
@@ -59,7 +64,7 @@ class ErrorDialog(tk.Toplevel):
 
         self.detailsToggle = ttk.Checkbutton(
             self,
-            text="Show details ⮞",
+            text=self.closedLabel,
             style="textOnly.TCheckbutton",
             command=self.toggleDetails,
         )
@@ -122,7 +127,7 @@ class ErrorDialog(tk.Toplevel):
         self.detailsToggle.expanded = not self.detailsToggle.expanded
 
         if self.detailsToggle.expanded:
-            self.detailsToggle.configure(text="Show details ⮟")
+            self.detailsToggle.configure(text=self.openLabel)
             self.detailsText.pack(padx=padding, pady=padding, fill="both", expand=True)
             if self.detailsFrame.winfo_reqheight() > self.detailsFrame.winfo_height():
                 self.geometry(
@@ -132,7 +137,7 @@ class ErrorDialog(tk.Toplevel):
             newHeight = self.winfo_height() - (
                 self.detailsFrame.winfo_height() - self.collapsedFrameHeight
             )
-            self.detailsToggle.configure(text="Show details ⮞")
+            self.detailsToggle.configure(text=self.closedLabel)
             self.detailsText.forget()
             self.geometry(f"{self.winfo_width()}x{newHeight}")
 
