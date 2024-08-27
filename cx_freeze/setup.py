@@ -8,6 +8,7 @@ build_options = {
     "packages": [],
     "excludes": [],
     "include_files": [] if sys.platform == "win32" else ["logo 512px.png"],
+    "include_msvcr": True,
     "silent": True,
 }
 
