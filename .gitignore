@@ -11,3 +11,7 @@ dist/
 cx_freeze/build/
 cx_freeze/dist/
 cx_freeze/venv/
+
+pyinstaller/build/
+pyinstaller/dist/
+pyinstaller/venv/
