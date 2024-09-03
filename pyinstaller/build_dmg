@@ -1,4 +1,12 @@
 #!/bin/sh
 
+if ! [ -f venv/bin/activate ]; then
+   python3 -m venv venv
+fi
+source venv/bin/activate
+
+pip install --upgrade --upgrade-strategy=eager pyinstaller dmgbuild ..
 pyinstaller --noconfirm Musketeer.spec
 dmgbuild -s dmgbuild_settings.py Musketeer dist/Musketeer-0.0.0-macOS.dmg
+
+deactivate
