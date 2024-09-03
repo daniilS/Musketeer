@@ -21,6 +21,7 @@ msi_options = {
 mac_options = {
     "bundle_name": "Musketeer",
     "iconfile": "logo 512px.icns",
+    "codesign_identity": "-",
     "plist_items": [
         ("CFBundleIdentifier", "daniilS.musketeer"),
         ("CFBundleVersion", musketeer.__version__),
