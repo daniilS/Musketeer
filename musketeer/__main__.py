@@ -117,6 +117,8 @@ class ErrorDialog(tk.Toplevel):
         self.wm_protocol("WM_DELETE_WINDOW", self.close)
 
         self.transient(root)
+        self.tkraise()  # otherwise window may only appear after the parent window receives a click
+        self.button.focus_set()
 
     def close(self):
         if self.oldGrab is not None and self.oldGrab.winfo_exists():
