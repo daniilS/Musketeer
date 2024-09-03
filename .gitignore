@@ -8,9 +8,12 @@ dist/
 
 .vscode/
 
+*.DS_Store
+
 cx_freeze/build/
 cx_freeze/dist/
 cx_freeze/venv/
+cx_freeze/settings.py
 
 pyinstaller/build/
 pyinstaller/dist/

@@ -1,5 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
+import platform
+
 from PyInstaller.utils.hooks import collect_all
+
+import musketeer
 
 datas = []
 binaries = []
@@ -36,7 +40,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='x86_64',
+    target_arch=platform.machine(),
     codesign_identity=None,
     entitlements_file=None,
     icon=['logo 512px.icns'],
@@ -49,4 +53,11 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='Musketeer',
+)
+app = BUNDLE(
+    coll,
+    name='Musketeer.app',
+    icon='logo 512px.icns',
+    bundle_identifier='daniilS.musketeer',
+    version=musketeer.__version__,
 )
