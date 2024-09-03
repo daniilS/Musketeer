@@ -355,7 +355,7 @@ class TitrationFrame(ttk.Frame):
             moduleFrame.update(titration, setDefault)
         self.numFits += 1
 
-        fitNotebook = FitNotebook(self, titration)
+        fitNotebook = FitNotebook(self.notebook, titration)
         if name is None:
             name = f"Fit {self.numFits}"
             titration.title = name
@@ -492,9 +492,14 @@ class FitNotebook(ttk.Notebook):
             try:
                 self.showFit(callback)
             except Exception as e:
-                raise RuntimeError(
-                    "Could not fully load the previous fit result. Please check all options are entered correctly, and then try to fit the data again."
-                ) from e
+                name = self.master.tab(self, "text")
+                try:
+                    name = name[: -self.master._padding_spaces]
+                except AttributeError:
+                    pass
+                warnings.warn(
+                    f"Could not fully load the previous fit result '{name}'.\nPlease check all options are entered correctly, and then try to fit the data again.\n\nCause: {str(e)}"
+                )
 
     def fitData(self):
         with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
