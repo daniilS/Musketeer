@@ -1,0 +1,4 @@
+#!/bin/sh
+
+pyinstaller --noconfirm Musketeer.spec
+dmgbuild -s dmgbuild_settings.py Musketeer dist/Musketeer-0.0.0-macOS.dmg
