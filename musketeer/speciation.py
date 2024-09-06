@@ -62,6 +62,39 @@ class ComplexSpeciationMixin:
     def complexBoundNames(self):
         return stoichiometriesToBoundNames(self.freeNames, self.complexStoichiometries)
 
+    @property
+    def complexFormsBinaryComplex(self):
+        # output[i, j] is True iff the IJ complex is formed
+        M = self.complexStoichiometries.tolist()
+        eye = np.eye(self.freeCount, dtype=int)
+        return np.array(
+            [
+                [
+                    np.sum(eye[[row, col]]).tolist() in M
+                    for col in range(self.freeCount)
+                ]
+                for row in range(self.freeCount)
+            ]
+        )  # fmt: skip
+
+    @property
+    def complexMaxValencyPerGuest(self):
+        # output[i, j] = the max number of js that can bind to one i
+        output = np.zeros([self.freeCount, self.freeCount], dtype=int)
+        for row in self.complexStoichiometries:
+            if np.count_nonzero(row) == 1:
+                host = guest = np.where(row > 0)[0][0]
+                valency = 1 if row[host] == 1 else 2
+            elif np.count_nonzero(row) == 2 and np.count_nonzero(row == 1) == 1:
+                host = np.where(row == 1)[0][0]
+                guest = np.where(row > 1)[0][0]
+                valency = row[guest]
+            else:
+                continue
+            output[host, guest] = max(output[host, guest], valency)
+
+        return output
+
     complexVariableNames = complexOutputNames = complexBoundNames
 
     complexOutputStoichiometries = complexStoichiometries
@@ -133,6 +166,32 @@ class PolymerSpeciationMixin:
         outputStoichiometries[::2] = np.where(M > 0, M / 2, abs(M))  # terminal rows
         outputStoichiometries[1::2] = np.where(M > 0, 0, abs(M))  # internal rows
         return outputStoichiometries
+
+    @property
+    def polymerFormsBinaryComplex(self):
+        # output[i, i] is True iff I_n is formeds
+        M = self.polymerStoichiometries.tolist()
+        eye = -1 * np.eye(self.freeCount, dtype=int)
+        return np.diag(
+            [
+                eye[freeIndex].tolist() in M
+                for freeIndex in range(self.freeCount)
+            ]
+        )  # fmt: skip
+
+    @property
+    def polymerMaxValencyPerGuest(self):
+        # output[i, j] = the max number of js that can bind to one i
+        output = np.zeros([self.freeCount, self.freeCount], dtype=int)
+        for row in self.polymerStoichiometries:
+            if np.count_nonzero(row) == 1:
+                host = guest = np.where(row < 0)[0][0]
+                valency = 2
+            else:
+                continue
+            output[host, guest] = max(output[host, guest], valency)
+
+        return output
 
     def splitPolymerKs(self, polymerKs):
         k2s = np.zeros(self.freeCount)
@@ -287,16 +346,13 @@ class Speciation(ComplexSpeciationMixin, PolymerSpeciationMixin, moduleFrame.Str
 
     @property
     def formsBinaryComplex(self):
-        # polymers include dimers, so treat as a dimer
-        M = np.where(self.stoichiometries < 0, 2, self.stoichiometries).tolist()
-        result = np.zeros([self.freeCount, self.freeCount], dtype=bool)
-        for host in range(self.freeCount):
-            for guest in range(self.freeCount):
-                target = [0] * self.freeCount
-                target[host] += 1
-                target[guest] += 1
-                result[host, guest] = target in M
-        return result
+        return self.complexFormsBinaryComplex | self.polymerFormsBinaryComplex
+
+    @property
+    def maximumValencyPerGuest(self):
+        return np.maximum(
+            self.complexMaxValencyPerGuest, self.polymerMaxValencyPerGuest
+        )
 
     @property
     def maximumValencyPerGuest(self):

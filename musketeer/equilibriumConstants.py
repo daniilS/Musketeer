@@ -289,7 +289,7 @@ class GetKsCustom(EquilibriumConstants):
         return globalKs
 
 
-class GetKsIndependentNoCooperativity(GetKsCustom):
+class GetKsNoCooperativity(GetKsCustom):
     Popup = None
     popupAttributes = ()
     requiredAttributes = tuple(
