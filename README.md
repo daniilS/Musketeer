@@ -13,10 +13,8 @@ You can now run Musketeer any time by typing:
 - Windows: `python -m musketeer`
 ## Usage Instructions
 ### Example files
-Two example files are provided:
+Five example `.fit` files are provided in [examples/](examples/), together with the `.csv` files they were created from. For detailed descriptions of the data and models used in each file, please see [the paper on Musketeer](https://doi.org/10.1039/D4SC03354J), where the same files are also provided as part of the Supplementary Information.
 
-- [A UV-Vis titration with guest absorption](examples/UV-Vis_example.fit?raw=1), from https://doi.org/10.1039/D2SC04271A
-- [A 31-P NMR denaturation experiment](examples/NMR_example.fit?raw=1), from https://doi.org/10.1039/D1SC02288A
 ### Loading titration data
 When starting Musketeer, you will see the option to either **Create a new fit file** or **Open an existing file**. Musketeer can directly open the following files:
 
