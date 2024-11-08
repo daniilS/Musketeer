@@ -791,6 +791,10 @@ class SpeciationSolver(Speciation):
                     "gtol": 1e-6 * LN_10,
                 },
             )
+            if result.success and "jac" not in result.keys():
+                # Happens if all lower bounds are equal to upper bounds, and possibly
+                # also in other cases.
+                result.jac = self.jacobianScaled(result.x, *args)
             if max(abs(result.jac)) > 1e-6 * LN_10:
                 self.scaling_factor *= 10_000
                 improvedResult = minimize(
@@ -805,6 +809,9 @@ class SpeciationSolver(Speciation):
                         "gtol": 1e-6 * LN_10,
                     },
                 )
+                if improvedResult.success and "jac" not in improvedResult.keys():
+                    improvedResult.jac = self.jacobianScaled(improvedResult.x, *args)
+
                 if max(abs(improvedResult.jac)) < max(abs(result.jac)):
                     result = improvedResult
                 else:
