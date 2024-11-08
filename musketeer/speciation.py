@@ -84,8 +84,12 @@ class ComplexSpeciationMixin:
 
 class PolymerSpeciationMixin:
     @property
+    def componentsThatFormPolymers(self):
+        return np.any(self.stoichiometries < 0, axis=0)
+
+    @property
     def polymerIndices(self):
-        return np.any(self.stoichiometries < 0, 1)
+        return np.any(self.stoichiometries < 0, axis=1)
 
     @property
     def polymerCount(self):
@@ -226,7 +230,9 @@ class PolymerSpeciationMixin:
         if self.polymerCount == 0:
             return np.inf
         return np.where(
-            self.polymerIndices, self.polymerFreeExactSolution(k2s, kns, total), np.inf
+            self.componentsThatFormPolymers,
+            self.polymerFreeExactSolution(k2s, kns, total),
+            np.inf,
         )
 
 
@@ -791,6 +797,10 @@ class SpeciationSolver(Speciation):
                     "gtol": 1e-6 * LN_10,
                 },
             )
+            if result.success and "jac" not in result.keys():
+                # Happens if all lower bounds are equal to upper bounds, and possibly
+                # also in other cases.
+                result.jac = self.jacobianScaled(result.x, *args)
             if max(abs(result.jac)) > 1e-6 * LN_10:
                 self.scaling_factor *= 10_000
                 improvedResult = minimize(
@@ -805,6 +815,9 @@ class SpeciationSolver(Speciation):
                         "gtol": 1e-6 * LN_10,
                     },
                 )
+                if improvedResult.success and "jac" not in improvedResult.keys():
+                    improvedResult.jac = self.jacobianScaled(improvedResult.x, *args)
+
                 if max(abs(improvedResult.jac)) < max(abs(result.jac)):
                     result = improvedResult
                 else:
