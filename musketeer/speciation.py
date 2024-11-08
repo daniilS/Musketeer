@@ -84,8 +84,12 @@ class ComplexSpeciationMixin:
 
 class PolymerSpeciationMixin:
     @property
+    def componentsThatFormPolymers(self):
+        return np.any(self.stoichiometries < 0, axis=0)
+
+    @property
     def polymerIndices(self):
-        return np.any(self.stoichiometries < 0, 1)
+        return np.any(self.stoichiometries < 0, axis=1)
 
     @property
     def polymerCount(self):
@@ -226,7 +230,9 @@ class PolymerSpeciationMixin:
         if self.polymerCount == 0:
             return np.inf
         return np.where(
-            self.polymerIndices, self.polymerFreeExactSolution(k2s, kns, total), np.inf
+            self.componentsThatFormPolymers,
+            self.polymerFreeExactSolution(k2s, kns, total),
+            np.inf,
         )
 
 
