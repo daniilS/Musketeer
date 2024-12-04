@@ -227,10 +227,11 @@ class PolymerSpeciationMixin:
         return polymerConcentration + endCapConcentration
 
     def polymerGetUpperBounds(self, k2s, kns, kabs, total, M):
-        if self.polymerCount == 0:
-            return np.inf
+        if not np.any(M < 0):
+            return np.full(len(total), np.inf)
+        componentsThatFormPolymers = np.any(M < 0, axis=0)
         return np.where(
-            self.componentsThatFormPolymers,
+            componentsThatFormPolymers,
             self.polymerFreeExactSolution(k2s, kns, total),
             np.inf,
         )
