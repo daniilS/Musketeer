@@ -901,6 +901,70 @@ class SpeciationHG2(Speciation):
         return output
 
 
+class SpeciationG2H(Speciation):
+    @property
+    def stoichiometries(self):
+        if self.freeCount < 2:
+            return np.array([[1] * self.freeCount])
+        else:
+            return np.pad(
+                array=[[1, 1], [2, 1]],
+                pad_width=[[0, 0], [0, self.freeCount - 2]],
+                mode="constant",
+                constant_values=0,
+            )
+
+    def run(self, variables, totalConcs):
+        K1, K2 = variables
+        output = np.empty([totalConcs.shape[0], 4])
+
+        for i, (Gtot, Htot) in enumerate(totalConcs):
+            if Htot == 0 or Gtot == 0:
+                output[i] = [Gtot, Htot, 0, 0]
+                continue
+
+            # When K2 is very small, solving a cubic in [G] can be numerically unstable,
+            # finding an inaccurate root, or not finding any real positive roots at
+            # all. After some testing, it seems that solving a cubic in [G]/Gtot is more
+            # stable, but I have not fully investigated the exact conditions under which
+            # the eigenvalues algorithm used by LAPACK (used by np.roots) becomes
+            # unstable, so adding error handling just in case.
+
+            # Solve for a([G]/Gtot)^3 + b([G]/Gtot)^2 + c([G]/Gtot) + d == 0
+            a = K2 * Gtot**3
+            b = (K2 * (2 * Htot - Gtot) + K1) * Gtot**2
+            c = (K1 * (Htot - Gtot) + 1) * Gtot
+            d = -Gtot
+
+            polynomial = np.array([a, b, c, d])
+
+            roots = np.roots(polynomial)
+
+            # Find smallest positive real root:
+            select = np.all([np.imag(roots) == 0, np.real(roots) >= 0], axis=0)
+            if np.count_nonzero(select) == 0:
+                raise RuntimeError(
+                    "No positive real roots found for cubic in [G]/Gtot when solving "
+                    "speciation.\n\nThe most common cause is when some Ks and/or total "
+                    "concentrations become very small or very large, leading to "
+                    "precision errors. Please check that the initial guesses for all "
+                    "variables are of a realistic order of magnitude, and that the "
+                    "model isn't overdetermined. If the problem persists, try "
+                    "selecting the 'Custom' binding isotherm option, which uses a "
+                    f"slower but more robust algorithm.\n\nDetails: {K1=}, {K2=}, "
+                    f"{Gtot=}, {Htot=}"
+                )
+            G = float(np.real(roots[select].min())) * Gtot
+
+            H = Htot / (1 + K1 * G + K2 * (G**2))
+            GH = K1 * H * G
+            G2H = K2 * H * G**2
+
+            output[i] = [G, H, GH, G2H]
+
+        return output
+
+
 class SpeciationCustom(SpeciationSolver):
     Popup = SpeciationPopup
     popupAttributes = ("stoichiometries",)
@@ -912,6 +976,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownOptions = {
         "1:1 binding": SpeciationHG,
         "1:2 binding": SpeciationHG2,
+        "2:1 binding": SpeciationG2H,
         "Dimerisation": SpeciationDimerisation,
         "Custom": SpeciationCustom,
         # "Custom Grad": SpeciationCustomGrad,
