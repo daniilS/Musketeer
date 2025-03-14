@@ -300,6 +300,10 @@ class VolumesPopup(moduleFrame.Popup):
             table.populateDefault()
 
     def saveData(self):
+        if np.unique(self.stockTable.rowTitles).size != self.stockTable.rowTitles.size:
+            raise ValueError("Stock names must be unique")
+        if np.any(self.stockTable.rowTitles == ""):
+            raise ValueError("Stock names cannot be empty")
         self.freeNames = self.stockTable.rowTitles
 
         self.stockTitles = self.stockTable.columnTitles
@@ -574,10 +578,18 @@ class ConcsPopup(moduleFrame.Popup):
         self.concsTable.populateDefault()
 
     def saveData(self):
+        if (
+            np.unique(self.concsTable.columnTitles).size
+            != self.concsTable.columnTitles.size
+        ):
+            raise ValueError("Stock names must be unique")
+        if np.any(self.concsTable.columnTitles == ""):
+            raise ValueError("Stock names cannot be empty")
+        self.freeNames = self.concsTable.columnTitles
+
         self.concsUnit = self.concsTable.concsUnit.get()
         self.unknownTotalConcsLinked = self.unknownTotalConcsLinkedVar.get()
         self.totalConcs = self.concsTable.data * prefixes[self.concsUnit.strip("M")]
-        self.freeNames = self.concsTable.columnTitles
 
         if np.any(self.concsTable.initialGuesses == 0):
             raise ValueError(

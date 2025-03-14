@@ -789,10 +789,10 @@ class ContinuousFittedFrame(PlotFrame):
 
         self.optionsFrame = ttk.Frame(self)
         self.optionsFrame.grid(row=1, column=2, sticky="w")
-        self.speciesLabel = ttk.Label(
+        self.deconvolutionLabel = ttk.Label(
             self.optionsFrame, anchor="center", justify="center", text="Show:"
         )
-        self.speciesLabel.pack(pady=padding, fill="x")
+        self.deconvolutionLabel.pack(pady=padding, fill="x")
 
         self.deconvolutionVar = tk.StringVar()
         deconvolutionOptions = (
@@ -808,7 +808,7 @@ class ContinuousFittedFrame(PlotFrame):
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.deconvolutionDropdown.pack()
+        self.deconvolutionDropdown.pack(pady=padding, fill="x")
 
         self.columnconfigure(
             0,
@@ -883,8 +883,6 @@ class FittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.totalConcentrations.freeNames[-1]
-        self.xConcs = titration.lastTotalConcs.T[-1]
         self.smooth = True
         self.logScale = False
 
@@ -902,8 +900,8 @@ class FittedFrame(PlotFrame):
         self.toolbar.update()
         self.toolbar.grid(row=1, column=0, sticky="ne")
 
-        self.toggleButtonsFrame = ttk.Frame(self)
-        self.toggleButtonsFrame.grid(row=1, column=2, sticky="w")
+        self.optionsFrame = ttk.Frame(self)
+        self.optionsFrame.grid(row=1, column=2, sticky="w")
 
         self.plotTypeVar = tk.StringVar()
         self.plotTypes = {
@@ -912,24 +910,17 @@ class FittedFrame(PlotFrame):
             f"Normalised change in {self.titration.yQuantity}": "normalised",
         }
         self.plotTypeDropdown = ttk.OptionMenu(
-            self.toggleButtonsFrame,
+            self.optionsFrame,
             self.plotTypeVar,
             [k for (k, v) in self.plotTypes.items() if v == "relative"][0],
             *self.plotTypes.keys(),
             command=lambda *args: self.plot(),
             style="primary.Outline.TMenubutton",
         )
-        self.plotTypeDropdown.pack()
+        self.plotTypeDropdown.pack(pady=padding, fill="x")
 
-        self.logScaleButton = ttk.Checkbutton(
-            self.toggleButtonsFrame,
-            text="Logarithmic x axis",
-            command=self.toggleLogScale,
-            style="Outline.Toolbutton",
-        )
-        self.logScaleButton.pack(pady=padding, fill="x")
         self.smoothButton = ttk.Checkbutton(
-            self.toggleButtonsFrame,
+            self.optionsFrame,
             text="Smooth curves",
             command=self.toggleSmooth,
             style="Outline.Toolbutton",
@@ -937,11 +928,38 @@ class FittedFrame(PlotFrame):
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
 
-        separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
+        separator = ttk.Separator(self.optionsFrame, orient="horizontal")
+        separator.pack(pady=padding, fill="x")
+
+        self.xAxisLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="X-axis:"
+        )
+        self.xAxisLabel.pack(pady=padding, fill="x")
+
+        self.xIndexVar = tk.StringVar()
+        self.xIndexDropdown = ttk.OptionMenu(
+            self.optionsFrame,
+            self.xIndexVar,
+            self.titration.totalConcentrations.freeNames[-1],
+            command=lambda *args: self.plot(),
+            *self.titration.totalConcentrations.freeNames,
+            style="primary.Outline.TMenubutton",
+        )
+        self.xIndexDropdown.pack(fill="x")
+
+        self.logScaleButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Logarithmic",
+            command=self.toggleLogScale,
+            style="Outline.Toolbutton",
+        )
+        self.logScaleButton.pack(pady=padding, fill="x")
+
+        separator = ttk.Separator(self.optionsFrame, orient="horizontal")
         separator.pack(pady=padding, fill="x")
 
         self.saveCurvesButton = ttk.Button(
-            self.toggleButtonsFrame,
+            self.optionsFrame,
             text="Save fitted curves",
             command=self.saveCurves,
             style="success.Outline.TButton",
@@ -960,7 +978,7 @@ class FittedFrame(PlotFrame):
             weight=1000,
             uniform="column",
             minsize=max(
-                w.winfo_reqwidth() for w in self.toggleButtonsFrame.children.values()
+                w.winfo_reqwidth() for w in self.optionsFrame.children.values()
             ),
         )
         self.rowconfigure(0, weight=1000, uniform="row")
@@ -971,6 +989,20 @@ class FittedFrame(PlotFrame):
     @property
     def plotType(self):
         return self.plotTypes[self.plotTypeVar.get()]
+
+    @property
+    def xIndex(self):
+        return np.argwhere(
+            self.titration.totalConcentrations.freeNames == self.xIndexVar.get()
+        )[0][0]
+
+    @property
+    def xQuantity(self):
+        return self.titration.totalConcentrations.freeNames[self.xIndex]
+
+    @property
+    def xConcs(self):
+        return self.titration.lastTotalConcs.T[self.xIndex]
 
     def toggleLogScale(self):
         self.logScale = not self.logScale
@@ -1290,7 +1322,7 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
         super().populate()
 
         self.choosePeakIndicesButton = ttk.Button(
-            self.toggleButtonsFrame,
+            self.optionsFrame,
             text=f"Select {self.titration.xQuantity} to display",
             command=self.choosePeakIndices,
             style="Outline.TButton",
@@ -1299,7 +1331,7 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
             before=self.saveCurvesButton, pady=padding, fill="x"
         )
 
-        separator = ttk.Separator(self.toggleButtonsFrame, orient="horizontal")
+        separator = ttk.Separator(self.optionsFrame, orient="horizontal")
         separator.pack(before=self.saveCurvesButton, pady=padding, fill="x")
 
     def choosePeakIndices(self):
@@ -1316,8 +1348,6 @@ class SpeciationFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.xQuantity = titration.totalConcentrations.freeNames[-1]
-        self.xConcs = titration.lastTotalConcs.T[-1]
         self.xUnit = titration.totalConcentrations.concsUnit
         self.speciesVar = tk.StringVar(self)
         self.separatePolymers = False
@@ -1356,7 +1386,7 @@ class SpeciationFrame(PlotFrame):
             *titration.totalConcentrations.freeNames,
             style="primary.Outline.TMenubutton",
         )
-        self.speciesDropdown.pack()
+        self.speciesDropdown.pack(pady=padding, fill="x")
 
         self.separatePolymersButton = ttk.Checkbutton(
             self.optionsFrame,
@@ -1368,14 +1398,6 @@ class SpeciationFrame(PlotFrame):
             self.separatePolymersButton.state(["disabled"])
         self.separatePolymersButton.pack(pady=padding, fill="x")
 
-        self.logScaleButton = ttk.Checkbutton(
-            self.optionsFrame,
-            text="Logarithmic x axis",
-            command=self.toggleLogScale,
-            style="Outline.Toolbutton",
-        )
-        self.logScaleButton.pack(pady=padding, fill="x")
-
         self.smoothButton = ttk.Checkbutton(
             self.optionsFrame,
             text="Smooth curves",
@@ -1384,6 +1406,36 @@ class SpeciationFrame(PlotFrame):
         )
         self.smoothButton.state(("selected",))
         self.smoothButton.pack(pady=padding, fill="x")
+
+        separator = ttk.Separator(self.optionsFrame, orient="horizontal")
+        separator.pack(pady=padding, fill="x")
+
+        self.xAxisLabel = ttk.Label(
+            self.optionsFrame, anchor="center", justify="center", text="X-axis:"
+        )
+        self.xAxisLabel.pack(pady=padding, fill="x")
+
+        self.xIndexVar = tk.StringVar()
+        self.xIndexDropdown = ttk.OptionMenu(
+            self.optionsFrame,
+            self.xIndexVar,
+            self.titration.totalConcentrations.freeNames[-1],
+            command=lambda *args: self.plot(),
+            *self.titration.totalConcentrations.freeNames,
+            style="primary.Outline.TMenubutton",
+        )
+        self.xIndexDropdown.pack(fill="x")
+
+        self.logScaleButton = ttk.Checkbutton(
+            self.optionsFrame,
+            text="Logarithmic",
+            command=self.toggleLogScale,
+            style="Outline.Toolbutton",
+        )
+        self.logScaleButton.pack(pady=padding, fill="x")
+
+        separator = ttk.Separator(self.optionsFrame, orient="horizontal")
+        separator.pack(pady=padding, fill="x")
 
         self.saveCurvesButton = ttk.Button(
             self.optionsFrame,
@@ -1480,6 +1532,20 @@ class SpeciationFrame(PlotFrame):
         return np.where(
             self.titration.totalConcentrations.freeNames == self.speciesVar.get()
         )[0][0]
+
+    @property
+    def xIndex(self):
+        return np.argwhere(
+            self.titration.totalConcentrations.freeNames == self.xIndexVar.get()
+        )[0][0]
+
+    @property
+    def xQuantity(self):
+        return self.titration.totalConcentrations.freeNames[self.xIndex]
+
+    @property
+    def xConcs(self):
+        return self.titration.lastTotalConcs.T[self.xIndex]
 
     def getData(self):
         titration = self.titration
