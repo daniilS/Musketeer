@@ -1,4 +1,6 @@
 import numpy as np
+from numpy import ma
+from scipy import ndimage
 from scipy.optimize import minimize
 from scipy.signal import find_peaks
 
@@ -24,6 +26,9 @@ titrationAttributes = (
     "lastSignalVars",
     "lastFittedSpectra",
     "lastFittedCurves",
+    "interpolatedTotalConcs",
+    "interpolatedSpeciesConcs",
+    "interpolatedFittedCurves",
     "_selectedSignalTitles",
 )
 
@@ -293,6 +298,31 @@ class Titration:
 
         return combinedResiduals
 
+    def simulate(self, speciationVars, totalConcs, spectra):
+        speciesConcs = self.speciation.run(speciationVars, totalConcs)
+        contributingSpeciesFilter = self.contributingSpecies.run()
+        signalVars, contributorsCountPerMolecule = self.contributors.run(speciesConcs)
+        proportionalSignalVars = self.proportionality.run(
+            signalVars, contributorsCountPerMolecule
+        )
+        fittedCurves = ma.dot(proportionalSignalVars, spectra)
+        fittedCurves.data[fittedCurves.mask] = np.nan
+
+        return speciesConcs, fittedCurves
+
+    def calculateInterpolatedConcsAndSpectra(self):
+        # Calculate speciation and spectra in between the data points, to plot the
+        # curves smoothly
+        scalingFactor = 10
+        zoomFactor = (scalingFactor * (self.numAdditions - 1) + 1) / self.numAdditions
+        # Linear interpolation
+        self.interpolatedTotalConcs = ndimage.zoom(
+            self.lastTotalConcs, (zoomFactor, 1), order=1
+        )
+        self.interpolatedSpeciesConcs, self.interpolatedFittedCurves = self.simulate(
+            self.lastKs, self.interpolatedTotalConcs, self.lastFittedSpectra
+        )
+
     def optimisationFuncLog(self, logKsAndTotalConcs):
         ksAndTotalConcs = 10**logKsAndTotalConcs
         return self.optimisationFunc(ksAndTotalConcs)
@@ -310,6 +340,9 @@ class Titration:
         )
         # to make sure the last fit is the optimal one
         self.optimisationFuncLog(result.x)
+
+        self.calculateInterpolatedConcsAndSpectra()
+
         return result.x
 
     # Run the optimisation with one or more of the variables at a fixed value

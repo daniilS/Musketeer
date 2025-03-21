@@ -16,7 +16,6 @@ from matplotlib.backend_bases import ResizeEvent
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from numpy import ma
-from scipy.interpolate import make_interp_spline
 from ttkbootstrap.widgets import InteractiveNotebook
 from ttkwidgets.autohidescrollbar import AutoHideScrollbar
 
@@ -314,6 +313,28 @@ class TitrationFrame(ttk.Frame):
                         # required attribute missing
                         continue
                     setattr(fit, moduleFrame.attributeName, selectedStrategy)
+
+                # Backwards compatibility: from version 1.9.1 onwards, after a fit has
+                # been calculated, interpolated concentrations are also calculated and
+                # stored in the Titration object.
+                if fileVersion < packaging.version.parse("1.9.1") and hasattr(
+                    fit, "lastFittedCurves"
+                ):
+                    try:
+                        fit.calculateInterpolatedConcsAndSpectra()
+                    except Exception as e:
+                        try:
+                            fit.interpolatedTotalConcs = fit.lastTotalConcs
+                            fit.interpolatedSpeciesConcs = fit.lastSpeciesConcs
+                            fit.interpolatedFittedCurves = fit.lastFittedCurves
+                        except AttributeError:
+                            # Other required attributes missing, so the relevant output
+                            # tab will already show a warning.
+                            pass
+                        else:
+                            warnings.warn(
+                                f"Could not calculate interpolated concentrations and spectra for fit '{name}'.\nTo show smooth curves, please manually press the 'Fit' button.\nCause: {str(e)}"
+                            )
 
                 self.newFit(fit, name, setDefault=False, callback=callback)
 
@@ -883,7 +904,6 @@ class FittedFrame(PlotFrame):
     def __init__(self, parent, titration, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.titration = titration
-        self.smooth = True
         self.logScale = False
 
     def populate(self):
@@ -918,15 +938,6 @@ class FittedFrame(PlotFrame):
             style="primary.Outline.TMenubutton",
         )
         self.plotTypeDropdown.pack(pady=padding, fill="x")
-
-        self.smoothButton = ttk.Checkbutton(
-            self.optionsFrame,
-            text="Smooth curves",
-            command=self.toggleSmooth,
-            style="Outline.Toolbutton",
-        )
-        self.smoothButton.state(("selected",))
-        self.smoothButton.pack(pady=padding, fill="x")
 
         separator = ttk.Separator(self.optionsFrame, orient="horizontal")
         separator.pack(pady=padding, fill="x")
@@ -1001,20 +1012,20 @@ class FittedFrame(PlotFrame):
         return self.titration.totalConcentrations.freeNames[self.xIndex]
 
     @property
-    def xConcs(self):
+    def xConcsPoints(self):
         return self.titration.lastTotalConcs.T[self.xIndex]
+
+    @property
+    def xConcsCurves(self):
+        return self.titration.interpolatedTotalConcs.T[self.xIndex]
 
     def toggleLogScale(self):
         self.logScale = not self.logScale
         if self.logScale:
-            self.ax.set_xscale("log")
+            self.ax.set_xscale("log", nonpositive="mask")
         else:
             self.ax.set_xscale("linear")
         self.canvas.draw()
-
-    def toggleSmooth(self):
-        self.smooth = not self.smooth
-        self.plot()
 
     def saveCurves(self):
         initialfile = os.path.splitext(self.titration.title)[0] + "_fitted_curves"
@@ -1040,96 +1051,73 @@ class FittedFrame(PlotFrame):
         # spectra.
         xQuantity = self.xQuantity
         xUnit = titration.totalConcentrations.concsUnit
-        xConcs = self.xConcs / totalConcentrations.prefixes[xUnit.strip("M")]
+        xConcsPoints = (
+            self.xConcsPoints / totalConcentrations.prefixes[xUnit.strip("M")]
+        )
+        xConcsCurves = (
+            self.xConcsCurves / totalConcentrations.prefixes[xUnit.strip("M")]
+        )
 
-        if ma.is_masked(self.curves):
-            firstUnmaskedIndices = [np.where(~row)[0][0] for row in self.curves.mask]
+        if ma.is_masked(self.points):
+            firstUnmaskedIndices = [np.where(~row)[0][0] for row in self.points.mask]
         else:
-            firstUnmaskedIndices = [0] * self.curves.shape[0]
+            firstUnmaskedIndices = [0] * self.points.shape[0]
         firstUnmaskedElements = np.array(
-            [curve[i] for curve, i in zip(self.curves, firstUnmaskedIndices)]
+            [curve[i] for curve, i in zip(self.points, firstUnmaskedIndices)]
         )
 
         # fitted Curves should always be masked
-        firstUnmaskedFittedIndices = [
-            np.where(~row)[0][0] for row in self.fittedCurves.mask
-        ]
+        firstUnmaskedFittedIndices = [np.where(~row)[0][0] for row in self.curves.mask]
         firstUnmaskedFittedElements = np.array(
             [
                 fittedCurve[i]
-                for fittedCurve, i in zip(self.fittedCurves, firstUnmaskedFittedIndices)
+                for fittedCurve, i in zip(self.curves, firstUnmaskedFittedIndices)
             ]
         )
 
         if self.plotType == "absolute":
+            points = self.points
             curves = self.curves
-            fittedCurves = self.fittedCurves
             self.ax.set_ylabel(f"{titration.yQuantity} / {titration.yUnit}")
         elif self.plotType == "relative":
             fittedZeros = np.atleast_2d(firstUnmaskedFittedElements).T
+            points = self.points - fittedZeros
             curves = self.curves - fittedZeros
-            fittedCurves = self.fittedCurves - fittedZeros
             self.ax.set_ylabel(f"Δ{titration.yQuantity} / {titration.yUnit}")
         elif self.plotType == "normalised":
+            points = self.points.T
             curves = self.curves.T
-            fittedCurves = self.fittedCurves.T
             # normalise so that all the fitted curves have the same amplitude
-            fittedDiff = self.fittedCurves.T - firstUnmaskedFittedElements
+            fittedDiff = self.curves.T - firstUnmaskedFittedElements
             maxFittedDiff = np.max(abs(fittedDiff), axis=0)
-            curves = curves / maxFittedDiff
+            points = points / maxFittedDiff
 
-            diff = curves - np.array(
-                [curve[i] for curve, i in zip(curves.T, firstUnmaskedIndices)]
+            diff = points - np.array(
+                [curve[i] for curve, i in zip(points.T, firstUnmaskedIndices)]
             )
             negatives = abs(np.amin(diff, axis=0)) > abs(np.amax(diff, axis=0))
-            curves[:, negatives] *= -1
+            points = np.where(negatives, -points, points)
+            points = points.T * 100
+
+            curves = curves / maxFittedDiff
+            curves = np.where(negatives, -curves, curves)
             curves = curves.T * 100
 
-            fittedCurves = fittedCurves / maxFittedDiff
-            fittedCurves[:, negatives] *= -1
-            fittedCurves = fittedCurves.T * 100
-
             fittedZeros = np.atleast_2d(
-                [
-                    fittedCurve[i]
-                    for fittedCurve, i in zip(fittedCurves, firstUnmaskedIndices)
-                ]
+                [fittedCurve[i] for fittedCurve, i in zip(curves, firstUnmaskedIndices)]
             ).T
+            points = points - fittedZeros
             curves = curves - fittedZeros
-            fittedCurves = fittedCurves - fittedZeros
             self.ax.set_ylabel(f"Normalised Δ{titration.yQuantity} / %")
         else:
             raise ValueError(f"Unknown plot type: {self.plotType}")
 
-        for curve, fittedCurve, name in zip(curves, fittedCurves, self.names):
-            self.ax.scatter(xConcs, curve)
-
-            # add step - 1 points between each data point
-            step = 10
-            smoothXCount = (xConcs.size - 1) * step + 1
-            smoothX = np.interp(
-                np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
-            )
-
-            # make_interp_spline requires all x values to be unique
-            filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            if (not self.smooth) or xConcs[filter].size < 3:
-                # cannot do spline interpolation with fewer than 3 unique x-values
-                self.ax.plot(xConcs, fittedCurve, label=name)
-                continue
-            try:
-                spl = make_interp_spline(
-                    xConcs[filter], fittedCurve[filter], bc_type="natural"
-                )
-                smoothY = spl(smoothX)
-                self.ax.plot(smoothX, smoothY, label=name)
-            except ValueError:
-                # spline interpolation failed
-                self.ax.plot(xConcs, fittedCurve, label=name)
-                continue
+        for pointsForCurve, curve, name in zip(points, curves, self.names):
+            self.ax.scatter(xConcsPoints, pointsForCurve)
+            self.ax.plot(xConcsCurves, curve, label=name)
 
         if self.logScale:
-            self.ax.set_xscale("log")
+            self.ax.set_xscale("log", nonpositive="mask")
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{xQuantity}] / {xUnit}")
@@ -1141,8 +1129,8 @@ class FittedFrame(PlotFrame):
 class DiscreteFittedFrame(FittedFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.curves = self.titration.processedData.T.copy()
-        self.fittedCurves = self.titration.lastFittedCurves.T.copy()
+        self.points = self.titration.processedData.T.copy()
+        self.curves = self.titration.interpolatedFittedCurves.T.copy()
         self.names = self.titration.processedSignalTitlesStrings
         self.populate()
         self.plot()
@@ -1313,8 +1301,8 @@ class DiscreteFromContinuousFittedFrame(FittedFrame):
 
     def setCurves(self):
         peakIndices = self.titration.peakIndices
-        self.curves = self.titration.processedData.T[peakIndices].copy()
-        self.fittedCurves = self.titration.lastFittedCurves.T[peakIndices].copy()
+        self.points = self.titration.processedData.T[peakIndices].copy()
+        self.curves = self.titration.interpolatedFittedCurves.T[peakIndices].copy()
         peakTitles = self.titration.processedSignalTitlesStrings[peakIndices]
         self.names = [f"{title} {self.titration.xUnit}" for title in peakTitles]
 
@@ -1352,7 +1340,6 @@ class SpeciationFrame(PlotFrame):
         self.speciesVar = tk.StringVar(self)
         self.separatePolymers = False
         self.logScale = False
-        self.smooth = True
         self.populate()
         self.plot()
 
@@ -1397,15 +1384,6 @@ class SpeciationFrame(PlotFrame):
         if titration.speciation.polymerCount == 0:
             self.separatePolymersButton.state(["disabled"])
         self.separatePolymersButton.pack(pady=padding, fill="x")
-
-        self.smoothButton = ttk.Checkbutton(
-            self.optionsFrame,
-            text="Smooth curves",
-            command=self.toggleSmooth,
-            style="Outline.Toolbutton",
-        )
-        self.smoothButton.state(("selected",))
-        self.smoothButton.pack(pady=padding, fill="x")
 
         separator = ttk.Separator(self.optionsFrame, orient="horizontal")
         separator.pack(pady=padding, fill="x")
@@ -1480,14 +1458,10 @@ class SpeciationFrame(PlotFrame):
     def toggleLogScale(self):
         self.logScale = not self.logScale
         if self.logScale:
-            self.ax.set_xscale("log")
+            self.ax.set_xscale("log", nonpositive="mask")
         else:
             self.ax.set_xscale("linear")
         self.canvas.draw()
-
-    def toggleSmooth(self):
-        self.smooth = not self.smooth
-        self.plot()
 
     def saveSpeciationCurves(self):
         freeName = self.speciesVar.get()
@@ -1545,15 +1519,12 @@ class SpeciationFrame(PlotFrame):
 
     @property
     def xConcs(self):
-        return self.titration.lastTotalConcs.T[self.xIndex]
+        return self.titration.interpolatedTotalConcs.T[self.xIndex]
 
     def getData(self):
         titration = self.titration
 
-        # xQuantity and xUnit for the fitted plot. Different from the xQuantity
-        # and xUnit in the titration object, which are used for the input
-        # spectra.
-        totalConcs = titration.lastTotalConcs[:, self.freeIndex]
+        totalConcs = titration.interpolatedTotalConcs[:, self.freeIndex]
         additionsFilter = totalConcs != 0
         totalConcs = totalConcs[additionsFilter]
 
@@ -1565,7 +1536,7 @@ class SpeciationFrame(PlotFrame):
         factor = abs(titration.speciation.outputStoichiometries[:, self.freeIndex])
         mask = factor.astype(bool)
 
-        concs = titration.lastSpeciesConcs * factor
+        concs = titration.interpolatedSpeciesConcs * factor
         concs = concs[additionsFilter, :][:, mask]
         curves = 100 * concs.T / totalConcs
 
@@ -1599,29 +1570,7 @@ class SpeciationFrame(PlotFrame):
         xConcs, curves, names = self.getData()
 
         for curve, name in zip(curves, names):
-            # add step - 1 points between each data point
-            step = 10
-            smoothXCount = (xConcs.size - 1) * step + 1
-            smoothX = np.interp(
-                np.arange(smoothXCount), np.arange(smoothXCount, step=step), xConcs
-            )
-
-            # make_interp_spline requires all x values to be unique
-            filter = np.concatenate((np.diff(xConcs).astype(bool), [True]))
-            if (not self.smooth) or xConcs[filter].size < 3:
-                # cannot do spline interpolation with fewer than 3 unique x-values
-                self.ax.plot(xConcs, curve, label=name)
-                continue
-            try:
-                spl = make_interp_spline(
-                    xConcs[filter], curve[filter], bc_type="natural"
-                )
-                smoothY = spl(smoothX)
-                self.ax.plot(smoothX, smoothY, label=name)
-            except ValueError:
-                # spline interpolation failed
-                self.ax.plot(xConcs, curve, label=name)
-                continue
+            self.ax.plot(xConcs, curve, label=name)
 
         freeName = self.speciesVar.get()
         self.ax.set_ylabel(f"% of {freeName}")
@@ -1629,7 +1578,7 @@ class SpeciationFrame(PlotFrame):
         self.ax.set_ylim(bottom=-5, top=105)
 
         if self.logScale:
-            self.ax.set_xscale("log")
+            self.ax.set_xscale("log", nonpositive="mask")
         else:
             self.ax.set_xscale("linear")
         self.ax.set_xlabel(f"[{self.xQuantity}] / {self.xUnit}")
@@ -1678,7 +1627,7 @@ class RMSEPopup(tk.Toplevel):
 
     def resetAxes(self):
         self.ax.clear()
-        self.ax.set_xscale("log")
+        self.ax.set_xscale("log", nonpositive="mask")
         self.ax.set_xlabel(self.xLabel)
         self.ax.set_ylabel(f"RMSE ({self.titration.yUnit})")
 
