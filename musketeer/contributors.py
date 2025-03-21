@@ -317,7 +317,7 @@ class ContributorConcsIdentical(ContributorConcs):
         # maximum total number of bonds each molecule can form
         maximumTotalValency = np.zeros(moleculeCount, dtype=int)
 
-        stoichiometries = self.titration.speciation.outputStoichiometries[
+        stoichiometries = self.titration.speciation.outputStoichiometries.copy()[
             self.titration.speciation.freeCount :
         ]
         # n-mer means host has n-1 binding sites for binding itself
