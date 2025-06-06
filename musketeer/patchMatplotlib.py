@@ -247,7 +247,11 @@ original_clear = _AxesBase.clear
 
 def clear(self, *args, **kwargs):
     if hasattr(self, "legend_") and self.legend_ is not None:
-        self.legend_.axes = self.legend_.figure = None
+        if hasattr(self.legend_, "_parent_figure"):
+            # for matplotlib >= 3.10
+            self.legend_.axes = self.legend_._parent_figure = None
+        else:
+            self.legend_.axes = self.legend_.figure = None
     original_clear(self, *args, **kwargs)
 
 
