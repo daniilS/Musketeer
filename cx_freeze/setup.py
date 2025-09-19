@@ -9,7 +9,7 @@ build_options = {
     "excludes": [],
     "include_files": [] if sys.platform == "win32" else ["logo 512px.png"],
     "include_msvcr": True,
-    "silent": True,
+    "silent": False,
 }
 
 msi_options = {
