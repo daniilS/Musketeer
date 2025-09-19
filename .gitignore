@@ -18,3 +18,5 @@ cx_freeze/settings.py
 pyinstaller/build/
 pyinstaller/dist/
 pyinstaller/venv/
+pyinstaller/installer_dist/
+pyinstaller/version_info.txt
