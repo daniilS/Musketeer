@@ -297,11 +297,27 @@ class GetKsNoCooperativity(GetKsCustom):
     )
 
     @property
+    def statisticalFactors(self):
+        statisticalFactors, _, _ = self.titration.speciation.noCooperativityValues
+        return statisticalFactors
+
+    @property
     def ksMatrix(self):
-        for host, guest in np.argwhere(
-            np.triu(self.titration.speciation.formsBinaryComplex)
-        ):
-            pass
+        _, ksMatrix, _ = self.titration.speciation.noCooperativityValues
+        return ksMatrix
+
+    @property
+    def kNames(self):
+        _, _, kNames = self.titration.speciation.noCooperativityValues
+        return kNames
+
+    @property
+    def knownKs(self):
+        return ma.array(np.empty(len(self.kNames)), mask=True)
+
+    @property
+    def initialKs(self):
+        return ma.array(np.empty(len(self.kNames)), mask=True)
 
 
 class KnownKsTable(Table):
@@ -401,6 +417,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
     dropdownLabelText = "Fix any K values?"
     dropdownOptions = {
         "No, optimise all Ks": GetKsAll,
+        "Assume no cooperativity": GetKsNoCooperativity,
         # "Assume second binding weak": GetKsNonspecific,
         "Fix some known Ks": GetKsKnown,
         "Custom": GetKsCustom,

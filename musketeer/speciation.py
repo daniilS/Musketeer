@@ -1,9 +1,11 @@
+import math
 import tkinter.ttk as ttk
 import warnings
 from abc import abstractmethod
 
 import numpy as np
 from numpy import ma
+import scipy
 from scipy.optimize import minimize
 
 from . import moduleFrame
@@ -62,20 +64,14 @@ class ComplexSpeciationMixin:
     def complexBoundNames(self):
         return stoichiometriesToBoundNames(self.freeNames, self.complexStoichiometries)
 
-    @property
-    def complexFormsBinaryComplex(self):
-        # output[i, j] is True iff the IJ complex is formed
-        M = self.complexStoichiometries.tolist()
-        eye = np.eye(self.freeCount, dtype=int)
-        return np.array(
-            [
-                [
-                    np.sum(eye[[row, col]]).tolist() in M
-                    for col in range(self.freeCount)
-                ]
-                for row in range(self.freeCount)
+    def complexFormsBinaryComplex(self, i, j):
+        if i == j:
+            desiredRow = [2 if index == i else 0 for index in range(self.freeCount)]
+        else:
+            desiredRow = [
+                1 if index in (i, j) else 0 for index in range(self.freeCount)
             ]
-        )  # fmt: skip
+        return np.any(np.all(self.complexStoichiometries == desiredRow, axis=1))
 
     @property
     def complexMaxValencyPerGuest(self):
@@ -89,11 +85,101 @@ class ComplexSpeciationMixin:
                 host = np.where(row == 1)[0][0]
                 guest = np.where(row > 1)[0][0]
                 valency = row[guest]
+            elif np.count_nonzero(row) == 2 and np.count_nonzero(row == 1) == 2:
+                host, guest = np.where(row == 1)[0]
+                valency = 1
+                output[host, guest] = max(output[host, guest], valency)
+                output[guest, host] = max(output[guest, host], valency)
             else:
                 continue
             output[host, guest] = max(output[host, guest], valency)
 
         return output
+
+    def getComplexNoCooperativityValues(self):
+        # Decomposes global Ks into products of microscopic Ks
+
+        # Go through the complexes in order of increasing size, so that we can use
+        # statistical factors of sub-complexes.
+        sortedRowIndices = np.argsort(self.complexStoichiometries.sum(axis=1))
+        M = self.complexStoichiometries[sortedRowIndices]
+
+        statisticalFactors = np.ones(self.complexCount)
+        ksMatrix = np.zeros(
+            [self.complexCount, self.freeCount, self.freeCount], dtype=int
+        )
+        microKsNames = [
+            [f"microK_{i}·{j}" for j in self.freeNames] for i in self.freeNames
+        ]
+
+        for rowIndex, row in enumerate(M):
+            if np.count_nonzero(row) >= 1:
+                statisticalFactor = 1
+                for componentIndex in np.nonzero(row)[0]:
+                    componentStatisticalFactor = 1
+                    # find largest super-complex wrt this component, if it exists
+                    for superRow in M[rowIndex + 1 : :][::-1]:
+                        if (
+                            np.count_nonzero(superRow) == np.count_nonzero(row)
+                            and np.count_nonzero(superRow - row) == 1
+                            and np.nonzero(superRow - row)[0].item() == componentIndex
+                        ):
+                            componentStatisticalFactor = math.comb(
+                                superRow[componentIndex], row[componentIndex]
+                            )
+                            break
+                    # find sub-complex lacking this component
+                    targetSubRow = row.copy()
+                    targetSubRow[componentIndex] = 0
+                    for subRowIndex, subRow in enumerate(M[:rowIndex]):
+                        if np.array_equal(subRow, targetSubRow):
+                            componentStatisticalFactor *= statisticalFactors[
+                                subRowIndex
+                            ]
+                            break
+
+                    statisticalFactor = max(
+                        statisticalFactor, componentStatisticalFactor
+                    )
+                statisticalFactors[rowIndex] = statisticalFactor
+
+            # now calculate the exponents of the microscopic Ks
+            for index, i in enumerate(np.nonzero(row)[0]):
+                for j in np.nonzero(row)[0][index:]:
+                    if not self.complexFormsBinaryComplex(i, j):
+                        continue
+                    if i == j:
+                        # assume dimers form a single bond, while larger complexes are rings
+                        if row[i] == 1:
+                            continue
+                        elif row[i] == 2:
+                            ksMatrix[rowIndex, i, j] = 1
+                        else:
+                            ksMatrix[rowIndex, i, j] = row[i]
+                    else:
+                        maxIBonds = row[i] * self.complexMaxValencyPerGuest[i, j]
+                        maxJBonds = row[j] * self.complexMaxValencyPerGuest[j, i]
+                        maxTotalBonds = row[i] * row[j]
+                        ksMatrix[rowIndex, i, j] = min(
+                            maxIBonds, maxJBonds, maxTotalBonds
+                        )
+
+        # flatten i and j into a single index
+        ksMatrix = ksMatrix.reshape(self.complexCount, self.freeCount**2)
+        microKsNames = np.array(microKsNames).flatten()
+
+        # filter out zero columns
+        nonZeroColumns = np.any(ksMatrix != 0, axis=0)
+        ksMatrix = ksMatrix[:, nonZeroColumns]
+        microKsNames = microKsNames[nonZeroColumns]
+
+        # unsort rows, and transpose Ks matrix to format expected by equilibriumConstants
+        unsortedIndices = np.argsort(sortedRowIndices)
+        return (
+            statisticalFactors[unsortedIndices].copy(),
+            ksMatrix[unsortedIndices].T.copy(),
+            microKsNames,
+        )
 
     complexVariableNames = complexOutputNames = complexBoundNames
 
@@ -146,6 +232,10 @@ class PolymerSpeciationMixin:
         return np.array(variableNames)
 
     @property
+    def polymerVariableCount(self):
+        return len(self.polymerVariableNames)
+
+    @property
     def polymerOutputNames(self):
         return np.ravel(
             [
@@ -168,18 +258,6 @@ class PolymerSpeciationMixin:
         return outputStoichiometries
 
     @property
-    def polymerFormsBinaryComplex(self):
-        # output[i, i] is True iff I_n is formeds
-        M = self.polymerStoichiometries.tolist()
-        eye = -1 * np.eye(self.freeCount, dtype=int)
-        return np.diag(
-            [
-                eye[freeIndex].tolist() in M
-                for freeIndex in range(self.freeCount)
-            ]
-        )  # fmt: skip
-
-    @property
     def polymerMaxValencyPerGuest(self):
         # output[i, j] = the max number of js that can bind to one i
         output = np.zeros([self.freeCount, self.freeCount], dtype=int)
@@ -192,6 +270,24 @@ class PolymerSpeciationMixin:
             output[host, guest] = max(output[host, guest], valency)
 
         return output
+
+    def getPolymerNoCooperativityValues(self):
+        statisticalFactors = np.ones(self.polymerVariableCount)
+        ksMatrix = np.empty((0, self.polymerCount), dtype=int)
+        microKsNames = [f"microK_{name}" for name in self.polymerBoundNames]
+
+        for rowIndex, row in enumerate(self.polymerStoichiometries):
+            outputRow = np.zeros(self.polymerCount, dtype=int)
+            outputRow[rowIndex] = 1
+
+            if np.count_nonzero(row) == 1:
+                # K2 and Kn are identical, i.e. isodesmic polymerisation
+                ksMatrix = np.vstack([ksMatrix, outputRow, outputRow])
+            else:
+                # for end-capped polymers, do not attempt to decompose the Kab
+                ksMatrix = np.vstack([ksMatrix, outputRow])
+
+        return statisticalFactors, ksMatrix.T, np.array(microKsNames)
 
     def splitPolymerKs(self, polymerKs):
         k2s = np.zeros(self.freeCount)
@@ -299,6 +395,15 @@ class PolymerSpeciationMixin:
 class Speciation(ComplexSpeciationMixin, PolymerSpeciationMixin, moduleFrame.Strategy):
     requiredAttributes = ("stoichiometries",)
 
+    @property
+    def stoichiometries(self):
+        return self._stoichiometries
+
+    @stoichiometries.setter
+    def stoichiometries(self, value):
+        self._stoichiometries = value
+        self._noCooperativityValues = self.getNoCooperativityValues()
+
     @abstractmethod
     def run(self, variables, totalConcs):
         pass
@@ -345,42 +450,32 @@ class Speciation(ComplexSpeciationMixin, PolymerSpeciationMixin, moduleFrame.Str
         )
 
     @property
-    def formsBinaryComplex(self):
-        return self.complexFormsBinaryComplex | self.polymerFormsBinaryComplex
-
-    @property
     def maximumValencyPerGuest(self):
         return np.maximum(
             self.complexMaxValencyPerGuest, self.polymerMaxValencyPerGuest
         )
 
     @property
-    def maximumValencyPerGuest(self):
-        # polymers can form 2 bonds to themselves, so treat as a trimer
-        M = np.where(self.stoichiometries < 0, 3, self.stoichiometries)
-        formsBinaryComplex = self.formsBinaryComplex
-        result = np.zeros([self.freeCount, self.freeCount], dtype=int)
-        for host in range(self.freeCount):
-            for guest in range(self.freeCount):
-                if not formsBinaryComplex[host, guest]:
-                    continue
-                elif host == guest:
-                    for complex in M:
-                        if np.count_nonzero(complex) == 1 and complex[host] != 0:
-                            result[host, guest] = max(
-                                result[host, guest], complex[host]
-                            )
-                else:
-                    for complex in M:
-                        if (
-                            np.count_nonzero(complex) == 2
-                            and complex[host] == 1
-                            and complex[guest] != 0
-                        ):
-                            result[host, guest] = max(
-                                result[host, guest], complex[guest]
-                            )
-        return result
+    def noCooperativityValues(self):
+        try:
+            return self._noCooperativityValues
+        except AttributeError:
+            self._noCooperativityValues = self.getNoCooperativityValues()
+            return self._noCooperativityValues
+
+    def getNoCooperativityValues(self):
+        statisticalFactorsC, ksMatrixC, microKsNamesC = (
+            self.getComplexNoCooperativityValues()
+        )
+        statisticalFactorsP, ksMatrixP, microKsNamesP = (
+            self.getPolymerNoCooperativityValues()
+        )
+
+        statisticalFactors = np.concatenate([statisticalFactorsC, statisticalFactorsP])
+        ksMatrix = scipy.linalg.block_diag(ksMatrixC, ksMatrixP)
+        microKsNames = np.concatenate([microKsNamesC, microKsNamesP])
+
+        return statisticalFactors, ksMatrix, microKsNames
 
     def variablesToKs(self, variables):
         complexKs = variables[: self.complexCount]
@@ -549,6 +644,8 @@ class SpeciationDimerisation(Speciation):
         M.resize([1, self.freeCount])
         return M
 
+    noCooperativityValues = (np.array([1]), np.array([[1]]), np.array(["microK_Host₂"]))
+
     def run(self, variables, totalConcs):
         K = variables[0]
         Htot = totalConcs.T[0]
@@ -563,6 +660,12 @@ class SpeciationHG(Speciation):
         M = np.array([[1, 1]])
         M.resize([1, self.freeCount])
         return M
+
+    noCooperativityValues = (
+        np.array([1]),
+        np.array([[1]]),
+        np.array(["microK_Host·Guest"]),
+    )
 
     def run(self, variables, totalConcs):
         K = variables[0]
@@ -586,6 +689,102 @@ class SpeciationHG(Speciation):
         HG = H * G * K
 
         return np.array([H, G, HG]).T
+
+
+class SpeciationHG2(Speciation):
+    @property
+    def stoichiometries(self):
+        if self.freeCount < 2:
+            return np.array([[1] * self.freeCount])
+        else:
+            return np.pad(
+                array=[[1, 1], [1, 2]],
+                pad_width=[[0, 0], [0, self.freeCount - 2]],
+                mode="constant",
+                constant_values=0,
+            )
+
+    noCooperativityValues = (
+        np.array([2, 1]),
+        np.array([[1, 2]]),
+        np.array(["microK_Host·Guest"]),
+    )
+
+    def run(self, variables, totalConcs):
+        K1, K2 = variables
+        output = np.empty([totalConcs.shape[0], 4])
+
+        for i, (Htot, Gtot) in enumerate(totalConcs):
+            if Htot == 0 or Gtot == 0:
+                output[i] = [Htot, Gtot, 0, 0]
+                continue
+
+            # When K2 is very small, solving a cubic in [G] can be numerically unstable,
+            # finding an inaccurate root, or not finding any real positive roots at
+            # all. After some testing, it seems that solving a cubic in [G]/Gtot is more
+            # stable, but I have not fully investigated the exact conditions under which
+            # the eigenvalues algorithm used by LAPACK (used by np.roots) becomes
+            # unstable, so adding error handling just in case.
+
+            # Solve for a([G]/Gtot)^3 + b([G]/Gtot)^2 + c([G]/Gtot) + d == 0
+            a = K2 * Gtot**3
+            b = (K2 * (2 * Htot - Gtot) + K1) * Gtot**2
+            c = (K1 * (Htot - Gtot) + 1) * Gtot
+            d = -Gtot
+
+            polynomial = np.array([a, b, c, d])
+
+            roots = np.roots(polynomial)
+
+            # Find smallest positive real root:
+            select = np.all([np.imag(roots) == 0, np.real(roots) >= 0], axis=0)
+            if np.count_nonzero(select) == 0:
+                raise RuntimeError(
+                    "No positive real roots found for cubic in [G]/Gtot when solving "
+                    "speciation.\n\nThe most common cause is when some Ks and/or total "
+                    "concentrations become very small or very large, leading to "
+                    "precision errors. Please check that the initial guesses for all "
+                    "variables are of a realistic order of magnitude, and that the "
+                    "model isn't overdetermined. If the problem persists, try "
+                    "selecting the 'Custom' binding isotherm option, which uses a "
+                    f"slower but more robust algorithm.\n\nDetails: {K1=}, {K2=}, "
+                    f"{Htot=}, {Gtot=}"
+                )
+            G = float(np.real(roots[select].min())) * Gtot
+
+            H = Htot / (1 + K1 * G + K2 * (G**2))
+            HG = K1 * H * G
+            HG2 = K2 * H * G**2
+
+            output[i] = [H, G, HG, HG2]
+
+        return output
+
+
+class SpeciationPolymerisation(Speciation):
+    @property
+    def stoichiometries(self):
+        M = np.array([[-1]])
+        M.resize([1, self.freeCount])
+        return M
+
+    noCooperativityValues = (
+        np.array([1]),
+        np.array([[1, 1]]),
+        np.array(["microK_Hostₙ"]),
+    )
+
+    def run(self, variables, totalConcs):
+        k2, kn = variables
+        return np.array(
+            [
+                [
+                    freeConc := self.polymerFreeExactSolutionSingle(k2, kn, totalConc),
+                    *self.getTerminalInternalConcs(freeConc, k2, kn, None),
+                ]
+                for totalConc in totalConcs[:, 0]
+            ]
+        )
 
 
 # Old, slower speciation algorithm, currently unused. Left in in case results need to
@@ -893,70 +1092,6 @@ class SpeciationSolver(Speciation):
         return np.hstack([free, bound])
 
 
-class SpeciationHG2(Speciation):
-    @property
-    def stoichiometries(self):
-        if self.freeCount < 2:
-            return np.array([[1] * self.freeCount])
-        else:
-            return np.pad(
-                array=[[1, 1], [1, 2]],
-                pad_width=[[0, 0], [0, self.freeCount - 2]],
-                mode="constant",
-                constant_values=0,
-            )
-
-    def run(self, variables, totalConcs):
-        K1, K2 = variables
-        output = np.empty([totalConcs.shape[0], 4])
-
-        for i, (Htot, Gtot) in enumerate(totalConcs):
-            if Htot == 0 or Gtot == 0:
-                output[i] = [Htot, Gtot, 0, 0]
-                continue
-
-            # When K2 is very small, solving a cubic in [G] can be numerically unstable,
-            # finding an inaccurate root, or not finding any real positive roots at
-            # all. After some testing, it seems that solving a cubic in [G]/Gtot is more
-            # stable, but I have not fully investigated the exact conditions under which
-            # the eigenvalues algorithm used by LAPACK (used by np.roots) becomes
-            # unstable, so adding error handling just in case.
-
-            # Solve for a([G]/Gtot)^3 + b([G]/Gtot)^2 + c([G]/Gtot) + d == 0
-            a = K2 * Gtot**3
-            b = (K2 * (2 * Htot - Gtot) + K1) * Gtot**2
-            c = (K1 * (Htot - Gtot) + 1) * Gtot
-            d = -Gtot
-
-            polynomial = np.array([a, b, c, d])
-
-            roots = np.roots(polynomial)
-
-            # Find smallest positive real root:
-            select = np.all([np.imag(roots) == 0, np.real(roots) >= 0], axis=0)
-            if np.count_nonzero(select) == 0:
-                raise RuntimeError(
-                    "No positive real roots found for cubic in [G]/Gtot when solving "
-                    "speciation.\n\nThe most common cause is when some Ks and/or total "
-                    "concentrations become very small or very large, leading to "
-                    "precision errors. Please check that the initial guesses for all "
-                    "variables are of a realistic order of magnitude, and that the "
-                    "model isn't overdetermined. If the problem persists, try "
-                    "selecting the 'Custom' binding isotherm option, which uses a "
-                    f"slower but more robust algorithm.\n\nDetails: {K1=}, {K2=}, "
-                    f"{Htot=}, {Gtot=}"
-                )
-            G = float(np.real(roots[select].min())) * Gtot
-
-            H = Htot / (1 + K1 * G + K2 * (G**2))
-            HG = K1 * H * G
-            HG2 = K2 * H * G**2
-
-            output[i] = [H, G, HG, HG2]
-
-        return output
-
-
 class SpeciationCustom(SpeciationSolver):
     Popup = SpeciationPopup
     popupAttributes = ("stoichiometries",)
@@ -969,6 +1104,7 @@ class ModuleFrame(moduleFrame.ModuleFrame):
         "1:1 binding": SpeciationHG,
         "1:2 binding": SpeciationHG2,
         "Dimerisation": SpeciationDimerisation,
+        "Polymerisation": SpeciationPolymerisation,
         "Custom": SpeciationCustom,
         # "Custom Grad": SpeciationCustomGrad,
     }
