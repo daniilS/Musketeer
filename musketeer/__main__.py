@@ -133,7 +133,7 @@ class ErrorDialog(tk.Toplevel):
             self.detailsText.pack(padx=padding, pady=padding, fill="both", expand=True)
             if self.detailsFrame.winfo_reqheight() > self.detailsFrame.winfo_height():
                 self.geometry(
-                    f"{self.winfo_width()}x{self.winfo_height() + self.detailsFrame.winfo_reqheight()-self.detailsFrame.winfo_height()}"
+                    f"{self.winfo_width()}x{self.winfo_height() + self.detailsFrame.winfo_reqheight() - self.detailsFrame.winfo_height()}"
                 )
         else:
             newHeight = self.winfo_height() - (
@@ -215,13 +215,11 @@ root.title(f"Musketeer {__version__}")
 # icon as possible
 
 try:
-    try:
-        iconData48 = (res.files(__package__) / "logo 48px.png").read_bytes()
-        iconData512 = (res.files(__package__) / "logo 512px.png").read_bytes()
-    except AttributeError:
-        # Python 3.8 compatibility
-        iconData48 = res.read_binary(__package__, "logo 48px.png")
-        iconData512 = res.read_binary(__package__, "logo 512px.png")
+    iconData16 = (res.files(__package__) / "logo 16px.png").read_bytes()
+    iconData48 = (res.files(__package__) / "logo 48px.png").read_bytes()
+    iconData512 = (res.files(__package__) / "logo 512px.png").read_bytes()
+
+    icon16 = tk.PhotoImage(data=iconData16)
     icon48 = tk.PhotoImage(data=iconData48)
     icon512 = tk.PhotoImage(data=iconData512)
 
@@ -229,9 +227,9 @@ try:
         # Call before update to make sure the icon appears straight away (otherwise the
         # default Tk icon may appear for a few seconds first). Call after update is
         # necessary to make the title bar icon not blurry.
-        root.iconphoto(True, icon48, icon512)
+        root.iconphoto(True, icon48, icon16)
         root.update()
-        root.iconphoto(True, icon48, icon512)
+        root.iconphoto(True, icon48, icon16)
     else:
         root.iconphoto(True, icon512, icon48)
 except Exception:
@@ -312,7 +310,8 @@ with ProgressDialog(
             self.resDropdown = ttk.Combobox(
                 self,
                 values=[
-                    f"{int(y*4/3)} x {y}" for y in [240, 360, 480, 600, 960, 1200, 1440]
+                    f"{int(y * 4 / 3)} x {y}"
+                    for y in [240, 360, 480, 600, 960, 1200, 1440]
                 ],
                 justify="right",
                 width=10,
