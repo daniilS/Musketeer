@@ -361,7 +361,7 @@ class TitrationFrame(ttk.Frame):
     def editData(self):
         root = self.winfo_toplevel()
         popup = editData.EditDataPopup(self.currentTab.titration, master=root)
-        popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
+        popup.geometry(f"+{root.winfo_x() + 100}+{root.winfo_y() + 100}")
         popup.show()
         self.currentTab.inputSpectraFrame.updateData()
         if (
@@ -610,8 +610,11 @@ class FitNotebook(ttk.Notebook):
         self.add(self.speciationFrame, text="Speciation")
         callback()
 
-        self.resultsFrame = ResultsFrame(self, self.titration)
-        self.add(self.resultsFrame, text="Results")
+        self.resultsTab = ScrolledFrame(self, autohide=False, scrollbars="vertical")
+        self.resultsTabInnerFrame = self.resultsTab.display_widget(
+            ResultsFrame, stretch=False, fit=True, titration=self.titration
+        )
+        self.add(self.resultsTab, text="Results", sticky="nesw")
         callback()
 
         if lastTabClass is not None:
@@ -1193,7 +1196,7 @@ class ChoosePeakIndicesPopup(tk.Toplevel):
         self.peakIndices = None
 
     def show(self):
-        self.geometry(f"+{self.master.winfo_x()+100}+{self.master.winfo_y()+100}")
+        self.geometry(f"+{self.master.winfo_x() + 100}+{self.master.winfo_y() + 100}")
         self.populate()
 
         self.deiconify()
@@ -2011,9 +2014,6 @@ class ResultsFrame(ttk.Frame):
 
         kTable.pack(side="top", pady=15)
 
-        # TODO: fix sheet becoming too small to be visible when there are a lot of
-        # variables shown above it.
-
         if titration.totalConcentrations.variableCount > 0:
             concsTable = Table(
                 self,
@@ -2072,13 +2072,24 @@ class ResultsFrame(ttk.Frame):
                 headers=list(titration.processedSignalTitlesStrings),
                 row_index=list(titration.contributors.outputNames),
                 set_all_heights_and_widths=True,
+                show_y_scrollbar=False,
+                show_x_scrollbar=True,
             )
-        sheet.MT.configure(height=0)
         sheet.RI.configure(height=0)
+        sheet.CH.configure(width=0)
+        sheet.MT.mousewheel = lambda event: None
+        ScrolledFrame.ignore_widget({sheet, sheet.RI, sheet.CH, sheet.MT})
+
+        def resizeSheet(event):
+            x0, y0, x1, y1 = self.tk.splitlist(sheet.MT.cget("scrollregion"))
+            width = min(int(x1), self.winfo_width() - sheet.RI.winfo_width())
+            height = int(y1)
+            sheet.MT.configure(width=width, height=height)
 
         sheet.enable_bindings()
         sheet.set_width_of_index_to_text()
-        sheet.pack(side="top", pady=15, fill="both", expand=True)
+        sheet.bind("<<SheetRedrawn>>", resizeSheet)
+        sheet.pack(side="top", pady=15, fill="x")
 
         saveButton = ttk.Button(
             self,
