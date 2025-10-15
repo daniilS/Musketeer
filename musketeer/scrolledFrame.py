@@ -16,6 +16,14 @@ class ScrolledFrame(ttk.Frame):
     steps = int(fps / 10)
 
     mousewheel_bindings = None
+    ignore_widgets = set()
+
+    @classmethod
+    def ignore_widget(cls, widget):
+        if isinstance(widget, set):
+            cls.ignore_widgets.update(widget)
+        else:
+            cls.ignore_widgets.add(widget)
 
     def bind_mousewheel(self):
         if self.mousewheel_bindings is not None:
@@ -43,7 +51,8 @@ class ScrolledFrame(ttk.Frame):
                 if tag not in ("all", widget.winfo_toplevel()._w)
             ]
         ):
-            return  # Widget has its own mouse wheel binding
+            if widget not in self.ignore_widgets:
+                return  # Widget has its own mouse wheel binding
         # Can't check for whether the widget is the toplevel in the loop condition, as
         # wm_manage could turn a ScrolledFrame into a toplevel window.
         while True:
@@ -56,6 +65,8 @@ class ScrolledFrame(ttk.Frame):
 
     def process_event(self, event):
         orient = "horizontal" if bool(event.state & 1) else "vertical"
+        if self.scrollbars not in (orient, "both"):
+            return
         # only scroll if the inner frame doesn't fit fully
         if (
             orient == "horizontal"
@@ -153,6 +164,8 @@ class ScrolledFrame(ttk.Frame):
                 )
         else:
             scrollbars = self._DEFAULT_SCROLLBARS
+
+        self.scrollbars = scrollbars
 
         if autohide:
             Scrollbar = AutoHideScrollbar
@@ -254,8 +267,7 @@ class ScrolledFrame(ttk.Frame):
     # Also override this alias for configure()
     config = configure
 
-    def display_widget(self, widget_class, stretch=True, **kw):
-        self._stretch = stretch
+    def display_widget(self, widget_class, stretch=True, fit=False, **kw):
         """Create and display a new widget.
 
         If stretch == True, the interior widget will be stretched as
@@ -268,6 +280,8 @@ class ScrolledFrame(ttk.Frame):
 
         # Blank the canvas
         self.erase()
+        self._stretch = stretch
+        self._fit = fit
 
         # Set the new interior widget
         self._interior = widget_class(self._canvas, **kw)
@@ -282,7 +296,7 @@ class ScrolledFrame(ttk.Frame):
         self._interior.bind("<Configure>", self._update_scroll_region)
 
         # Fit the interior widget to the canvas if requested
-        # We don't need to check fit_width here since _resize_interior()
+        # We don't need to check _fit here since _resize_interior()
         # already does.
         self._resize_interior()
 
@@ -305,8 +319,9 @@ class ScrolledFrame(ttk.Frame):
         self._interior = None
         self._interior_id = None
 
-        # Reset width fitting
-        self._fit_width = False
+        # Reset fitting
+        self._fit = False
+        self._stretch = False
 
     def scroll_to_top(self):
         """Scroll to the top-left corner of the canvas."""
@@ -317,8 +332,34 @@ class ScrolledFrame(ttk.Frame):
     # ------------------------------------------------------------------------
 
     def _resize_interior(self, event=None):
-        """Resize the canvas to fit the interior widget."""
+        """Stretch the interior widget to fit the canvas."""
+        if self._fit:
+            # Can only fit in the direction that isn't being scrolled
+            if self.scrollbars == "vertical":
+                self._canvas.itemconfigure(
+                    self._interior_id,
+                    width=self._canvas.winfo_width(),
+                )
+            elif self.scrollbars == "horizontal":
+                self._canvas.itemconfigure(
+                    self._interior_id,
+                    height=self._canvas.winfo_height(),
+                )
+            elif self.scrollbars == "both":
+                pass
+
+    def _update_scroll_region(self, event=None):
+        """Update the scroll region when the interior widget is resized."""
+
+        # The interior widget's requested width and height
+        req_width = self._interior.winfo_reqwidth()
+        req_height = self._interior.winfo_reqheight()
+
+        # Set the scroll region to fit the interior widget
+        self._canvas.configure(scrollregion=(0, 0, req_width, req_height))
+
         if self._stretch:
+            """Resize the canvas to fit the interior widget."""
             # The current width of the canvas
             canvas_width = self._canvas.winfo_width()
 
@@ -335,16 +376,6 @@ class ScrolledFrame(ttk.Frame):
             requested_height = self._interior.winfo_reqheight()
             if requested_height < canvas_height:
                 self._canvas.config(height=requested_height)
-
-    def _update_scroll_region(self, event):
-        """Update the scroll region when the interior widget is resized."""
-
-        # The interior widget's requested width and height
-        req_width = self._interior.winfo_reqwidth()
-        req_height = self._interior.winfo_reqheight()
-
-        # Set the scroll region to fit the interior widget
-        self._canvas.configure(scrollregion=(0, 0, req_width, req_height))
 
     # ------------------------------------------------------------------------
 
