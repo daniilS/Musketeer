@@ -23,6 +23,7 @@ from ttkwidgets.autohidescrollbar import AutoHideScrollbar
 
 from . import (
     __version__,
+    style,
     contributingSpecies,
     contributors,
     editData,
@@ -1971,25 +1972,43 @@ class ResultsFrame(ttk.Frame):
             columnOptions=("readonlyTitles",),
         )
 
-        kNames = titration.equilibriumConstants.variableNames
-        ks = titration.lastKVars
+        kNames = titration.equilibriumConstants.kNames
+        ks = titration.equilibriumConstants.knownKs.copy()
+        ks[titration.equilibriumConstants.knownMask] = titration.lastKVars
+        ks = ma.compressed(ks)
+        isFixedMask = ~titration.equilibriumConstants.knownMask
+        variableIndex = 0
 
-        for index, (name, value) in enumerate(zip(kNames, ks)):
-            kTable.addRow(
-                name,
-                [
-                    self.formatK(value),
-                    [
-                        "button",
-                        {
-                            "text": "RMSE plot",
-                            "command": lambda index=index: self.showRMSEPlot(
-                                index, "equilibriumConstants"
-                            ),
-                        },
-                    ],
-                ],
-            )
+        for parameterIndex, (name, value, isFixed) in enumerate(
+            zip(kNames, ks, isFixedMask)
+        ):
+            if isFixed:
+                entry = [
+                    "readonlyEntry",
+                    {
+                        "text": self.formatK(value),
+                        "font": style.boldFont,
+                        "align": "right",
+                    },
+                ]
+                button = ["button", {"text": "(Fixed value)", "state": "disabled"}]
+            else:
+                entry = [
+                    "readonlyEntry",
+                    {"text": self.formatK(value), "align": "right"},
+                ]
+                button = [
+                    "button",
+                    {
+                        "text": "RMSE plot",
+                        "command": lambda index=variableIndex: self.showRMSEPlot(
+                            index, "equilibriumConstants"
+                        ),
+                    },
+                ]
+                variableIndex += 1
+            kTable.addRow(name, [entry, button])
+
         kTable.pack(side="top", pady=15)
 
         # TODO: fix sheet becoming too small to be visible when there are a lot of
@@ -2008,24 +2027,27 @@ class ResultsFrame(ttk.Frame):
             concNames = self.titration.totalConcentrations.variableNames
             concs = titration.lastTotalConcVars
 
-            for index, (concName, conc) in enumerate(zip(concNames, concs)):
-                concsTable.addRow(
-                    concName,
-                    [
-                        totalConcentrations.convertConc(
+            for variableIndex, (concName, conc) in enumerate(zip(concNames, concs)):
+                entry = [
+                    "readonlyEntry",
+                    {
+                        "text": totalConcentrations.convertConc(
                             conc, "M", titration.totalConcentrations.concsUnit
                         ),
-                        [
-                            "button",
-                            {
-                                "text": "RMSE plot",
-                                "command": lambda index=index: self.showRMSEPlot(
-                                    index, "totalConcentrations"
-                                ),
-                            },
-                        ],
-                    ],
-                )
+                        "align": "right",
+                    },
+                ]
+                button = [
+                    "button",
+                    {
+                        "text": "RMSE plot",
+                        "command": lambda index=variableIndex: self.showRMSEPlot(
+                            index, "totalConcentrations"
+                        ),
+                    },
+                ]
+                concsTable.addRow(concName, [entry, button])
+
             concsTable.pack(side="top", pady=15)
 
         if titration.continuous:
