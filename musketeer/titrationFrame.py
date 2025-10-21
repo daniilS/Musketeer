@@ -95,13 +95,14 @@ class TitrationFrame(ttk.Frame):
         )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
-        self.reloadButton = ttk.Button(
-            self.options,
-            style="danger.TButton",
-            text="Reload",
-            command=self.reloadObjects,
-        )
-        self.reloadButton.grid(sticky="nesw", pady=padding, ipady=padding)
+        if __debug__ and sys.flags.dev_mode:
+            self.reloadButton = ttk.Button(
+                self.options,
+                style="danger.TButton",
+                text="Reload",
+                command=self.reloadObjects,
+            )
+            self.reloadButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         separator = ttk.Separator(self.options, orient="horizontal")
         separator.grid(sticky="nesw", pady=padding)
@@ -558,14 +559,15 @@ class FitNotebook(ttk.Notebook):
         with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
             self.titration.fitData(progressDialog.callback)
 
-            importlib.reload(sys.modules[self.__module__])
-            for widget in [self.master, self] + [
-                self.nametowidget(tab) for tab in self.tabs()
-            ]:
-                widget.__class__ = sys.modules[self.__module__].__dict__[
-                    widget.__class__.__name__
-                ]
-            print(f"reloaded {self.__module__}")
+            if __debug__ and sys.flags.dev_mode:
+                importlib.reload(sys.modules[self.__module__])
+                for widget in [self.master, self] + [
+                    self.nametowidget(tab) for tab in self.tabs()
+                ]:
+                    widget.__class__ = sys.modules[self.__module__].__dict__[
+                        widget.__class__.__name__
+                    ]
+                print(f"reloaded {self.__module__}")
 
             progressDialog.setLabelText("Loading results")
             self.showFit()
