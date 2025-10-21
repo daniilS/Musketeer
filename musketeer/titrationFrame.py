@@ -1,4 +1,6 @@
+import importlib
 import os
+import sys
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.ttk as ttk
@@ -92,6 +94,15 @@ class TitrationFrame(ttk.Frame):
             self.options, style="success.TButton", text="Fit", command=self.fitData
         )
         fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
+
+        if __debug__ and sys.flags.dev_mode:
+            self.reloadButton = ttk.Button(
+                self.options,
+                style="danger.TButton",
+                text="Reload",
+                command=self.reloadObjects,
+            )
+            self.reloadButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         separator = ttk.Separator(self.options, orient="horizontal")
         separator.grid(sticky="nesw", pady=padding)
@@ -360,8 +371,10 @@ class TitrationFrame(ttk.Frame):
 
     def updateDpi(self):
         for tab in self.notebook.tabs():
-            if isinstance(fitNotebook := self.nametowidget(tab), FitNotebook):
-                fitNotebook.updateDpi()
+            try:
+                self.nametowidget(tab).updateDpi()
+            except AttributeError:
+                pass
 
     @property
     def currentTab(self):
@@ -395,6 +408,26 @@ class TitrationFrame(ttk.Frame):
 
     def fitData(self):
         self.currentTab.fitData()
+
+    def reloadObjects(self):
+        importlib.reload(sys.modules[self.__module__])
+        importlib.reload(sys.modules[self.currentTab.titration.__module__])
+        for widget in [self] + [
+            self.nametowidget(tab)
+            for fitNotebook in self.notebook.tabs()
+            if isinstance(self.nametowidget(fitNotebook), ttk.Notebook)
+            for tab in self.nametowidget(fitNotebook).tabs()
+        ]:
+            widget.__class__ = sys.modules[self.__module__].__dict__[
+                widget.__class__.__name__
+            ]
+            if hasattr(widget, "titration"):
+                widget.titration.__class__ = sys.modules[
+                    self.currentTab.titration.__module__
+                ].__dict__[widget.titration.__class__.__name__]
+
+        self.reloadButton.configure(command=self.reloadObjects)
+        print(f"reloaded {self.__module__} and {self.currentTab.titration.__module__}")
 
     def saveFile(self, saveAs=False):
         options = {}
@@ -525,6 +558,17 @@ class FitNotebook(ttk.Notebook):
     def fitData(self):
         with ProgressDialog(self, "Fitting data", "Fitting data") as progressDialog:
             self.titration.fitData(progressDialog.callback)
+
+            if __debug__ and sys.flags.dev_mode:
+                importlib.reload(sys.modules[self.__module__])
+                for widget in [self.master, self] + [
+                    self.nametowidget(tab) for tab in self.tabs()
+                ]:
+                    widget.__class__ = sys.modules[self.__module__].__dict__[
+                        widget.__class__.__name__
+                    ]
+                print(f"reloaded {self.__module__}")
+
             progressDialog.setLabelText("Loading results")
             self.showFit()
 

@@ -1,3 +1,5 @@
+import importlib
+import sys
 import tkinter as tk
 import tkinter.ttk as ttk
 from abc import ABC
@@ -134,20 +136,33 @@ class ModuleFrame(ttk.Frame):
         if getattr(self.titration, self.attributeName) is None:
             self.stringVar.set("")
             return
-        self.lastValue = list(self.dropdownOptions.keys())[
-            list(self.dropdownOptions.values()).index(
-                type(getattr(self.titration, self.attributeName))
-            )
-        ]
+        if __debug__ and sys.flags.dev_mode:
+            self.lastValue = list(self.dropdownOptions.keys())[
+                [option.__name__ for option in self.dropdownOptions.values()].index(
+                    type(getattr(self.titration, self.attributeName)).__name__
+                )
+            ]
+        else:
+            self.lastValue = list(self.dropdownOptions.keys())[
+                list(self.dropdownOptions.values()).index(
+                    type(getattr(self.titration, self.attributeName))
+                )
+            ]
         self.stringVar.set(self.lastValue)
 
     def callback(self, value):
+        if __debug__ and sys.flags.dev_mode:
+            importlib.reload(sys.modules[self.__module__])
+            self.dropdownOptions = sys.modules[
+                self.__module__
+            ].ModuleFrame.dropdownOptions
+            print(f"reloaded {self.__module__}")
         SelectedStrategy = self.dropdownOptions[value]
         selectedStrategy = SelectedStrategy(self.titration)
         if selectedStrategy.Popup is not None:
             root = self.winfo_toplevel()
             popup = selectedStrategy.Popup(self.titration, master=root)
-            popup.geometry(f"+{root.winfo_x()+100}+{root.winfo_y()+100}")
+            popup.geometry(f"+{root.winfo_x() + 100}+{root.winfo_y() + 100}")
             if not popup.show():
                 # Returns False if the new options shouldn't be saved, so restore the
                 # previous value.

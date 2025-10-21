@@ -507,8 +507,11 @@ with ProgressDialog(
 
         def updateDpi(self):
             for tab in self.tabs():
-                if isinstance(titrationFrame := self.nametowidget(tab), TitrationFrame):
-                    titrationFrame.updateDpi()
+                try:
+                    self.nametowidget(tab).updateDpi()
+                except AttributeError:
+                    pass
+
             self.update()
 
     notebook = TitrationsNotebook(frame)
