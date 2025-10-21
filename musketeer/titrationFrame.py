@@ -90,10 +90,18 @@ class TitrationFrame(ttk.Frame):
             self.moduleFrames[mod.__name__] = moduleFrame
             moduleFrame.pack(fill="x", padx=padding)
 
-        fitDataButton = ttk.Button(
+        self.fitDataButton = ttk.Button(
             self.options, style="success.TButton", text="Fit", command=self.fitData
         )
-        fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
+        self.fitDataButton.grid(sticky="nesw", pady=padding, ipady=padding)
+
+        self.fitMultipleButton = ttk.Button(
+            self.options,
+            style="info.TButton",
+            text="Fit Multiple",
+            command=self.fitMultiple,
+        )
+        self.fitMultipleButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         if __debug__ and sys.flags.dev_mode:
             self.reloadButton = ttk.Button(
@@ -107,8 +115,10 @@ class TitrationFrame(ttk.Frame):
         separator = ttk.Separator(self.options, orient="horizontal")
         separator.grid(sticky="nesw", pady=padding)
 
-        copyFitButton = ttk.Button(self.options, text="Copy fit", command=self.copyFit)
-        copyFitButton.grid(sticky="nesw", pady=padding, ipady=padding)
+        self.copyFitButton = ttk.Button(
+            self.options, text="Copy fit", command=self.copyFit
+        )
+        self.copyFitButton.grid(sticky="nesw", pady=padding, ipady=padding)
 
         self.options.columnconfigure(0, weight=1)
 
@@ -399,7 +409,12 @@ class TitrationFrame(ttk.Frame):
         fitNotebook.loadTabs(callback)
 
     def copyFit(self):
-        self.newFit(deepcopy(self.currentTab.titration), setDefault=False)
+        lastTitrationFrame = self.nametowidget(self.master.tabs()[-2])
+        lastTitrationFrame.newFit(
+            deepcopy(self.currentTab.titration),
+            name=self.master.tab("current", "text")[: -self.master._padding_spaces],
+            setDefault=False,
+        )
 
     def switchFit(self, event):
         fitNotebook = self.currentTab
@@ -408,6 +423,101 @@ class TitrationFrame(ttk.Frame):
 
     def fitData(self):
         self.currentTab.fitData()
+
+    def fitMultiple(self):
+        # Fit all tabs simultaneously, linking the value of variables with identical
+        # names.
+        fitNotebooks = [
+            self.nametowidget(tab)
+            for tab in self.notebook.tabs()
+            if hasattr(self.nametowidget(tab), "titration")
+        ]
+        titrations = [fitNotebook.titration for fitNotebook in fitNotebooks]
+        kVarNames = np.unique(
+            np.concatenate(
+                [
+                    titration.equilibriumConstants.variableNames
+                    for titration in titrations
+                ]
+            )
+        )
+        kVarsMaps = [
+            [
+                np.where(kVarNames == varName)[0][0]
+                for varName in titration.equilibriumConstants.variableNames
+            ]
+            for titration in titrations
+        ]
+
+        concVarNames = np.unique(
+            np.concatenate(
+                [
+                    titration.totalConcentrations.variableNames
+                    for titration in titrations
+                ]
+            )
+        )
+        concVarsMaps = [
+            [
+                np.where(concVarNames == varName)[0][0]
+                for varName in titration.totalConcentrations.variableNames
+            ]
+            for titration in titrations
+        ]
+
+        def objective(logKsAndTotalConcs):
+            logKs = logKsAndTotalConcs[: len(kVarNames)]
+            logConcs = logKsAndTotalConcs[len(kVarNames) :]
+
+            residuals = []
+            for titration, kVarsMap, concVarsMap in zip(
+                titrations, kVarsMaps, concVarsMaps
+            ):
+                residuals.append(
+                    titration.optimisationFuncLog(
+                        np.concatenate([logKs[kVarsMap], logConcs[concVarsMap]])
+                    )
+                )
+
+            return np.sqrt(np.sum(residuals))
+
+        from scipy.optimize import minimize
+
+        initialGuessKs = np.full(len(kVarNames), np.nan)
+        initialGuessConcs = np.full(len(concVarNames), np.nan)
+        for titration, kVarsMap, concVarsMap in zip(
+            titrations, kVarsMaps, concVarsMaps
+        ):
+            initialGuessKs[kVarsMap] = (
+                titration.equilibriumConstants.variableInitialGuesses
+            )
+            initialGuessConcs[concVarsMap] = (
+                titration.totalConcentrations.variableInitialGuesses
+            )
+
+        with ProgressDialog(
+            self, "Fitting data", "Fitting all tabs simultaneously"
+        ) as progressDialog:
+            result = minimize(
+                objective,
+                x0=np.log10(np.concatenate([initialGuessKs, initialGuessConcs])),
+                method="nelder-mead",
+                callback=progressDialog.callback,
+            )
+
+            objective(result.x)
+            logKs = result.x[: len(kVarNames)]
+            logConcs = result.x[len(kVarNames) :]
+
+            progressDialog.setLabelText("Loading results")
+
+            for fitNotebook, titration, kVarsMap, concVarsMap in zip(
+                fitNotebooks, titrations, kVarsMaps, concVarsMaps
+            ):
+                titration.fitResult = 10 ** np.concatenate(
+                    [logKs[kVarsMap], logConcs[concVarsMap]]
+                )
+                fitNotebook.showFit()
 
     def reloadObjects(self):
         importlib.reload(sys.modules[self.__module__])
@@ -426,7 +536,10 @@ class TitrationFrame(ttk.Frame):
                     self.currentTab.titration.__module__
                 ].__dict__[widget.titration.__class__.__name__]
 
+        self.fitDataButton.configure(command=self.fitData)
+        self.fitMultipleButton.configure(command=self.fitMultiple)
         self.reloadButton.configure(command=self.reloadObjects)
+        self.copyFitButton.configure(command=self.copyFit)
         print(f"reloaded {self.__module__} and {self.currentTab.titration.__module__}")
 
     def saveFile(self, saveAs=False):
