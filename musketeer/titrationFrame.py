@@ -1,4 +1,5 @@
 import importlib
+import itertools
 import os
 import sys
 import tkinter as tk
@@ -1953,6 +1954,9 @@ class ResultsFrame(ttk.Frame):
         popup.show()
 
     def showResults(self):
+        self.grid_columnconfigure(1, weight=1)
+        rowCounter = itertools.count(0)
+
         titration = self.titration
         bicLabel = ttk.Label(
             self,
@@ -1960,11 +1964,14 @@ class ResultsFrame(ttk.Frame):
         )
         # bicLabel.pack(side="top", pady=15)
 
-        rmselabel = ttk.Label(
-            self,
-            text=f"RMSE: {titration.RMSE:.8g}",
+        rmselabel = ttk.Entry(self, style="TLabel")
+        rmselabel.insert(0, f"RMSE: {titration.RMSE:.8g}")
+        rmselabel.grid(
+            row=next(rowCounter), column=0, sticky="n", padx=padding, pady=15
         )
-        rmselabel.pack(side="top", pady=15)
+
+        kTableLabel = ttk.Label(self, text="")
+        kTableLabel.grid(row=next(rowCounter), column=0, sticky="n", padx=padding)
 
         kTable = Table(
             self,
@@ -1972,7 +1979,7 @@ class ResultsFrame(ttk.Frame):
             0,
             ["K (M⁻ⁿ)", ""],
             rowOptions=("readonlyTitles",),
-            columnOptions=("readonlyTitles",),
+            columnOptions=(),
         )
 
         kNames = titration.equilibriumConstants.kNames
@@ -2012,16 +2019,66 @@ class ResultsFrame(ttk.Frame):
                 variableIndex += 1
             kTable.addRow(name, [entry, button])
 
-        kTable.pack(side="top", pady=15)
+        kTable.grid(row=next(rowCounter), column=0, sticky="nw", padx=padding, pady=15)
+
+        if hasattr(titration.equilibriumConstants, "ksMatrix"):
+            kTableLabel.configure(text="Fitted microscopic Ks (M⁻ⁿ):")
+
+            ksSummaryLabel = ttk.Label(
+                self, text="Relationship between global and microscopic Ks:"
+            )
+            ksSummaryLabel.grid(
+                row=kTableLabel.grid_info()["row"], column=1, sticky="nw", padx=padding
+            )
+
+            ksSummary = equilibriumConstants.summariseKsRelationships(
+                titration.equilibriumConstants.outputNames,
+                titration.equilibriumConstants.kNames,
+                titration.equilibriumConstants.statisticalFactors,
+                titration.equilibriumConstants.ksMatrix,
+            )
+
+            self.summaryFont = tk.font.nametofont("TkTextFont").copy()
+            self.summaryFont["size"] = int(1.3 * self.summaryFont["size"])
+
+            ksSummaryText = tk.Text(
+                self,
+                takefocus=False,
+                height=len(ksSummary.splitlines()),
+                width=max(len(line) for line in ksSummary.splitlines()) + 1,
+                font=self.summaryFont,
+                wrap="word",
+            )
+            ksSummaryText.insert("end", ksSummary)
+            ksSummaryText.configure(state="disabled")
+            ksSummaryText.grid(
+                row=kTable.grid_info()["row"],
+                column=1,
+                sticky="nw",
+                padx=padding,
+                pady=15,
+            )
+        else:
+            kTableLabel.configure(text="Fitted Ks (M⁻ⁿ):")
+
+        separator1 = ttk.Separator(self, orient="horizontal")
+        separator1.grid(
+            row=next(rowCounter), column=0, columnspan=2, sticky="ew", pady=15
+        )
 
         if titration.totalConcentrations.variableCount > 0:
+            concsLabel = ttk.Label(
+                self,
+                text=f"Fitted total concentrations ({titration.totalConcentrations.concsUnit}):",
+            )
+            concsLabel.grid(row=next(rowCounter), column=0, sticky="nw", padx=padding)
             concsTable = Table(
                 self,
                 0,
                 0,
-                [f"c ({titration.totalConcentrations.concsUnit})", ""],
+                [],
                 rowOptions=["readonlyTitles"],
-                columnOptions=["readonlyTitles"],
+                columnOptions=[],
             )
 
             concNames = self.titration.totalConcentrations.variableNames
@@ -2048,7 +2105,12 @@ class ResultsFrame(ttk.Frame):
                 ]
                 concsTable.addRow(concName, [entry, button])
 
-            concsTable.pack(side="top", pady=15)
+            concsTable.grid(row=next(rowCounter), column=0, sticky="nw", pady=15)
+
+            separator2 = ttk.Separator(self, orient="horizontal")
+            separator2.grid(
+                row=next(rowCounter), column=0, columnspan=2, sticky="ew", pady=15
+            )
 
         if titration.continuous:
             sheetLabel = ttk.Label(
@@ -2060,7 +2122,7 @@ class ResultsFrame(ttk.Frame):
                 self,
                 text=f"Fitted spectra ({titration.yQuantity} / {titration.yUnit}) for each species and signal:",
             )
-        sheetLabel.pack(fill="x", padx=padding)
+        sheetLabel.grid(row=next(rowCounter), column=0, sticky="nw", padx=padding)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -2089,7 +2151,14 @@ class ResultsFrame(ttk.Frame):
         sheet.enable_bindings()
         sheet.set_width_of_index_to_text()
         sheet.bind("<<SheetRedrawn>>", resizeSheet)
-        sheet.pack(side="top", pady=15, fill="x")
+        sheet.grid(
+            row=next(rowCounter),
+            column=0,
+            columnspan=2,
+            sticky="nesw",
+            padx=padding,
+            pady=15,
+        )
 
         saveButton = ttk.Button(
             self,
@@ -2097,7 +2166,9 @@ class ResultsFrame(ttk.Frame):
             command=self.saveCSV,
             style="success.TButton",
         )
-        saveButton.pack(side="top", pady=15)
+        saveButton.grid(
+            row=next(rowCounter), column=0, sticky="nw", padx=padding, pady=15
+        )
 
     def saveCSV(self):
         initialfile = os.path.splitext(self.titration.title)[0] + "_fit"
