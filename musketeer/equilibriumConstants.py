@@ -11,6 +11,29 @@ from .table import ButtonFrame, Table, WrappedLabel
 DEFAULT_INITIAL_GUESS = 1000
 
 
+def summariseKsRelationships(globalKNames, microKNames, statisticalFactors, ksMatrix):
+    labels = []
+    trans = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+    for globalK, statisticalFactor, variableFactors in zip(
+        globalKNames,
+        statisticalFactors,
+        ksMatrix.T,
+    ):
+        textFactors = []
+        if (statisticalFactor != 1) or all(variableFactors == 0):
+            textFactors.append(str(statisticalFactor))
+        for variable, factor in zip(microKNames, variableFactors):
+            if factor == 0 or factor == "":
+                continue
+            elif factor == 1:
+                textFactors.append(variable)
+            else:
+                textFactors.append(variable + str(factor).translate(trans))
+        labels.append(f"Global K for {globalK} = " + " × ".join(textFactors))
+
+    return "\n".join(labels)
+
+
 class EquilibriumConstants(moduleFrame.Strategy):
     requiredAttributes = (
         "kNames",
@@ -164,34 +187,16 @@ class CustomKsTable(Table):
         self.cells[-1, -1].get = lambda: self.blankValue
 
     def createLabels(self, *args, **kwargs):
+        if not hasattr(self, "equationsLabel"):
+            return
         try:
-            labels = []
-            trans = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
-            variables = self.rowTitles[1:]
-            for globalK, statFactor, variableFactors in zip(
+            text = summariseKsRelationships(
                 self.columnTitles[:-1],
+                self.rowTitles[1:],
                 self.data[0, :-1],
-                self.data[1:, :-1].T.astype(int),
-            ):
-                if (int(statFactor) != 1) or all(variableFactors == 0):
-                    label = f"Global K for {globalK} = {statFactor}"
-                    needsCross = True
-                else:
-                    label = f"Global K for {globalK} ="
-                    needsCross = False
-                for variable, factor in zip(variables, variableFactors):
-                    if factor == 0 or factor == "":
-                        continue
-                    if needsCross:
-                        label += " ×"
-                    else:
-                        needsCross = True
-                    label += f" {variable}"
-                    if factor == 1:
-                        continue
-                    label += str(factor).translate(trans)
-                labels.append(label)
-            self.equationsLabel.configure(text="\n".join(labels))
+                self.data[1:, :-1].astype(int),
+            )
+            self.equationsLabel.configure(text=text)
         except Exception:
             pass
         return True
