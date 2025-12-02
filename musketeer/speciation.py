@@ -197,11 +197,21 @@ class ComplexSpeciationMixin:
         return M.T @ (M * np.outer(complexKs * np.prod(free**M, 1), 1 / free))
 
     def complexGetUpperBounds(self, complexKs, total, M):
-        if len(total) == 3:
-            return np.array([total[0], total[1] + total[0] * 3, total[2]])
-        elif len(total) == 4:
-            return np.array([total[0], total[1], total[2] + total[1] * 3, total[3]])
-        return total
+        return np.array(
+            [
+                total[i]
+                + np.max(
+                    np.nanmin(
+                        -M[M[:, i] < 0, :][:, [i]]
+                        * np.delete(total, i)
+                        / np.delete(M[M[:, i] < 0, :], i, axis=1),
+                        axis=1,
+                    ),
+                    initial=0,
+                )
+                for i in range(M.shape[1])
+            ]
+        )
 
 
 class PolymerSpeciationMixin:
