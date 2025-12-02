@@ -558,7 +558,10 @@ class SpeciationTable(Table):
         ):
             cell.set(title)
 
-        self.rowTitles = stoichiometriesToBoundNames(self.columnTitles, self.data)
+        try:
+            self.rowTitles = stoichiometriesToBoundNames(self.columnTitles, self.data)
+        except Exception:
+            pass
 
     def addFreeRow(self, index=-1):
         row = self.cells.shape[0]
