@@ -877,57 +877,45 @@ class SpeciationSolver(Speciation):
     #
     # So gtol in the minimisation algorithm can be set to the desired precision in
     # the total concentrations.
-    def objective(
-        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
-    ):
-        free = 10 ** (logFreeTimesTotal / total)
+    def objective(self, logFree, complexKs, k2s, kns, kabs, total, complexM, polymerM):
+        free = 10**logFree
         return (
             np.sum(free)
-            - np.sum(logFreeTimesTotal) * LN_10
+            - np.nansum(logFree * total) * LN_10
             + self.complexObjective(free, complexKs, total, complexM)
             + self.polymerObjective(free, k2s, kns, kabs, total, polymerM)
         )
 
-    def jacobian(
-        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
-    ):
-        free = 10 ** (logFreeTimesTotal / total)
+    def jacobian(self, logFree, complexKs, k2s, kns, kabs, total, complexM, polymerM):
+        free = 10**logFree
         return (
-            (
-                free
-                + self.complexJacobian(free, complexKs, total, complexM)
-                + self.polymerJacobian(free, k2s, kns, kabs, total, polymerM)
-                - total
-            )
-            * LN_10
-            / total
-        )
+            free
+            + self.complexJacobian(free, complexKs, total, complexM)
+            + self.polymerJacobian(free, k2s, kns, kabs, total, polymerM)
+            - total
+        ) * LN_10
 
     def objectiveScaled(
-        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
+        self, logFree, complexKs, k2s, kns, kabs, total, complexM, polymerM
     ):
-        free = 10 ** (logFreeTimesTotal / self.scaling_factor / total)
+        free = 10 ** (logFree / self.scaling_factor)
         return (
             np.sum(free)
-            - np.sum(logFreeTimesTotal / self.scaling_factor) * LN_10
+            - np.nansum(logFree * total) * LN_10 / self.scaling_factor
             + self.complexObjective(free, complexKs, total, complexM)
             + self.polymerObjective(free, k2s, kns, kabs, total, polymerM)
         ) * self.scaling_factor
 
     def jacobianScaled(
-        self, logFreeTimesTotal, complexKs, k2s, kns, kabs, total, complexM, polymerM
+        self, logFree, complexKs, k2s, kns, kabs, total, complexM, polymerM
     ):
-        free = 10 ** (logFreeTimesTotal / self.scaling_factor / total)
+        free = 10 ** (logFree / self.scaling_factor)
         return (
-            (
-                free
-                + self.complexJacobian(free, complexKs, total, complexM)
-                + self.polymerJacobian(free, k2s, kns, kabs, total, polymerM)
-                - total
-            )
-            * LN_10
-            / total
-        )
+            free
+            + self.complexJacobian(free, complexKs, total, complexM)
+            + self.polymerJacobian(free, k2s, kns, kabs, total, polymerM)
+            - total
+        ) * LN_10
 
     def smoothObjective(self, logFreeTimesTotal, *args, **kwargs):
         upperBounds = self.getDomainUpperBounds(*args, **kwargs)
@@ -960,19 +948,20 @@ class SpeciationSolver(Speciation):
     # Could be refined iteratively, by computing the LB using this method, then taking
     # UB = self.freeToBoundConcs(free=LB), calculating a new LB using that UB, etc.
     def getUpperBounds(self, complexKs, k2s, kns, kabs, total, complexM, polymerM):
-        return total * np.log10(
+        return np.log10(
             np.minimum(
                 self.complexGetUpperBounds(complexKs, total, complexM),
                 self.polymerGetUpperBounds(k2s, kns, kabs, total, polymerM),
             )
         )
 
+    # TODO: derive expression for negative stoichiometries
     def getLowerBounds(self, complexKs, k2s, kns, kabs, total, complexM, polymerM):
         maxFree = np.minimum(
             self.complexGetUpperBounds(complexKs, total, complexM),
             self.polymerGetUpperBounds(k2s, kns, kabs, total, polymerM),
         )
-        return total * np.log10(
+        return np.log10(
             (total * maxFree)
             / (
                 maxFree
@@ -992,8 +981,13 @@ class SpeciationSolver(Speciation):
             additionTotalConcs = totalConcs[i]
 
             # Filter the to exclude species and complexes that will have a concentration
-            # of 0
-            zeroFree = additionTotalConcs == 0
+            # of
+            zeroFree = (
+                self.complexGetUpperBounds(
+                    complexKs, additionTotalConcs, self.complexStoichiometries
+                )
+                == 0
+            )
             zeroBound = np.any(self.stoichiometries[:, zeroFree], axis=1)
             if all(zeroBound):
                 free[i] = additionTotalConcs
@@ -1042,7 +1036,7 @@ class SpeciationSolver(Speciation):
             # )
             self.scaling_factor = 1_000_000
 
-            if i == 0:
+            if i == 0 or True:
                 # Initial guess: all species 100% free, only polymers are formed
                 x0 = ub
             else:
@@ -1058,7 +1052,7 @@ class SpeciationSolver(Speciation):
                 initialGuess[~concsIncreased] *= (
                     totalConcs[i][~concsIncreased] / totalConcs[i - 1][~concsIncreased]
                 )
-                x0 = filteredTotal * np.log10(initialGuess[~zeroFree])
+                x0 = np.log10(initialGuess[~zeroFree])
                 x0 = np.clip(x0, lb, ub)
 
             result = minimize(
@@ -1102,7 +1096,7 @@ class SpeciationSolver(Speciation):
                         RuntimeWarning,
                     )
 
-            logFree = result.x / self.scaling_factor / filteredTotal
+            logFree = result.x / self.scaling_factor
 
             free[i, ~zeroFree] = 10**logFree
             free[i, zeroFree] = 0
