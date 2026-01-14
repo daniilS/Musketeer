@@ -248,7 +248,10 @@ with ProgressDialog(
     labelText="Loading modules",
     abortCallback=sys.exit,
 ) as progressDialog:
-    from pathlib import PurePath
+    import os
+
+    progressDialog.callback()
+    from pathlib import Path, PurePath
 
     progressDialog.callback()
 
@@ -258,6 +261,22 @@ with ProgressDialog(
     from ttkbootstrap.widgets import InteractiveNotebook
 
     progressDialog.callback()
+    # Override the matplotlib confic and cache dir. Pyinstaller will set it to a
+    # temporary folder by default, which means matplotlib has to rebuild the font cache
+    # every time. We also don't want to use the user's default matplotlib config, in
+    # case it contains incompatible settings.
+    try:
+        if sys.platform.startswith(("linux", "freebsd")):
+            cachedir = (
+                Path(os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache"))
+                / "musketeer"
+                / ".matplotlib"
+            )
+        else:
+            cachedir = Path.home() / ".musketeer" / ".matplotlib"
+        os.environ["MPLCONFIGDIR"] = str(cachedir)
+    except RuntimeError:  # raised if Path.home() is not available
+        pass
 
     from . import patchMatplotlib
 
