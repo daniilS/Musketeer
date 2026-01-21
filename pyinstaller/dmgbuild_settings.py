@@ -1,6 +1,8 @@
+import platform
+
 import musketeer
 
-filename = f"dist/Musketeer-{musketeer.__version__}-macOS.dmg"
+filename = f"dist/Musketeer-{musketeer.__version__}-macOS-{platform.machine()}.dmg"
 volume_name = "Musketeer"
 format = "UDZO"
 filesystem = "HFS+"
