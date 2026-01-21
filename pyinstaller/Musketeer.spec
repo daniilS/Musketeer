@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_all
 
 import musketeer
 
-datas = []
+datas = [("Assets.car", ".")] if sys.platform == "darwin" else []
 binaries = []
 hiddenimports = ["musketeer"]
 tmp_ret = collect_all("musketeer")
@@ -46,7 +46,7 @@ exe = EXE(
     target_arch=platform.machine(),
     codesign_identity=None,
     entitlements_file=None,
-    icon=["logo 48px.ico" if sys.platform == "win32" else "logo 512px.icns"],
+    icon=["logo 48px.ico" if sys.platform == "win32" else "Musketeer.icns"],
     version="version_info.txt" if sys.platform == "win32" else None,
 )
 coll = COLLECT(
@@ -61,7 +61,8 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="Musketeer.app",
-    icon="logo 512px.icns",
+    icon="Musketeer.icns",
     bundle_identifier="daniilS.musketeer",
     version=musketeer.__version__,
+    info_plist={"CFBundleIconName": "Musketeer"},
 )
