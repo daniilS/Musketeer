@@ -4,7 +4,7 @@ python3 -m venv --clear --upgrade-deps venv
 source venv/bin/activate
 
 pip install --upgrade pip
-pip install --upgrade --upgrade-strategy=eager pyinstaller dmgbuild ..
+pip install --upgrade --upgrade-strategy=eager pyinstaller dmgbuild[badge_icons] ..
 pyinstaller --noconfirm Musketeer.spec
 dmgbuild -s dmgbuild_settings.py Musketeer dist/Musketeer-0.0.0-macOS.dmg
 

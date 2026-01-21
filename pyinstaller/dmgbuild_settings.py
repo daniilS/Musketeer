@@ -1,14 +1,17 @@
+import platform
+
 import musketeer
 
-filename = f"dist/Musketeer-{musketeer.__version__}-macOS.dmg"
+filename = f"dist/Musketeer-{musketeer.__version__}-macOS-{platform.machine()}.dmg"
 volume_name = "Musketeer"
 format = "UDZO"
 filesystem = "HFS+"
 size = None
 files = ["dist/Musketeer.app"]
 symlinks = {"Applications": "/Applications"}
-badge_icon = "logo 512px.icns"
-background = None
+badge_icon = "Musketeer.icns"
+icon_locations = {"Musketeer.app": (100, 100), "Applications": (500, 100)}
+background = "builtin-arrow"
 show_status_bar = False
 show_tab_view = False
 show_pathbar = False

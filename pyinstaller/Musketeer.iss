@@ -38,7 +38,7 @@ LicenseFile="..\LICENSE"
 PrivilegesRequiredOverridesAllowed=dialog
 OutputBaseFilename=Musketeer-{#MyAppVersion}-win64-installer
 OutputDir=installer_dist
-SetupIconFile="logo 48px.ico"
+SetupIconFile="Musketeer.ico"
 SolidCompression=yes
 WizardStyle=modern
 

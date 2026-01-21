@@ -214,28 +214,35 @@ root.title(f"Musketeer {__version__}")
 # on MacOS, only the first icon is used, and it is recommended to provide as large an
 # icon as possible
 
+usingPyinstaller = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
 try:
-    iconData16 = (res.files(__package__) / "logo 16px.png").read_bytes()
-    iconData48 = (res.files(__package__) / "logo 48px.png").read_bytes()
-    iconData512 = (res.files(__package__) / "logo 512px.png").read_bytes()
+    if root._windowingsystem == "aqua":
+        if usingPyinstaller:
+            # On MacOS, the icon included in the .app bundle is used automatically
+            pass
+        else:
+            iconData = (res.files(__package__) / "logo macos 1024px.png").read_bytes()
+            icon = tk.PhotoImage(data=iconData)
+            root.iconphoto(True, icon)
+    else:
+        iconData16 = (res.files(__package__) / "logo 16px.png").read_bytes()
+        iconData48 = (res.files(__package__) / "logo 48px.png").read_bytes()
 
-    icon16 = tk.PhotoImage(data=iconData16)
-    icon48 = tk.PhotoImage(data=iconData48)
-    icon512 = tk.PhotoImage(data=iconData512)
+        icon16 = tk.PhotoImage(data=iconData16)
+        icon48 = tk.PhotoImage(data=iconData48)
 
-    if root._windowingsystem == "win32":
         # Call before update to make sure the icon appears straight away (otherwise the
         # default Tk icon may appear for a few seconds first). Call after update is
-        # necessary to make the title bar icon not blurry.
+        # necessary to make the title bar icon not blurry on Windows.
         root.iconphoto(True, icon48, icon16)
         root.update()
         root.iconphoto(True, icon48, icon16)
-    else:
-        root.iconphoto(True, icon512, icon48)
 except Exception:
     # Should currently never happen, but if anything changes about the API in
     # the future, we can survive without an icon.
     pass
+
 frame = ttk.Frame(root, padding=padding)
 frame.pack(expand=True, fill="both")
 
