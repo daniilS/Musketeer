@@ -46,7 +46,7 @@ exe = EXE(
     target_arch=platform.machine(),
     codesign_identity=None,
     entitlements_file=None,
-    icon=["logo 48px.ico" if sys.platform == "win32" else "Musketeer.icns"],
+    icon=["Musketeer.ico" if sys.platform == "win32" else "Musketeer.icns"],
     version="version_info.txt" if sys.platform == "win32" else None,
 )
 coll = COLLECT(
