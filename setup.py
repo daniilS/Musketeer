@@ -18,7 +18,7 @@ def get_version():
     with Path("./musketeer/__init__.py").open() as file:
         for line in file:
             if line.startswith("__version__"):
-                return line.split('"')[1]
+                return line.split('"')[1] + "+negative.stoichiometries"
         else:
             warnings.warn(
                 "Could not find version string in __init__.py", RuntimeWarning
