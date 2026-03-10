@@ -20,8 +20,8 @@ LN_10 = np.log(10)
 
 def hashGetMaximumArguments(total, M):
     hash = hashlib.new("sha1", usedforsecurity=False)
-    hash.update(total)
-    hash.update(M)
+    hash.update(total.tobytes())
+    hash.update(M.tobytes())
     return hash.hexdigest()
 
 
