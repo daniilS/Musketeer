@@ -920,6 +920,9 @@ class ContinuousFittedFrame(PlotFrame):
                 wavelengths,
                 titration.processedData[deconvolutionPoint],
                 color="0.5",
+                # Our custom cycler also cycles linestyles, so need to specify the style
+                # explicitly to avoid advancing the cycler.
+                linestyle="-",
                 label="Observed",
             )
             self.ax.plot(
