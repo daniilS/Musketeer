@@ -22,7 +22,18 @@ a = Analysis(
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},
+    hooksconfig={
+        "matplotlib": {
+            "backends": [
+                "TkAgg",
+                "agg",
+                "pdf",
+                "pgf",
+                "ps",
+                "svg",
+            ]
+        },
+    },
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
