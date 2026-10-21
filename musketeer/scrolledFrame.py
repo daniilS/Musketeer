@@ -22,7 +22,7 @@ class ScrolledFrame(ttk.Frame):
             return False
         else:
             events = (
-                ("<MouseWheel",)
+                ("<MouseWheel>", "<TouchpadScroll>")
                 if self.use_TIP474
                 else ("<MouseWheel>", "<Button-4>", "<Button-5>")
             )
@@ -35,7 +35,10 @@ class ScrolledFrame(ttk.Frame):
         if type(widget) is str:
             return
 
-        event_name = f"<{event.type._name_}>"
+        if event.type == "39":
+            event_name = "<TouchpadScroll>"
+        else:
+            event_name = f"<{event.type._name_}>"
         if any(
             [
                 event_name in widget._bind(("bind", tag), None, None, None)
@@ -55,6 +58,20 @@ class ScrolledFrame(ttk.Frame):
         widget.process_event(event)
 
     def process_event(self, event):
+        if event.type == "39" or event.type._name_ == "TouchpadScroll":
+            x_delta, y_delta = self.tk.call("tk::PreciseScrollDeltas", event.delta)
+            if (
+                x_delta != 0
+                and self._canvas.winfo_reqwidth() >= self._canvas.winfo_width()
+            ):
+                self._canvas.xview_scroll(-1 * x_delta, "units")
+            if (
+                y_delta != 0
+                and self._canvas.winfo_reqheight() >= self._canvas.winfo_height()
+            ):
+                self._canvas.yview_scroll(-1 * y_delta, "units")
+            return
+
         orient = "horizontal" if bool(event.state & 1) else "vertical"
         # only scroll if the inner frame doesn't fit fully
         if (
