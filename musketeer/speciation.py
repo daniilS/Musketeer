@@ -1020,7 +1020,7 @@ class SpeciationSolver(Speciation):
             self.scaling_factor = 1000 / np.min(
                 np.abs(filteredTotal * np.log10(filteredTotal))
             )
-            self.scaling_factor = 1
+            self.scaling_factor = 1000
 
             if i == 0:
                 # Initial guess: all species 100% free, only polymers are formed
@@ -1058,12 +1058,13 @@ class SpeciationSolver(Speciation):
                 # also in other cases.
                 result.jac = self.jacobianScaled(result.x, *args)
             if max(abs(result.jac)) > 1e-6 * LN_10:
-                self.scaling_factor *= 10_000
+                scaling_step = 10_000
+                self.scaling_factor *= scaling_step
                 improvedResult = minimize(
                     self.objectiveScaled,
                     jac=self.jacobianScaled,
                     args=args,
-                    x0=result.x,
+                    x0=result.x * scaling_step,
                     bounds=np.vstack([lb, ub]).T * self.scaling_factor,
                     method="L-BFGS-B",
                     options={
